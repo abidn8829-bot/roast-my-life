@@ -125,18 +125,31 @@ export async function POST(request: Request) {
   const week_start_date = getWeekStartDate();
   const share_slug = generateShareSlug();
 
-  const { data, error } = await supabase
+  const baseRow = {
+    user_id: user.id,
+    roast_text: roastText,
+    report_card,
+    week_start_date,
+    model_used: MODEL,
+    share_slug,
+  };
+
+  let { data, error } = await supabase
     .from("roasts")
-    .insert({
-      user_id: user.id,
-      roast_text: roastText,
-      report_card,
-      week_start_date,
-      model_used: MODEL,
-      share_slug,
-    })
+    .insert({ ...baseRow, answers })
     .select("id")
     .single();
+
+  if (
+    error &&
+    (error.code === "42703" || error.message?.includes("answers"))
+  ) {
+    ({ data, error } = await supabase
+      .from("roasts")
+      .insert(baseRow)
+      .select("id")
+      .single());
+  }
 
   if (error) {
     console.error("Supabase insert error:", error);
@@ -146,5 +159,16 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ id: data.id, shareSlug: share_slug });
+  const roastId = data?.id ? String(data.id) : "";
+  if (!roastId) {
+    console.error("[api/roast] insert ok but missing id in response:", data);
+    return NextResponse.json(
+      { error: "Failed to save roast" },
+      { status: 500 },
+    );
+  }
+
+  console.log("[api/roast] saved roast id:", roastId);
+
+  return NextResponse.json({ id: roastId, shareSlug: share_slug });
 }

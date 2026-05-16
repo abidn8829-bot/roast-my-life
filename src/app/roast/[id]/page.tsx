@@ -1,8 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { RoastView } from "@/components/roast-view";
+import { fetchOwnRoastById } from "@/lib/fetch-own-roast";
 import { isUuid } from "@/lib/is-uuid";
 import { parseReportCard } from "@/lib/parse-report-card";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+export const dynamic = "force-dynamic";
 
 export default async function RoastDetailPage({
   params,
@@ -10,40 +13,35 @@ export default async function RoastDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id: param } = await params;
+  const roastId = decodeURIComponent(param).trim();
+
+  if (!roastId) {
+    notFound();
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (isUuid(param)) {
+  if (isUuid(roastId)) {
     if (!user) {
-      redirect(`/login?next=/roast/${param}`);
+      redirect(`/login?next=/roast/${roastId}`);
     }
 
-    const { data, error } = await supabase
-      .from("roasts")
-      .select("id, roast_text, report_card, share_slug, reaction, user_id")
-      .eq("id", param)
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (error || !data) {
-      notFound();
-    }
-
-    const reportCard = parseReportCard(data.report_card);
-    if (!reportCard) {
+    const roast = await fetchOwnRoastById(supabase, roastId, user.id);
+    if (!roast) {
       notFound();
     }
 
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-[#0A0A0A] px-4 py-12 text-[#FAFAFA]">
         <RoastView
-          roastId={data.id}
-          roastText={data.roast_text}
-          reportCard={reportCard}
-          shareSlug={data.share_slug}
-          initialReaction={data.reaction}
+          roastId={roast.id}
+          roastText={roast.roast_text}
+          reportCard={roast.report_card}
+          shareSlug={roast.share_slug}
+          initialReaction={roast.reaction}
           canReact
         />
       </main>
@@ -51,10 +49,11 @@ export default async function RoastDetailPage({
   }
 
   const { data, error } = await supabase.rpc("get_roast_by_share_slug", {
-    p_slug: param,
+    p_slug: roastId,
   });
 
   if (error || !data?.length) {
+    console.error("[roast page] share slug lookup failed:", error?.message);
     notFound();
   }
 
@@ -73,12 +72,7 @@ export default async function RoastDetailPage({
   let initialReaction: string | null = null;
   let canReact = false;
   if (user) {
-    const { data: owned } = await supabase
-      .from("roasts")
-      .select("reaction")
-      .eq("id", row.id)
-      .eq("user_id", user.id)
-      .maybeSingle();
+    const owned = await fetchOwnRoastById(supabase, row.id, user.id);
     if (owned) {
       canReact = true;
       initialReaction = owned.reaction;

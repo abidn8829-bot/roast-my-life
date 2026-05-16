@@ -118,13 +118,19 @@ export function OnboardingWizard() {
       body: JSON.stringify(buildAnswers()),
     });
     const data = (await res.json()) as { id?: string; error?: string };
-    if (!res.ok || !data.id) {
+    const roastId =
+      typeof data.id === "string" ? data.id.trim() : String(data.id ?? "");
+
+    if (!res.ok || !roastId) {
       console.error("[onboarding] roast API failed:", res.status, data);
       setError(data.error ?? "Something went wrong. Try again.");
       setStep(4);
       return;
     }
-    router.push(`/roast/${data.id}`);
+
+    console.log("[onboarding] redirecting to roast:", roastId);
+    router.push(`/roast/${encodeURIComponent(roastId)}`);
+    router.refresh();
   }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, router]);
 
   useEffect(() => {

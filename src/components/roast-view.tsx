@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ShareButtons } from "@/components/share-buttons";
 import { gradeColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
-import { roastShareUrl } from "@/lib/site";
 import type { ReportCard } from "@/lib/roast-types";
 
 const GRADE_LABELS: { key: keyof ReportCard; label: string }[] = [
@@ -23,12 +23,6 @@ type Props = {
   canReact?: boolean;
 };
 
-function isMobileShare(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent;
-  return /Android|iPhone|iPad|iPod/i.test(ua);
-}
-
 export function RoastView({
   roastId,
   roastText,
@@ -39,8 +33,6 @@ export function RoastView({
 }: Props) {
   const [displayed, setDisplayed] = useState("");
   const [doneTyping, setDoneTyping] = useState(false);
-  const [shareStatus, setShareStatus] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
   const [reaction, setReaction] = useState<string | null>(initialReaction);
   const [savingReaction, setSavingReaction] = useState(false);
   const indexRef = useRef(0);
@@ -53,8 +45,7 @@ export function RoastView({
 
     const tick = () => {
       indexRef.current += 1;
-      const next = roastText.slice(0, indexRef.current);
-      setDisplayed(next);
+      setDisplayed(roastText.slice(0, indexRef.current));
       if (indexRef.current < roastText.length) {
         timeoutId = window.setTimeout(tick, 18);
       } else {
@@ -68,69 +59,6 @@ export function RoastView({
       if (timeoutId) window.clearTimeout(timeoutId);
     };
   }, [roastText]);
-
-  const fetchReportCardPng = useCallback(async () => {
-    const res = await fetch(`/api/og/${roastId}`);
-    if (!res.ok) throw new Error("Failed to generate report card");
-    return res.blob();
-  }, [roastId]);
-
-  async function onShare() {
-    setSharing(true);
-    setShareStatus(null);
-    const shareUrl = roastShareUrl(shareSlug);
-
-    try {
-      const blob = await fetchReportCardPng();
-      const file = new File([blob], "roast-report-card.png", {
-        type: "image/png",
-      });
-
-      const mobile = isMobileShare();
-
-      if (
-        mobile &&
-        typeof navigator.share === "function" &&
-        (!navigator.canShare || navigator.canShare({ files: [file] }))
-      ) {
-        await navigator.share({
-          title: "Roast My Life — Weekly Report Card",
-          text: "They roasted my life choices.",
-          files: [file],
-          url: shareUrl,
-        });
-        setShareStatus("Shared!");
-      } else if (mobile && typeof navigator.share === "function") {
-        await navigator.share({
-          title: "Roast My Life",
-          text: "They roasted my life choices.",
-          url: shareUrl,
-        });
-        setShareStatus("Link shared!");
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "roast-report-card.png";
-        a.click();
-        URL.revokeObjectURL(url);
-
-        await navigator.clipboard.writeText(shareUrl);
-        setShareStatus("Image downloaded · link copied");
-      }
-    } catch (err) {
-      console.error("Share failed:", err);
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        setShareStatus("Link copied");
-      } catch {
-        setShareStatus("Could not share");
-      }
-    } finally {
-      setSharing(false);
-      window.setTimeout(() => setShareStatus(null), 3500);
-    }
-  }
 
   async function onReaction(emoji: ReactionEmoji) {
     if (!canReact || savingReaction) return;
@@ -184,7 +112,7 @@ export function RoastView({
       </article>
 
       {doneTyping ? (
-        <section className="relative z-10 opacity-100 transition-opacity duration-500">
+        <section className="relative z-10">
           <p className="mb-3 text-center text-xs font-medium uppercase tracking-widest text-neutral-500">
             The damage
           </p>
@@ -232,28 +160,15 @@ export function RoastView({
       ) : null}
 
       {doneTyping ? (
-        <div className="relative z-10 flex flex-col gap-3 sm:flex-row">
-          <button
-            type="button"
-            onClick={() => void onShare()}
-            disabled={sharing}
-            className="flex-1 rounded-lg bg-[#FF3D00] px-4 py-3 text-sm font-semibold text-white shadow-[0_0_24px_rgba(255,61,0,0.35)] transition hover:brightness-110 disabled:opacity-60"
-          >
-            {sharing ? "Preparing card…" : "Share"}
-          </button>
+        <div className="relative z-10 flex flex-col gap-6">
+          <ShareButtons roastId={roastId} shareSlug={shareSlug} />
           <Link
             href="/onboarding"
-            className="flex-1 rounded-lg border border-neutral-700 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50"
+            className="block w-full rounded-lg border border-neutral-700 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50"
           >
             Roast me again
           </Link>
         </div>
-      ) : null}
-
-      {shareStatus ? (
-        <p className="relative z-10 text-center text-sm text-neutral-400">
-          {shareStatus}
-        </p>
       ) : null}
     </div>
   );
