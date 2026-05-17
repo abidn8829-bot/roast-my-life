@@ -30,7 +30,7 @@ export function GoogleAuthButton({
     <button
       type="button"
       onClick={() => void signInWithGoogle()}
-      className="w-full rounded-md border border-neutral-700 bg-[#1a1a1a] px-4 py-2.5 text-sm font-medium text-[#FAFAFA] transition hover:bg-neutral-800"
+      className="w-full rounded-md border-2 border-neutral-700 bg-[#1a1a1a] px-4 py-3 text-sm font-bold text-[#FAFAFA] transition hover:bg-neutral-800 hover:border-neutral-600"
     >
       {label}
     </button>
