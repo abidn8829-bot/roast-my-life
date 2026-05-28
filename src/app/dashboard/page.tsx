@@ -19,6 +19,15 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  // Fetch user's subscription tier
+  const { data: userData } = await supabase
+    .from("users")
+    .select("subscription_tier")
+    .eq("id", user.id)
+    .single();
+
+  const subscriptionTier = userData?.subscription_tier || "free";
+
   let rows: Array<{
     id: string;
     roast_text: string;
@@ -83,8 +92,30 @@ export default async function DashboardPage() {
           <Link href="/" className="text-sm font-semibold text-[#FF3D00]">
             Roast My Life
           </Link>
-          <LogoutButton />
+          <div className="flex items-center gap-4">
+            <Link href="/pricing" className="text-sm text-neutral-400 hover:text-[#FAFAFA] transition">
+              Pricing
+            </Link>
+            <LogoutButton />
+          </div>
         </div>
+        {subscriptionTier === "free" && (
+          <div className="rounded-xl border border-neutral-800 bg-[#111111] p-4">
+            <p className="text-sm text-neutral-300">
+              You're on the free plan — 1 roast per day
+            </p>
+            {process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL && (
+              <a
+                href={process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-block rounded-lg bg-[#FF3D00] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+              >
+                Upgrade to Pro for unlimited roasts 🔥
+              </a>
+            )}
+          </div>
+        )}
         <DashboardView name={name} roasts={roasts} />
       </div>
     </main>

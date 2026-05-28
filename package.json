@@ -14,6 +14,7 @@
     "@vercel/og": "^0.11.1",
     "groq-sdk": "^1.2.0",
     "next": "16.2.4",
+    "posthog-js": "^1.374.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.12.3"

@@ -72,6 +72,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Check user's subscription tier
+  const { data: userData } = await supabase
+    .from("users")
+    .select("subscription_tier")
+    .eq("id", user.id)
+    .single();
+
+  const subscriptionTier = userData?.subscription_tier || "free";
+
+  // If free tier, check if they already have a roast today
+  if (subscriptionTier === "free") {
+    const today = new Date().toISOString().split('T')[0];
+    const { data: existingRoast } = await supabase
+      .from("roasts")
+      .select("id")
+      .eq("user_id", user.id)
+      .gte("created_at", today)
+      .single();
+
+    if (existingRoast) {
+      return NextResponse.json(
+        { error: "You've used your free roast today. Upgrade to Pro for unlimited roasts 🔥" },
+        { status: 429 },
+      );
+    }
+  }
+
   let body: unknown;
   try {
     body = await request.json();

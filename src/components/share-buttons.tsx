@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { roastShareUrl } from "@/lib/site";
+import posthog from "posthog-js";
 
 type Props = {
   roastId: string;
@@ -32,6 +33,7 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
       a.click();
       URL.revokeObjectURL(url);
       setStatus("Image saved!");
+      posthog.capture('roast_shared');
     } catch {
       setStatus("Download failed");
     } finally {
@@ -52,6 +54,7 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
     await downloadImage();
     setStatus("Saved! Post to Instagram Stories");
     window.setTimeout(() => setStatus(null), 3500);
+    posthog.capture('roast_shared');
   }
 
   const btnBase =
@@ -67,6 +70,7 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           href={whatsappHref}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => posthog.capture('roast_shared')}
           className={`${btnBase} hover:border-[#25D366] hover:bg-[#25D366]/10`}
           aria-label="Share on WhatsApp"
         >
@@ -76,6 +80,7 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           href={twitterHref}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => posthog.capture('roast_shared')}
           className={`${btnBase} hover:border-neutral-400 hover:bg-neutral-900`}
           aria-label="Share on X"
         >

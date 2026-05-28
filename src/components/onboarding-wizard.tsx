@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { OnboardingAnswers } from "@/lib/roast-types";
+import posthog from "posthog-js";
 
 const LOADING_MESSAGES = [
   "Analyzing your poor life choices...",
@@ -62,6 +63,10 @@ export function OnboardingWizard() {
   const [step, setStep] = useState<Step>(0);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    posthog.capture('onboarding_started');
+  }, []);
 
   const [phoneHours, setPhoneHours] = useState("");
   const [worstApp, setWorstApp] = useState("");
@@ -129,6 +134,7 @@ export function OnboardingWizard() {
     }
 
     console.log("[onboarding] redirecting to roast:", roastId);
+    posthog.capture('roast_generated');
     router.push(`/roast/${encodeURIComponent(roastId)}`);
     router.refresh();
   }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, router]);
