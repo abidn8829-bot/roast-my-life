@@ -3,15 +3,38 @@ import { gradeOgColor } from "@/lib/grades";
 import { getRoastByIdentifier } from "@/lib/get-roast-public";
 import { extractRoastQuote } from "@/lib/roast-quote";
 import type { ReportCard } from "@/lib/roast-types";
+import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "edge";
 
-const OG_LABELS: { key: keyof ReportCard; label: string }[] = [
+const BASE_LABELS: { key: keyof ReportCard; label: string }[] = [
   { key: "screenTime", label: "Screen Time" },
   { key: "sleep", label: "Sleep" },
   { key: "spending", label: "Spending" },
   { key: "productivity", label: "Productivity" },
 ];
+
+const PRO_LABELS: { key: keyof ReportCard; label: string }[] = [
+  { key: "socialMedia", label: "Social Media" },
+  { key: "fitness", label: "Fitness" },
+];
+
+async function getUserTier(userId: string): Promise<"free" | "pro"> {
+  try {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+    const { data } = await supabase
+      .from("users")
+      .select("subscription_tier")
+      .eq("id", userId)
+      .single();
+    return data?.subscription_tier === "pro" ? "pro" : "free";
+  } catch {
+    return "free";
+  }
+}
 
 export async function GET(
   _request: Request,
@@ -26,6 +49,11 @@ export async function GET(
 
   const quote = extractRoastQuote(roast.roast_text);
   const card = roast.report_card;
+  const userTier = await getUserTier(roast.user_id);
+
+  const labels = userTier === "pro" 
+    ? [...BASE_LABELS, ...PRO_LABELS.filter(l => card[l.key] !== undefined)]
+    : BASE_LABELS;
 
   return new ImageResponse(
     (
@@ -80,7 +108,7 @@ export async function GET(
             marginBottom: 40,
           }}
         >
-          {OG_LABELS.map(({ key, label }) => (
+          {labels.map(({ key, label }) => (
             <div
               key={key}
               style={{
@@ -142,16 +170,18 @@ export async function GET(
           </span>
         </div>
 
-        <span
-          style={{
-            fontSize: 16,
-            color: "#525252",
-            textAlign: "center",
-            marginTop: 32,
-          }}
-        >
-          roastmylife.vercel.app
-        </span>
+        {userTier === "free" && (
+          <span
+            style={{
+              fontSize: 16,
+              color: "#525252",
+              textAlign: "center",
+              marginTop: 32,
+            }}
+          >
+            roastmylife.vercel.app
+          </span>
+        )}
       </div>
     ),
     {

@@ -5,6 +5,8 @@ export type ReportCard = {
   sleep: Grade;
   spending: Grade;
   productivity: Grade;
+  socialMedia?: Grade;
+  fitness?: Grade;
 };
 
 export type OnboardingAnswers = {
@@ -13,7 +15,11 @@ export type OnboardingAnswers = {
   sleepHours: number;
   foodDeliverySpend: number;
   neverDoThing: string;
+  socialMediaHours?: number;
+  workoutFrequency?: number;
 };
+
+export type RoastTone = "normal" | "no_mercy" | "destroy_me";
 
 export type RoastRow = {
   id: string;
@@ -23,5 +29,6 @@ export type RoastRow = {
   week_start_date: string;
   model_used: string;
   share_slug: string;
+  tone?: RoastTone;
   created_at?: string;
 };

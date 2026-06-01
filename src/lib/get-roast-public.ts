@@ -4,6 +4,7 @@ import type { ReportCard } from "@/lib/roast-types";
 
 export type PublicRoast = {
   id: string;
+  user_id: string;
   roast_text: string;
   report_card: ReportCard;
   share_slug: string;
@@ -31,6 +32,7 @@ export async function getRoastByIdentifier(
 
   const row = data[0] as {
     id: string;
+    user_id: string;
     roast_text: string;
     report_card: unknown;
     share_slug: string;
@@ -41,6 +43,7 @@ export async function getRoastByIdentifier(
 
   return {
     id: row.id,
+    user_id: row.user_id,
     roast_text: row.roast_text,
     report_card,
     share_slug: row.share_slug,

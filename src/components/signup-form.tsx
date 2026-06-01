@@ -27,12 +27,12 @@ export function SignupForm() {
     setInfo(null);
     setLoading(true);
     const supabase = createSupabaseBrowserClient();
-    const origin = window.location.origin;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const { data, error: signError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${origin}/auth/callback?next=/dashboard`,
+        emailRedirectTo: `${appUrl}/auth/callback?next=/dashboard`,
       },
     });
     setLoading(false);

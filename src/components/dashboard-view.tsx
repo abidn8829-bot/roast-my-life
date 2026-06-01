@@ -2,7 +2,7 @@ import Link from "next/link";
 import { gradeColor } from "@/lib/grades";
 import { formatWeekLabel, snippet } from "@/lib/format-week";
 import { getWeekStartDate } from "@/lib/week-start";
-import type { OnboardingAnswers, ReportCard } from "@/lib/roast-types";
+import type { OnboardingAnswers, ReportCard, Grade } from "@/lib/roast-types";
 
 export type DashboardRoast = {
   id: string;
@@ -16,14 +16,35 @@ export type DashboardRoast = {
 type Props = {
   name: string;
   roasts: DashboardRoast[];
+  isPro: boolean;
 };
 
-const GRADE_LABELS: { key: keyof ReportCard; label: string }[] = [
+const BASE_GRADE_LABELS: { key: keyof ReportCard; label: string }[] = [
   { key: "screenTime", label: "Screen Time" },
   { key: "sleep", label: "Sleep" },
   { key: "spending", label: "Spending" },
   { key: "productivity", label: "Productivity" },
 ];
+
+const PRO_GRADE_LABELS: { key: keyof ReportCard; label: string }[] = [
+  { key: "socialMedia", label: "Social Media" },
+  { key: "fitness", label: "Fitness" },
+];
+
+function calculateAverageGrade(grades: (Grade | undefined)[]): Grade {
+  const validGrades = grades.filter((g): g is Grade => g !== undefined);
+  if (validGrades.length === 0) return "C";
+  
+  const gradeValues: Record<Grade, number> = { A: 4, B: 3, C: 2, D: 1, F: 0 };
+  const sum = validGrades.reduce((acc, grade) => acc + gradeValues[grade], 0);
+  const avg = sum / validGrades.length;
+  
+  if (avg >= 3.5) return "A";
+  if (avg >= 2.5) return "B";
+  if (avg >= 1.5) return "C";
+  if (avg >= 0.5) return "D";
+  return "F";
+}
 
 function statValue(
   key: keyof ReportCard,
@@ -41,13 +62,28 @@ function statValue(
       return answers.neverDoThing.length > 28
         ? `${answers.neverDoThing.slice(0, 28)}…`
         : answers.neverDoThing;
+    case "socialMedia":
+      return answers.socialMediaHours !== undefined
+        ? `${answers.socialMediaHours}h / day`
+        : "—";
+    case "fitness":
+      return answers.workoutFrequency !== undefined
+        ? `${answers.workoutFrequency} / wk`
+        : "—";
+    default:
+      return "—";
   }
 }
 
-export function DashboardView({ name, roasts }: Props) {
+export function DashboardView({ name, roasts, isPro }: Props) {
   const currentWeek = getWeekStartDate();
   const thisWeek =
     roasts.find((r) => r.week_start_date === currentWeek) ?? roasts[0] ?? null;
+
+  // Compute grade labels based on tier and available data
+  const gradeLabels = isPro && thisWeek?.report_card
+    ? [...BASE_GRADE_LABELS, ...PRO_GRADE_LABELS.filter(l => thisWeek.report_card[l.key] !== undefined)]
+    : BASE_GRADE_LABELS;
 
   const seenWeeks = new Set<string>();
   const previous: DashboardRoast[] = [];
@@ -81,16 +117,16 @@ export function DashboardView({ name, roasts }: Props) {
               {snippet(thisWeek.roast_text)}
             </p>
             <div className="mt-4 grid grid-cols-4 gap-2">
-              {GRADE_LABELS.map(({ key, label }) => (
+              {gradeLabels.map(({ key, label }: { key: keyof ReportCard; label: string }) => (
                 <div
                   key={key}
-                  className={`rounded-lg border px-1 py-2 text-center ${gradeColor(thisWeek.report_card[key])}`}
+                  className={`rounded-lg border px-1 py-2 text-center ${gradeColor(thisWeek.report_card[key]!)}`}
                 >
                   <span className="block text-[9px] uppercase text-neutral-500">
                     {label.split(" ")[0]}
                   </span>
                   <span className="text-lg font-bold">
-                    {thisWeek.report_card[key]}
+                    {thisWeek.report_card[key]!}
                   </span>
                 </div>
               ))}
@@ -102,7 +138,7 @@ export function DashboardView({ name, roasts }: Props) {
               Your stats
             </h2>
             <div className="grid grid-cols-2 gap-3">
-              {GRADE_LABELS.map(({ key, label }) => (
+              {gradeLabels.map(({ key, label }: { key: keyof ReportCard; label: string }) => (
                 <div
                   key={key}
                   className="rounded-xl border border-neutral-800 bg-[#141414] p-4"
@@ -112,9 +148,9 @@ export function DashboardView({ name, roasts }: Props) {
                     {statValue(key, thisWeek.answers)}
                   </p>
                   <span
-                    className={`mt-2 inline-block rounded px-2 py-0.5 text-xs font-bold ${gradeColor(thisWeek.report_card[key])}`}
+                    className={`mt-2 inline-block rounded px-2 py-0.5 text-xs font-bold ${gradeColor(thisWeek.report_card[key]!)}`}
                   >
-                    {thisWeek.report_card[key]}
+                    {thisWeek.report_card[key]!}
                   </span>
                 </div>
               ))}
@@ -155,12 +191,12 @@ export function DashboardView({ name, roasts }: Props) {
                     Week of {formatWeekLabel(r.week_start_date)}
                   </span>
                   <span className="flex gap-1.5">
-                    {GRADE_LABELS.map(({ key }) => (
+                    {gradeLabels.map(({ key }: { key: keyof ReportCard; label: string }) => (
                       <span
                         key={key}
-                        className={`rounded px-1.5 py-0.5 text-xs font-bold ${gradeColor(r.report_card[key])}`}
+                        className={`rounded px-1.5 py-0.5 text-xs font-bold ${gradeColor(r.report_card[key]!)}`}
                       >
-                        {r.report_card[key]}
+                        {r.report_card[key]!}
                       </span>
                     ))}
                   </span>
@@ -170,6 +206,39 @@ export function DashboardView({ name, roasts }: Props) {
           </ul>
         </section>
       ) : null}
+
+      {isPro && roasts.length >= 2 && (
+        <section>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-500">
+            Grade trend (last 8 weeks)
+          </h2>
+          <div className="rounded-xl border border-neutral-800 bg-[#141414] p-4">
+            <div className="space-y-3">
+              {BASE_GRADE_LABELS.map(({ key, label }) => {
+                const gradeValues = roasts.slice(0, 8).reverse().map(r => r.report_card[key]);
+                const avgGrade = calculateAverageGrade(gradeValues);
+                return (
+                  <div key={key} className="flex items-center gap-3">
+                    <span className="w-24 text-xs text-neutral-400">{label}</span>
+                    <div className="flex-1 flex gap-1">
+                      {gradeValues.map((grade, i) => (
+                        <div
+                          key={i}
+                          className={`h-6 flex-1 rounded ${gradeColor(grade!)}`}
+                          title={`Week ${i + 1}: ${grade}`}
+                        />
+                      ))}
+                    </div>
+                    <span className={`text-sm font-bold ${gradeColor(avgGrade)}`}>
+                      {avgGrade}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

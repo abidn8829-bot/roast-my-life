@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { OnboardingAnswers } from "@/lib/roast-types";
+import type { OnboardingAnswers, RoastTone } from "@/lib/roast-types";
 import posthog from "posthog-js";
+import { ToneSelector } from "@/components/tone-selector";
+import { UpgradeModal } from "@/components/upgrade-modal";
 
 const LOADING_MESSAGES = [
   "Analyzing your poor life choices...",
@@ -12,7 +14,7 @@ const LOADING_MESSAGES = [
   "Almost done judging you...",
 ];
 
-const QUESTIONS = [
+const BASE_QUESTIONS = [
   {
     key: "phoneHours" as const,
     label: "How many hours a day are you on your phone?",
@@ -50,7 +52,26 @@ const QUESTIONS = [
   },
 ];
 
-type Step = number | "loading";
+const PRO_QUESTIONS = [
+  {
+    key: "socialMediaHours" as const,
+    label: "How many hours do you spend on social media per day?",
+    type: "number" as const,
+    min: 0,
+    max: 20,
+    placeholder: "4",
+  },
+  {
+    key: "workoutFrequency" as const,
+    label: "How many times did you workout this week?",
+    type: "number" as const,
+    min: 0,
+    max: 14,
+    placeholder: "0",
+  },
+];
+
+type Step = number | "tone" | "loading";
 
 const inputClass =
   "w-full rounded-md border border-neutral-800 bg-[#141414] px-3 py-2.5 text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2";
@@ -63,9 +84,17 @@ export function OnboardingWizard() {
   const [step, setStep] = useState<Step>(0);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isPro, setIsPro] = useState(false);
+  const [selectedTone, setSelectedTone] = useState<RoastTone>("normal");
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
     posthog.capture('onboarding_started');
+    // Check if user is pro
+    fetch('/api/user/tier')
+      .then(res => res.json())
+      .then(data => setIsPro(data.tier === 'pro'))
+      .catch(() => setIsPro(false));
   }, []);
 
   const [phoneHours, setPhoneHours] = useState("");
@@ -73,27 +102,34 @@ export function OnboardingWizard() {
   const [sleepHours, setSleepHours] = useState("");
   const [foodDeliverySpend, setFoodDeliverySpend] = useState("");
   const [neverDoThing, setNeverDoThing] = useState("");
+  const [socialMediaHours, setSocialMediaHours] = useState("");
+  const [workoutFrequency, setWorkoutFrequency] = useState("");
   const roastStarted = useRef(false);
 
-  const values: Record<(typeof QUESTIONS)[number]["key"], string> = {
+  const allQuestions = [...BASE_QUESTIONS, ...(isPro ? PRO_QUESTIONS : [])];
+
+  const values: Record<string, string> = {
     phoneHours,
     worstApp,
     sleepHours,
     foodDeliverySpend,
     neverDoThing,
+    socialMediaHours,
+    workoutFrequency,
   };
 
-  const setters: Record<(typeof QUESTIONS)[number]["key"], (v: string) => void> =
-    {
-      phoneHours: setPhoneHours,
-      worstApp: setWorstApp,
-      sleepHours: setSleepHours,
-      foodDeliverySpend: setFoodDeliverySpend,
-      neverDoThing: setNeverDoThing,
-    };
+  const setters: Record<string, (v: string) => void> = {
+    phoneHours: setPhoneHours,
+    worstApp: setWorstApp,
+    sleepHours: setSleepHours,
+    foodDeliverySpend: setFoodDeliverySpend,
+    neverDoThing: setNeverDoThing,
+    socialMediaHours: setSocialMediaHours,
+    workoutFrequency: setWorkoutFrequency,
+  };
 
   function validateStep(index: number): boolean {
-    const q = QUESTIONS[index];
+    const q = allQuestions[index];
     const raw = values[q.key].trim();
     if (!raw) return false;
     if (q.type === "number") {
@@ -106,13 +142,20 @@ export function OnboardingWizard() {
   }
 
   function buildAnswers(): OnboardingAnswers {
-    return {
+    const answers: OnboardingAnswers = {
       phoneHours: Number(phoneHours),
       worstApp: worstApp.trim(),
       sleepHours: Number(sleepHours),
       foodDeliverySpend: Number(foodDeliverySpend),
       neverDoThing: neverDoThing.trim(),
     };
+
+    if (isPro) {
+      answers.socialMediaHours = Number(socialMediaHours);
+      answers.workoutFrequency = Number(workoutFrequency);
+    }
+
+    return answers;
   }
 
   const generateRoast = useCallback(async () => {
@@ -120,7 +163,10 @@ export function OnboardingWizard() {
     const res = await fetch("/api/roast", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildAnswers()),
+      body: JSON.stringify({
+        ...buildAnswers(),
+        tone: selectedTone,
+      }),
     });
     const data = (await res.json()) as { id?: string; error?: string };
     const roastId =
@@ -128,8 +174,15 @@ export function OnboardingWizard() {
 
     if (!res.ok || !roastId) {
       console.error("[onboarding] roast API failed:", res.status, data);
+      
+      // Check if it's a daily limit error
+      if (res.status === 429 && data.error?.includes("free roast today")) {
+        setShowUpgradeModal(true);
+        return;
+      }
+      
       setError(data.error ?? "Something went wrong. Try again.");
-      setStep(4);
+      setStep(allQuestions.length - 1);
       return;
     }
 
@@ -137,7 +190,7 @@ export function OnboardingWizard() {
     posthog.capture('roast_generated');
     router.push(`/roast/${encodeURIComponent(roastId)}`);
     router.refresh();
-  }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, router]);
+  }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, selectedTone, isPro, router, allQuestions]);
 
   useEffect(() => {
     if (step !== "loading") return;
@@ -160,11 +213,10 @@ export function OnboardingWizard() {
       return;
     }
     setError(null);
-    if (step < QUESTIONS.length - 1) {
+    if (step < allQuestions.length - 1) {
       setStep(step + 1);
     } else {
-      setStep("loading");
-      setLoadingMsgIndex(0);
+      setStep("tone");
     }
   }
 
@@ -172,6 +224,12 @@ export function OnboardingWizard() {
     if (typeof step !== "number" || step === 0) return;
     setError(null);
     setStep(step - 1);
+  }
+
+  function onToneSelect(tone: RoastTone) {
+    setSelectedTone(tone);
+    setStep("loading");
+    setLoadingMsgIndex(0);
   }
 
   if (step === "loading") {
@@ -185,17 +243,34 @@ export function OnboardingWizard() {
     );
   }
 
+  if (step === "tone") {
+    return (
+      <>
+        <ToneSelector 
+          onSelect={onToneSelect} 
+          isPro={isPro} 
+          onUpgradeRequest={() => setShowUpgradeModal(true)}
+        />
+        <UpgradeModal 
+          isOpen={showUpgradeModal} 
+          onClose={() => setShowUpgradeModal(false)}
+          reason="pro_feature"
+        />
+      </>
+    );
+  }
+
   const slideIndex = step;
-  const q = QUESTIONS[slideIndex];
+  const q = allQuestions[slideIndex];
 
   return (
     <div className="w-full max-w-md">
       <div className="mb-6 flex items-center justify-between text-sm text-neutral-500">
         <span>
-          {slideIndex + 1} / {QUESTIONS.length}
+          {slideIndex + 1} / {allQuestions.length}
         </span>
         <div className="flex gap-1">
-          {QUESTIONS.map((_, i) => (
+          {allQuestions.map((_, i) => (
             <span
               key={i}
               className={`h-1.5 w-6 rounded-full transition-colors ${
@@ -256,7 +331,7 @@ export function OnboardingWizard() {
           onClick={onNext}
           className="ml-auto rounded-md bg-[#FF3D00] px-5 py-2.5 text-sm font-medium text-white transition hover:brightness-110"
         >
-          {slideIndex === QUESTIONS.length - 1 ? "Roast me" : "Next"}
+          {slideIndex === allQuestions.length - 1 ? "Choose Tone" : "Next"}
         </button>
       </div>
     </div>

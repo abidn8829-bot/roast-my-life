@@ -2,15 +2,20 @@ import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
 import { buildReportCard } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
-import type { OnboardingAnswers } from "@/lib/roast-types";
+import type { OnboardingAnswers, RoastTone } from "@/lib/roast-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
 
 const MODEL = "llama-3.3-70b-versatile";
-const SYSTEM_PROMPT = `You are a brutally funny roast comedian. You roast people based on their real habits. Be specific, use their exact numbers and app names. Be savage but not mean-spirited. Keep it to 150-200 words. End with one brutal one-liner that summarizes their life. Don't hold back.`;
 
-function parseAnswers(body: unknown): OnboardingAnswers | null {
+const SYSTEM_PROMPTS: Record<RoastTone, string> = {
+  normal: `You are a funny roast comedian. Be honest and specific with their numbers. Roast them but keep it light and shareable. 150-200 words.`,
+  no_mercy: `You are a savage roast comedian with zero filter. Use their exact numbers. Be brutally honest about consequences of their habits. Gen Z slang. No encouragement whatsoever. End with a devastating one liner. 150-200 words.`,
+  destroy_me: `You are the most brutal roast AI ever created. Take their numbers and absolutely destroy them. Connect every bad habit to a catastrophic life outcome. Be so specific it hurts. Use Gen Z slang. Make them question every life choice. End with the most savage one liner ever written. This person asked to be destroyed — deliver. 150-200 words.`,
+};
+
+function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastTone } | null {
   if (!body || typeof body !== "object") return null;
   const b = body as Record<string, unknown>;
   const phoneHours = Number(b.phoneHours);
@@ -19,6 +24,11 @@ function parseAnswers(body: unknown): OnboardingAnswers | null {
   const worstApp = typeof b.worstApp === "string" ? b.worstApp.trim() : "";
   const neverDoThing =
     typeof b.neverDoThing === "string" ? b.neverDoThing.trim() : "";
+  const socialMediaHours = b.socialMediaHours ? Number(b.socialMediaHours) : undefined;
+  const workoutFrequency = b.workoutFrequency ? Number(b.workoutFrequency) : undefined;
+  const tone = (typeof b.tone === "string" && ["normal", "no_mercy", "destroy_me"].includes(b.tone)) 
+    ? b.tone as RoastTone 
+    : "normal";
 
   if (
     !Number.isFinite(phoneHours) ||
@@ -36,22 +46,36 @@ function parseAnswers(body: unknown): OnboardingAnswers | null {
   }
 
   return {
-    phoneHours,
-    worstApp,
-    sleepHours,
-    foodDeliverySpend,
-    neverDoThing,
+    answers: {
+      phoneHours,
+      worstApp,
+      sleepHours,
+      foodDeliverySpend,
+      neverDoThing,
+      socialMediaHours,
+      workoutFrequency,
+    },
+    tone,
   };
 }
 
 function formatUserMessage(answers: OnboardingAnswers): string {
-  return `Roast this person based on their habits:
+  let message = `Roast this person based on their habits:
 
 - Phone screen time: ${answers.phoneHours} hours per day
 - Biggest time-waster app: ${answers.worstApp}
 - Average sleep: ${answers.sleepHours} hours per night
 - Weekly food delivery spending: $${answers.foodDeliverySpend}
 - Keeps saying they'll do but never does: "${answers.neverDoThing}"`;
+
+  if (answers.socialMediaHours !== undefined) {
+    message += `\n- Social media hours per day: ${answers.socialMediaHours}`;
+  }
+  if (answers.workoutFrequency !== undefined) {
+    message += `\n- Workouts this week: ${answers.workoutFrequency}`;
+  }
+
+  return message;
 }
 
 export async function POST(request: Request) {
@@ -106,10 +130,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const answers = parseAnswers(body);
-  if (!answers) {
+  const parsed = parseAnswers(body);
+  if (!parsed) {
     return NextResponse.json({ error: "Invalid answers" }, { status: 400 });
   }
+
+  const { answers, tone } = parsed;
 
   const groq = new Groq({ apiKey });
 
@@ -118,13 +144,14 @@ export async function POST(request: Request) {
     console.log("[api/roast] Calling Groq", {
       model: MODEL,
       max_tokens: 1000,
+      tone,
     });
 
     const completion = await groq.chat.completions.create({
       model: MODEL,
       max_tokens: 1000,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: SYSTEM_PROMPTS[tone] },
         { role: "user", content: formatUserMessage(answers) },
       ],
     });
@@ -159,6 +186,7 @@ export async function POST(request: Request) {
     week_start_date,
     model_used: MODEL,
     share_slug,
+    tone,
   };
 
   let { data, error } = await supabase
