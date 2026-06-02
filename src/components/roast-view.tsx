@@ -122,7 +122,7 @@ export function RoastView({
               return (
                 <div
                   key={key}
-                  className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-4 text-center transition-transform hover:scale-[1.02] ${gradeColor(grade)}`}
+                  className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-4 text-center transition-transform hover:scale-[1.02] ${gradeColor(grade ?? 'F')}`}
                 >
                   <span className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
                     {label}
