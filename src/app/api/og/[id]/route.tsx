@@ -129,7 +129,7 @@ export async function GET(
                 style={{
                   fontSize: 72,
                   fontWeight: 800,
-                  color: gradeOgColor(card[key]),
+                  color: gradeOgColor(card[key] ?? 'F'),
                 }}
               >
                 {card[key]}
