@@ -163,8 +163,14 @@ export function DashboardView({ name, roasts, isPro }: Props) {
             🔥
           </p>
           <p className="mt-3 text-neutral-400">
-            No roast yet this week. Ready to get judged?
+            No roasts yet — get roasted!
           </p>
+          <Link
+            href="/onboarding"
+            className="mt-4 inline-block rounded-lg bg-[#FF3D00] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+          >
+            Get Roasted Now
+          </Link>
         </div>
       )}
 

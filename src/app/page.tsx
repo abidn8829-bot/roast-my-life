@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#0A0A0A] text-[#FAFAFA]">
       {/* Navbar */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0A0A0A]/95 backdrop-blur-sm">
         <span className="text-[#FF3D00] font-black text-xl tracking-widest">
           ROAST MY LIFE
         </span>

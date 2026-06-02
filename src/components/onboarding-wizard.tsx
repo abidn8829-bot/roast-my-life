@@ -235,6 +235,7 @@ export function OnboardingWizard() {
   if (step === "loading") {
     return (
       <div className="w-full max-w-md text-center">
+        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[#FF3D00] border-t-transparent" />
         <p className="text-lg text-[#FAFAFA] animate-pulse">
           {LOADING_MESSAGES[loadingMsgIndex]}
         </p>
