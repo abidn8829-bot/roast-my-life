@@ -141,12 +141,6 @@ export async function POST(request: Request) {
 
   let roastText: string;
   try {
-    console.log("[api/roast] Calling Groq", {
-      model: MODEL,
-      max_tokens: 1000,
-      tone,
-    });
-
     const completion = await groq.chat.completions.create({
       model: MODEL,
       max_tokens: 1000,
@@ -222,8 +216,6 @@ export async function POST(request: Request) {
       { status: 500 },
     );
   }
-
-  console.log("[api/roast] saved roast id:", roastId);
 
   return NextResponse.json({ id: roastId, shareSlug: share_slug });
 }

@@ -33,7 +33,6 @@ export async function POST(request: Request) {
     
     // Check if this is a sale event
     if (data.event !== "sale") {
-      console.log("[gumroad webhook] Ignoring non-sale event:", data.event);
       return NextResponse.json({ success: true });
     }
 
@@ -56,7 +55,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
     }
 
-    console.log("[gumroad webhook] Successfully upgraded user to pro:", email);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[gumroad webhook] Error:", error);

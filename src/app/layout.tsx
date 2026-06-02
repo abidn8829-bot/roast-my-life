@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Roast My Life",
-  description: "Get roasted using your personal stats.",
+  title: "Roast My Life — Get Brutally Roasted by AI",
+  description: "Answer 5 questions. Get brutally roasted by AI. Share your shame.",
 };
 
 export default function RootLayout({

@@ -164,7 +164,17 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-white/10 px-6 py-8 text-center text-white/30 text-sm">
-        ROAST MY LIFE · Made with 🔥
+        <div className="flex flex-col items-center gap-2">
+          <p>ROAST MY LIFE · Made with 🔥</p>
+          <div className="flex gap-4">
+            <Link href="/privacy" className="hover:text-[#FAFAFA] transition">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-[#FAFAFA] transition">
+              Terms
+            </Link>
+          </div>
+        </div>
       </footer>
     </main>
   );

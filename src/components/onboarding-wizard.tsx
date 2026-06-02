@@ -186,7 +186,6 @@ export function OnboardingWizard() {
       return;
     }
 
-    console.log("[onboarding] redirecting to roast:", roastId);
     posthog.capture('roast_generated');
     router.push(`/roast/${encodeURIComponent(roastId)}`);
     router.refresh();
