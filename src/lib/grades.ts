@@ -64,7 +64,7 @@ export function gradeColor(grade: Grade): string {
   }
 }
 
-export function gradeOgColor(grade: Grade): string {
+export function gradeOgColor(grade: Grade | undefined): string {
   switch (grade) {
     case "A":
     case "B":
@@ -74,6 +74,8 @@ export function gradeOgColor(grade: Grade): string {
     case "D":
       return "#fb923c";
     case "F":
+      return "#f87171";
+    default:
       return "#f87171";
   }
 }
