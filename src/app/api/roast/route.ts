@@ -92,18 +92,26 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  console.log("[api/roast] Auth user retrieved:", user ? { id: user.id, email: user.email } : null);
+
   if (!user) {
+    console.error("[api/roast] No authenticated user found");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   // Check user's subscription tier
-  const { data: userData } = await supabase
+  const { data: userData, error: userError } = await supabase
     .from("users")
     .select("subscription_tier")
     .eq("id", user.id)
     .single();
 
+  if (userError) {
+    console.error("[api/roast] Error fetching user subscription tier:", userError);
+  }
+
   const subscriptionTier = userData?.subscription_tier || "free";
+  console.log("[api/roast] User subscription tier:", subscriptionTier);
 
   // If free tier, check if they already have a roast today
   if (subscriptionTier === "free") {
@@ -132,10 +140,12 @@ export async function POST(request: Request) {
 
   const parsed = parseAnswers(body);
   if (!parsed) {
+    console.error("[api/roast] Failed to parse answers:", body);
     return NextResponse.json({ error: "Invalid answers" }, { status: 400 });
   }
 
   const { answers, tone } = parsed;
+  console.log("[api/roast] Parsed answers:", { answers, tone });
 
   const groq = new Groq({ apiKey });
 
@@ -180,33 +190,38 @@ export async function POST(request: Request) {
     week_start_date,
     model_used: MODEL,
     share_slug,
-    tone,
   };
+
+  console.log("[api/roast] Preparing to insert roast with data:", {
+    user_id: baseRow.user_id,
+    roast_text_length: baseRow.roast_text.length,
+    report_card_keys: Object.keys(baseRow.report_card),
+    week_start_date: baseRow.week_start_date,
+    model_used: baseRow.model_used,
+    share_slug: baseRow.share_slug,
+  });
 
   let { data, error } = await supabase
     .from("roasts")
-    .insert({ ...baseRow, answers })
+    .insert(baseRow)
     .select("id")
     .single();
 
-  if (
-    error &&
-    (error.code === "42703" || error.message?.includes("answers"))
-  ) {
-    ({ data, error } = await supabase
-      .from("roasts")
-      .insert(baseRow)
-      .select("id")
-      .single());
-  }
-
   if (error) {
-    console.error("Supabase insert error:", error);
+    console.error("[api/roast] Supabase insert error:", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      user_id: baseRow.user_id,
+    });
     return NextResponse.json(
       { error: "Failed to save roast" },
       { status: 500 },
     );
   }
+
+  console.log("[api/roast] Successfully inserted roast with ID:", data?.id);
 
   const roastId = data?.id ? String(data.id) : "";
   if (!roastId) {
