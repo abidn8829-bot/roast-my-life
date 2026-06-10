@@ -29,7 +29,7 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "roast-report-card.png";
+      a.download = "roast-my-life.png";
       a.click();
       URL.revokeObjectURL(url);
       setStatus("Image saved!");
@@ -52,7 +52,7 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
 
   async function onInstagram() {
     await downloadImage();
-    setStatus("Saved! Post to Instagram Stories");
+    setStatus("Image saved! Now open Instagram and share it as a story 📸");
     window.setTimeout(() => setStatus(null), 3500);
     posthog.capture('roast_shared');
   }
