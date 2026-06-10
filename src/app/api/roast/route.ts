@@ -190,6 +190,7 @@ export async function POST(request: Request) {
     week_start_date,
     model_used: MODEL,
     share_slug,
+    answers,
   };
 
   console.log("[api/roast] Preparing to insert roast with data:", {

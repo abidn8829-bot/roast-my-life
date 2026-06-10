@@ -4,6 +4,7 @@ import { fetchOwnRoastById } from "@/lib/fetch-own-roast";
 import { isUuid } from "@/lib/is-uuid";
 import { parseReportCard } from "@/lib/parse-report-card";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { OnboardingAnswers } from "@/lib/roast-types";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,15 @@ export default async function RoastDetailPage({
       notFound();
     }
 
+    // Fetch week count
+    const { data: weekData } = await supabase
+      .from("roasts")
+      .select("week_start_date")
+      .eq("user_id", user.id);
+    
+    const uniqueWeeks = new Set(weekData?.map(r => r.week_start_date) || []);
+    const weekCount = uniqueWeeks.size;
+
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-[#0A0A0A] px-4 py-12 text-[#FAFAFA]">
         <RoastView
@@ -43,6 +53,8 @@ export default async function RoastDetailPage({
           shareSlug={roast.share_slug}
           initialReaction={roast.reaction}
           canReact
+          answers={roast.answers}
+          weekCount={weekCount}
         />
       </main>
     );
@@ -71,12 +83,25 @@ export default async function RoastDetailPage({
 
   let initialReaction: string | null = null;
   let canReact = false;
+  let answers: OnboardingAnswers | undefined = undefined;
+  let weekCount = 1;
+  
   if (user) {
     const owned = await fetchOwnRoastById(supabase, row.id, user.id);
     if (owned) {
       canReact = true;
       initialReaction = owned.reaction;
+      answers = owned.answers;
     }
+    
+    // Fetch week count
+    const { data: weekData } = await supabase
+      .from("roasts")
+      .select("week_start_date")
+      .eq("user_id", user.id);
+    
+    const uniqueWeeks = new Set(weekData?.map(r => r.week_start_date) || []);
+    weekCount = uniqueWeeks.size;
   }
 
   return (
@@ -88,6 +113,8 @@ export default async function RoastDetailPage({
         shareSlug={row.share_slug}
         initialReaction={initialReaction}
         canReact={canReact}
+        answers={answers}
+        weekCount={weekCount}
       />
     </main>
   );

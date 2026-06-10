@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { ShareButtons } from "@/components/share-buttons";
 import { gradeColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
-import type { ReportCard } from "@/lib/roast-types";
+import type { Grade, OnboardingAnswers, ReportCard } from "@/lib/roast-types";
 
 const GRADE_LABELS: { key: keyof ReportCard; label: string }[] = [
   { key: "screenTime", label: "Screen Time" },
@@ -21,6 +21,8 @@ type Props = {
   shareSlug: string;
   initialReaction?: string | null;
   canReact?: boolean;
+  answers?: OnboardingAnswers;
+  weekCount?: number;
 };
 
 export function RoastView({
@@ -30,12 +32,65 @@ export function RoastView({
   shareSlug,
   initialReaction = null,
   canReact = false,
+  answers,
+  weekCount = 1,
 }: Props) {
   const [displayed, setDisplayed] = useState("");
   const [doneTyping, setDoneTyping] = useState(false);
   const [reaction, setReaction] = useState<string | null>(initialReaction);
   const [savingReaction, setSavingReaction] = useState(false);
   const indexRef = useRef(0);
+
+  // Find worst grade
+  const worstGrade = Object.entries(reportCard).reduce<{ key: string; grade: Grade } | null>(
+    (worst, [key, grade]) => {
+      if (!grade) return worst;
+      const gradeOrder: Record<Grade, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
+      if (!worst || gradeOrder[grade] < gradeOrder[worst.grade]) {
+        return { key, grade };
+      }
+      return worst;
+    },
+    null
+  );
+
+  const worstGradeLabel = worstGrade ? GRADE_LABELS.find(l => l.key === worstGrade.key)?.label || worstGrade.key : 'Unknown';
+
+  // Generate consequences based on answers
+  const consequences = answers ? generateConsequences(answers) : [];
+
+  function generateConsequences(ans: OnboardingAnswers): string[] {
+    const cons: string[] = [];
+    
+    if (ans.phoneHours >= 8) {
+      cons.push(`At ${ans.phoneHours}h/day of screen time, you'll have carpel tunnel by 30 and your attention span will be shorter than a TikTok.`);
+    } else if (ans.phoneHours >= 5) {
+      cons.push(`With ${ans.phoneHours}h daily screen time, your brain is literally rewiring itself to need constant dopamine hits.`);
+    }
+    
+    if (ans.sleepHours <= 5) {
+      cons.push(`Sleeping ${ans.sleepHours}h/night? Your cognitive decline is accelerating faster than your credit card debt.`);
+    } else if (ans.sleepHours <= 6) {
+      cons.push(`At ${ans.sleepHours}h of sleep, you're operating at 60% capacity. No wonder you're mediocre at everything.`);
+    }
+    
+    if (ans.foodDeliverySpend >= 200) {
+      cons.push(`$${ans.foodDeliverySpend}/week on delivery? That's $10k+ a year on laziness. Your bank account is crying.`);
+    } else if (ans.foodDeliverySpend >= 100) {
+      cons.push(`Spending $${ans.foodDeliverySpend}/week on delivery adds up to $5k/year. Hope that instant gratification is worth it.`);
+    }
+    
+    if (ans.socialMediaHours && ans.socialMediaHours >= 4) {
+      cons.push(`${ans.socialMediaHours}h on social media daily? You're literally watching other people live instead of living your own life.`);
+    }
+    
+    if (ans.workoutFrequency === 0) {
+      cons.push(`Zero workouts this week? Your muscles are atrophying as we speak. Sedentary lifestyle incoming.`);
+    }
+    
+    // Return 2-3 consequences
+    return cons.slice(0, 3);
+  }
 
   useEffect(() => {
     setDisplayed("");
@@ -98,6 +153,9 @@ export function RoastView({
         <h1 className="text-2xl font-bold tracking-tight text-[#FAFAFA]">
           Report Card
         </h1>
+        <p className="text-xs text-neutral-500">
+          Week {weekCount} of facing reality
+        </p>
       </header>
 
       <article className="relative z-10 rounded-xl border border-neutral-800/80 bg-[#111111] p-5 shadow-[0_0_40px_rgba(255,61,0,0.06)]">
@@ -112,27 +170,59 @@ export function RoastView({
       </article>
 
       {doneTyping ? (
-        <section className="relative z-10">
-          <p className="mb-3 text-center text-xs font-medium uppercase tracking-widest text-neutral-500">
-            The damage
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {GRADE_LABELS.map(({ key, label }) => {
-              const grade = reportCard[key];
-              return (
-                <div
-                  key={key}
-                  className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-4 text-center transition-transform hover:scale-[1.02] ${gradeColor(grade ?? 'F')}`}
-                >
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
-                    {label}
-                  </span>
-                  <span className="text-3xl font-black">{grade}</span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        <>
+          {/* Worst Grade Callout */}
+          {worstGrade && (
+            <div className="relative z-10 rounded-xl border-2 border-[#FF3D00] bg-[#FF3D00]/10 p-4">
+              <p className="text-center text-sm font-semibold text-[#FF3D00]">
+                Your biggest problem this week 🔥
+              </p>
+              <div className="mt-2 flex items-center justify-center gap-2">
+                <span className="text-lg font-bold text-[#FAFAFA]">{worstGradeLabel}:</span>
+                <span className={`text-3xl font-black ${gradeColor(worstGrade.grade)}`}>{worstGrade.grade}</span>
+              </div>
+            </div>
+          )}
+
+          <section className="relative z-10">
+            <p className="mb-3 text-center text-xs font-medium uppercase tracking-widest text-neutral-500">
+              The damage
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {GRADE_LABELS.map(({ key, label }) => {
+                const grade = reportCard[key];
+                return (
+                  <div
+                    key={key}
+                    className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-4 text-center transition-transform hover:scale-[1.02] ${gradeColor(grade ?? 'F')}`}
+                  >
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                      {label}
+                    </span>
+                    <span className="text-3xl font-black">{grade}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Consequences Section */}
+          {consequences.length > 0 && (
+            <div className="relative z-10 rounded-xl border border-neutral-800 bg-[#111111] p-5">
+              <p className="mb-3 text-center text-sm font-semibold text-[#FAFAFA]">
+                If you keep this up...
+              </p>
+              <ul className="space-y-2">
+                {consequences.map((consequence, idx) => (
+                  <li key={idx} className="flex items-start gap-2 text-sm text-neutral-300">
+                    <span className="mt-0.5 text-[#FF3D00]">•</span>
+                    <span>{consequence}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
       ) : null}
 
       {doneTyping && canReact ? (

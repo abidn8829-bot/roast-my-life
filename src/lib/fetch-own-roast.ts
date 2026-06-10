@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseReportCard } from "@/lib/parse-report-card";
-import type { ReportCard } from "@/lib/roast-types";
+import type { OnboardingAnswers, ReportCard } from "@/lib/roast-types";
 
 export type OwnRoast = {
   id: string;
@@ -8,6 +8,7 @@ export type OwnRoast = {
   report_card: ReportCard;
   share_slug: string;
   reaction: string | null;
+  answers?: OnboardingAnswers;
 };
 
 export async function fetchOwnRoastById(
@@ -17,7 +18,7 @@ export async function fetchOwnRoastById(
 ): Promise<OwnRoast | null> {
   const { data, error } = await supabase
     .from("roasts")
-    .select("id, roast_text, report_card, share_slug")
+    .select("id, roast_text, report_card, share_slug, answers")
     .eq("id", roastId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -56,5 +57,6 @@ export async function fetchOwnRoastById(
     report_card,
     share_slug: data.share_slug,
     reaction,
+    answers: data.answers as OnboardingAnswers | undefined,
   };
 }
