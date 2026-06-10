@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ShareButtons } from "@/components/share-buttons";
 import { gradeColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
 import type { Grade, OnboardingAnswers, ReportCard } from "@/lib/roast-types";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const GRADE_LABELS: { key: keyof ReportCard; label: string }[] = [
   { key: "screenTime", label: "Screen Time" },
@@ -35,10 +37,12 @@ export function RoastView({
   answers,
   weekCount = 1,
 }: Props) {
+  const router = useRouter();
   const [displayed, setDisplayed] = useState("");
   const [doneTyping, setDoneTyping] = useState(false);
   const [reaction, setReaction] = useState<string | null>(initialReaction);
   const [savingReaction, setSavingReaction] = useState(false);
+  const [checkingLimit, setCheckingLimit] = useState(false);
   const indexRef = useRef(0);
 
   // Find worst grade
@@ -133,6 +137,60 @@ export function RoastView({
       setReaction(initialReaction);
     } finally {
       setSavingReaction(false);
+    }
+  }
+
+  async function handleRoastAgain() {
+    if (!canReact) {
+      // Not authenticated, just go to onboarding
+      router.push("/onboarding");
+      return;
+    }
+
+    setCheckingLimit(true);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/onboarding");
+        return;
+      }
+
+      // Check user's subscription tier
+      const { data: userData } = await supabase
+        .from("users")
+        .select("subscription_tier")
+        .eq("id", user.id)
+        .single();
+
+      const subscriptionTier = userData?.subscription_tier || "free";
+
+      // If free tier, check if they already have a roast today
+      if (subscriptionTier === "free") {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: existingRoast } = await supabase
+          .from("roasts")
+          .select("id")
+          .eq("user_id", user.id)
+          .gte("created_at", `${today}T00:00:00.000Z`)
+          .lte("created_at", `${today}T23:59:59.999Z`)
+          .maybeSingle();
+
+        if (existingRoast) {
+          // Already used free roast today, redirect to pricing
+          router.push("/pricing");
+          return;
+        }
+      }
+
+      // Can roast again
+      router.push("/onboarding");
+    } catch (error) {
+      console.error("Error checking roast limit:", error);
+      router.push("/onboarding");
+    } finally {
+      setCheckingLimit(false);
     }
   }
 
@@ -252,12 +310,14 @@ export function RoastView({
       {doneTyping ? (
         <div className="relative z-10 flex flex-col gap-6">
           <ShareButtons roastId={roastId} shareSlug={shareSlug} />
-          <Link
-            href="/onboarding"
-            className="block w-full rounded-lg border border-neutral-700 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50"
+          <button
+            type="button"
+            disabled={checkingLimit}
+            onClick={() => void handleRoastAgain()}
+            className="block w-full rounded-lg border border-neutral-700 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50 disabled:opacity-50"
           >
-            Roast me again
-          </Link>
+            {checkingLimit ? "Checking..." : "Roast me again"}
+          </button>
         </div>
       ) : null}
     </div>

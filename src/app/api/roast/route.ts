@@ -120,12 +120,13 @@ export async function POST(request: Request) {
       .from("roasts")
       .select("id")
       .eq("user_id", user.id)
-      .gte("created_at", today)
-      .single();
+      .gte("created_at", `${today}T00:00:00.000Z`)
+      .lte("created_at", `${today}T23:59:59.999Z`)
+      .maybeSingle();
 
     if (existingRoast) {
       return NextResponse.json(
-        { error: "You've used your free roast today. Upgrade to Pro for unlimited roasts 🔥" },
+        { error: "You've used your free roast today. Come back tomorrow or upgrade to Pro 🔥" },
         { status: 429 },
       );
     }
