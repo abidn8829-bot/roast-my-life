@@ -1,20 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ShareButtons } from "@/components/share-buttons";
 import { gradeColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
-import type { Grade, OnboardingAnswers, ReportCard } from "@/lib/roast-types";
+import type { CategoryScores, Grade, OnboardingAnswers, ReportCard } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-
-const GRADE_LABELS: { key: keyof ReportCard; label: string }[] = [
-  { key: "screenTime", label: "Screen Time" },
-  { key: "sleep", label: "Sleep" },
-  { key: "spending", label: "Spending" },
-  { key: "productivity", label: "Productivity" },
-];
 
 type Props = {
   roastId: string;
@@ -25,6 +17,10 @@ type Props = {
   canReact?: boolean;
   answers?: OnboardingAnswers;
   weekCount?: number;
+  lifeScore?: number;
+  funnyTitle?: string;
+  top5Roasts?: string[];
+  categoryScores?: CategoryScores;
 };
 
 export function RoastView({
@@ -34,90 +30,31 @@ export function RoastView({
   shareSlug,
   initialReaction = null,
   canReact = false,
-  answers,
   weekCount = 1,
+  lifeScore = 50,
+  funnyTitle = "Your Life",
+  top5Roasts = [],
+  categoryScores,
 }: Props) {
   const router = useRouter();
-  const [displayed, setDisplayed] = useState("");
-  const [doneTyping, setDoneTyping] = useState(false);
   const [reaction, setReaction] = useState<string | null>(initialReaction);
   const [savingReaction, setSavingReaction] = useState(false);
   const [checkingLimit, setCheckingLimit] = useState(false);
-  const indexRef = useRef(0);
+  const [showFullRoast, setShowFullRoast] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
-  // Find worst grade
-  const worstGrade = Object.entries(reportCard).reduce<{ key: string; grade: Grade } | null>(
-    (worst, [key, grade]) => {
-      if (!grade) return worst;
-      const gradeOrder: Record<Grade, number> = { F: 0, D: 1, C: 2, B: 3, A: 4 };
-      if (!worst || gradeOrder[grade] < gradeOrder[worst.grade]) {
-        return { key, grade };
-      }
-      return worst;
-    },
-    null
-  );
+  // Get color based on life score
+  const getScoreColor = (score: number) => {
+    if (score <= 40) return "text-red-500";
+    if (score <= 70) return "text-amber-500";
+    return "text-emerald-500";
+  };
 
-  const worstGradeLabel = worstGrade ? GRADE_LABELS.find(l => l.key === worstGrade.key)?.label || worstGrade.key : 'Unknown';
-
-  // Generate consequences based on answers
-  const consequences = answers ? generateConsequences(answers) : [];
-
-  function generateConsequences(ans: OnboardingAnswers): string[] {
-    const cons: string[] = [];
-    
-    if (ans.phoneHours >= 8) {
-      cons.push(`At ${ans.phoneHours}h/day of screen time, you'll have carpel tunnel by 30 and your attention span will be shorter than a TikTok.`);
-    } else if (ans.phoneHours >= 5) {
-      cons.push(`With ${ans.phoneHours}h daily screen time, your brain is literally rewiring itself to need constant dopamine hits.`);
-    }
-    
-    if (ans.sleepHours <= 5) {
-      cons.push(`Sleeping ${ans.sleepHours}h/night? Your cognitive decline is accelerating faster than your credit card debt.`);
-    } else if (ans.sleepHours <= 6) {
-      cons.push(`At ${ans.sleepHours}h of sleep, you're operating at 60% capacity. No wonder you're mediocre at everything.`);
-    }
-    
-    if (ans.foodDeliverySpend >= 200) {
-      cons.push(`$${ans.foodDeliverySpend}/week on delivery? That's $10k+ a year on laziness. Your bank account is crying.`);
-    } else if (ans.foodDeliverySpend >= 100) {
-      cons.push(`Spending $${ans.foodDeliverySpend}/week on delivery adds up to $5k/year. Hope that instant gratification is worth it.`);
-    }
-    
-    if (ans.socialMediaHours && ans.socialMediaHours >= 4) {
-      cons.push(`${ans.socialMediaHours}h on social media daily? You're literally watching other people live instead of living your own life.`);
-    }
-    
-    if (ans.workoutFrequency === 0) {
-      cons.push(`Zero workouts this week? Your muscles are atrophying as we speak. Sedentary lifestyle incoming.`);
-    }
-    
-    // Return 2-3 consequences
-    return cons.slice(0, 3);
-  }
-
-  useEffect(() => {
-    setDisplayed("");
-    setDoneTyping(false);
-    indexRef.current = 0;
-    let timeoutId: number | undefined;
-
-    const tick = () => {
-      indexRef.current += 1;
-      setDisplayed(roastText.slice(0, indexRef.current));
-      if (indexRef.current < roastText.length) {
-        timeoutId = window.setTimeout(tick, 18);
-      } else {
-        setDoneTyping(true);
-      }
-    };
-
-    timeoutId = window.setTimeout(tick, 400);
-
-    return () => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-    };
-  }, [roastText]);
+  const getScoreBgColor = (score: number) => {
+    if (score <= 40) return "from-red-500/20 to-red-500/5";
+    if (score <= 70) return "from-amber-500/20 to-amber-500/5";
+    return "from-emerald-500/20 to-emerald-500/5";
+  };
 
   async function onReaction(emoji: ReactionEmoji) {
     if (!canReact || savingReaction) return;
@@ -142,7 +79,6 @@ export function RoastView({
 
   async function handleRoastAgain() {
     if (!canReact) {
-      // Not authenticated, just go to onboarding
       router.push("/onboarding");
       return;
     }
@@ -157,7 +93,6 @@ export function RoastView({
         return;
       }
 
-      // Check user's subscription tier
       const { data: userData } = await supabase
         .from("users")
         .select("subscription_tier")
@@ -166,7 +101,6 @@ export function RoastView({
 
       const subscriptionTier = userData?.subscription_tier || "free";
 
-      // If free tier, check if they already have a roast today
       if (subscriptionTier === "free") {
         const today = new Date().toISOString().split('T')[0];
         const { data: existingRoast } = await supabase
@@ -178,13 +112,11 @@ export function RoastView({
           .maybeSingle();
 
         if (existingRoast) {
-          // Already used free roast today, redirect to pricing
           router.push("/pricing");
           return;
         }
       }
 
-      // Can roast again
       router.push("/onboarding");
     } catch (error) {
       console.error("Error checking roast limit:", error);
@@ -194,97 +126,125 @@ export function RoastView({
     }
   }
 
-  return (
-    <div className="relative flex w-full max-w-lg flex-col gap-8">
-      <div
-        className="pointer-events-none absolute -top-24 left-1/2 h-48 w-48 -translate-x-1/2 rounded-full opacity-30 blur-3xl"
-        style={{ background: "radial-gradient(circle, #FF3D00 0%, transparent 70%)" }}
-      />
+  function copyToClipboard(text: string, index: number) {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  }
 
-      <header className="relative z-10 flex flex-col items-center gap-2 text-center">
-        <span className="text-4xl" aria-hidden>
-          🔥
-        </span>
-        <p className="text-xs font-semibold tracking-[0.35em] text-[#FF3D00]">
-          YOUR WEEKLY ROAST
+  const categoryRoasts: Record<string, string> = {
+    sleep: "Your sleep schedule is a disaster waiting to happen.",
+    fitness: "Your workout routine is non-existent.",
+    discipline: "Your discipline is weaker than your excuses.",
+    focus: "Your attention span is microscopic.",
+    spending: "Your spending habits are financially suicidal.",
+  };
+
+  return (
+    <div className="flex w-full max-w-2xl flex-col gap-8 pb-12">
+      {/* Life Score Section */}
+      <div className="relative flex flex-col items-center gap-4 text-center">
+        <div
+          className={`absolute inset-0 -z-10 rounded-full blur-3xl opacity-30 bg-gradient-to-b ${getScoreBgColor(lifeScore)}`}
+        />
+        <p className="text-xs font-semibold tracking-[0.35em] text-neutral-500 uppercase">
+          Your Life Score
         </p>
-        <h1 className="text-2xl font-bold tracking-tight text-[#FAFAFA]">
-          Report Card
+        <div className={`text-8xl font-black tracking-tighter ${getScoreColor(lifeScore)}`}>
+          {lifeScore}
+          <span className="text-4xl text-neutral-500">/100</span>
+        </div>
+        <h1 className="text-3xl font-bold tracking-tight text-[#FAFAFA] sm:text-4xl">
+          {funnyTitle}
         </h1>
         <p className="text-xs text-neutral-500">
           Week {weekCount} of facing reality
         </p>
-      </header>
+      </div>
 
-      <article className="relative z-10 rounded-xl border border-neutral-800/80 bg-[#111111] p-5 shadow-[0_0_40px_rgba(255,61,0,0.06)]">
-        <p className="whitespace-pre-wrap text-base leading-relaxed text-[#FAFAFA]">
-          {displayed}
-          {!doneTyping ? (
-            <span className="ml-0.5 inline-block animate-pulse text-[#FF3D00]">
-              |
-            </span>
-          ) : null}
-        </p>
-      </article>
-
-      {doneTyping ? (
-        <>
-          {/* Worst Grade Callout */}
-          {worstGrade && (
-            <div className="relative z-10 rounded-xl border-2 border-[#FF3D00] bg-[#FF3D00]/10 p-4">
-              <p className="text-center text-sm font-semibold text-[#FF3D00]">
-                Your biggest problem this week 🔥
-              </p>
-              <div className="mt-2 flex items-center justify-center gap-2">
-                <span className="text-lg font-bold text-[#FAFAFA]">{worstGradeLabel}:</span>
-                <span className={`text-3xl font-black ${gradeColor(worstGrade.grade)}`}>{worstGrade.grade}</span>
+      {/* Category Scorecards */}
+      {categoryScores && (
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries(categoryScores).map(([key, data]) => (
+            <div
+              key={key}
+              className={`rounded-xl border border-neutral-800 bg-[#111111] p-5 transition-transform hover:scale-[1.02] ${gradeColor(data.grade)}`}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-semibold uppercase tracking-wide text-neutral-400">
+                  {key}
+                </span>
+                <span className="text-2xl font-black">{data.grade}</span>
               </div>
+              <div className="mb-2 text-3xl font-bold text-[#FAFAFA]">
+                {Math.round(data.score / 10)}/10
+              </div>
+              <p className="text-xs text-neutral-400">{categoryRoasts[key] || "Needs improvement."}</p>
             </div>
-          )}
+          ))}
+        </section>
+      )}
 
-          <section className="relative z-10">
-            <p className="mb-3 text-center text-xs font-medium uppercase tracking-widest text-neutral-500">
-              The damage
+      {/* Top 5 Roasts */}
+      {top5Roasts.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <p className="text-center text-sm font-semibold uppercase tracking-widest text-neutral-500">
+            Top 5 Roasts
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {top5Roasts.map((roast, index) => (
+              <div
+                key={index}
+                className="group relative rounded-xl border border-neutral-800 bg-[#111111] p-4 transition-all hover:border-[#FF3D00]/50 hover:bg-[#1a1a1a]"
+              >
+                <p className="text-sm text-[#FAFAFA]">{roast}</p>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(roast, index)}
+                  className="absolute right-3 top-3 opacity-0 transition-opacity group-hover:opacity-100"
+                  aria-label="Copy roast"
+                >
+                  {copiedIndex === index ? (
+                    <svg className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Share Buttons */}
+      <ShareButtons roastId={roastId} shareSlug={shareSlug} />
+
+      {/* Expandable Full Roast */}
+      <section className="flex flex-col gap-4">
+        {!showFullRoast ? (
+          <button
+            type="button"
+            onClick={() => setShowFullRoast(true)}
+            className="w-full rounded-lg border border-neutral-800 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50 hover:bg-[#111111]"
+          >
+            Read full roast
+          </button>
+        ) : (
+          <div className="rounded-xl border border-neutral-800 bg-[#111111] p-6">
+            <p className="whitespace-pre-wrap text-base leading-relaxed text-[#FAFAFA]">
+              {roastText}
             </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {GRADE_LABELS.map(({ key, label }) => {
-                const grade = reportCard[key];
-                return (
-                  <div
-                    key={key}
-                    className={`flex flex-col items-center gap-1 rounded-xl border px-3 py-4 text-center transition-transform hover:scale-[1.02] ${gradeColor(grade ?? 'F')}`}
-                  >
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
-                      {label}
-                    </span>
-                    <span className="text-3xl font-black">{grade}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
+          </div>
+        )}
+      </section>
 
-          {/* Consequences Section */}
-          {consequences.length > 0 && (
-            <div className="relative z-10 rounded-xl border border-neutral-800 bg-[#111111] p-5">
-              <p className="mb-3 text-center text-sm font-semibold text-[#FAFAFA]">
-                If you keep this up...
-              </p>
-              <ul className="space-y-2">
-                {consequences.map((consequence, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm text-neutral-300">
-                    <span className="mt-0.5 text-[#FF3D00]">•</span>
-                    <span>{consequence}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </>
-      ) : null}
-
-      {doneTyping && canReact ? (
-        <section className="relative z-10 flex flex-col items-center gap-3">
+      {/* Reactions */}
+      {canReact && (
+        <section className="flex flex-col items-center gap-3">
           <p className="text-sm text-neutral-400">How did that feel?</p>
           <div className="flex gap-2">
             {REACTION_EMOJIS.map((emoji) => (
@@ -305,21 +265,17 @@ export function RoastView({
             ))}
           </div>
         </section>
-      ) : null}
+      )}
 
-      {doneTyping ? (
-        <div className="relative z-10 flex flex-col gap-6">
-          <ShareButtons roastId={roastId} shareSlug={shareSlug} />
-          <button
-            type="button"
-            disabled={checkingLimit}
-            onClick={() => void handleRoastAgain()}
-            className="block w-full rounded-lg border border-neutral-700 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50 disabled:opacity-50"
-          >
-            {checkingLimit ? "Checking..." : "Roast me again"}
-          </button>
-        </div>
-      ) : null}
+      {/* Roast Again Button */}
+      <button
+        type="button"
+        disabled={checkingLimit}
+        onClick={() => void handleRoastAgain()}
+        className="w-full rounded-lg border border-neutral-700 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50 disabled:opacity-50"
+      >
+        {checkingLimit ? "Checking..." : "Roast me again"}
+      </button>
     </div>
   );
 }

@@ -55,6 +55,10 @@ export default async function RoastDetailPage({
           canReact
           answers={roast.answers}
           weekCount={weekCount}
+          lifeScore={roast.life_score}
+          funnyTitle={roast.funny_title}
+          top5Roasts={roast.top_5_roasts}
+          categoryScores={roast.category_scores}
         />
       </main>
     );
@@ -85,6 +89,10 @@ export default async function RoastDetailPage({
   let canReact = false;
   let answers: OnboardingAnswers | undefined = undefined;
   let weekCount = 1;
+  let lifeScore: number | undefined = undefined;
+  let funnyTitle: string | undefined = undefined;
+  let top5Roasts: string[] | undefined = undefined;
+  let categoryScores: import("@/lib/roast-types").CategoryScores | undefined = undefined;
   
   if (user) {
     const owned = await fetchOwnRoastById(supabase, row.id, user.id);
@@ -92,6 +100,10 @@ export default async function RoastDetailPage({
       canReact = true;
       initialReaction = owned.reaction;
       answers = owned.answers;
+      lifeScore = owned.life_score;
+      funnyTitle = owned.funny_title;
+      top5Roasts = owned.top_5_roasts;
+      categoryScores = owned.category_scores;
     }
     
     // Fetch week count
@@ -115,6 +127,10 @@ export default async function RoastDetailPage({
         canReact={canReact}
         answers={answers}
         weekCount={weekCount}
+        lifeScore={lifeScore}
+        funnyTitle={funnyTitle}
+        top5Roasts={top5Roasts}
+        categoryScores={categoryScores}
       />
     </main>
   );
