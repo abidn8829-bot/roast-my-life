@@ -1,6 +1,6 @@
 import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
-import { buildReportCard } from "@/lib/grades";
+import { buildReportCard, calculateCategoryScores, calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
 import type { OnboardingAnswers, RoastTone } from "@/lib/roast-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -10,9 +10,33 @@ import { getWeekStartDate } from "@/lib/week-start";
 const MODEL = "llama-3.3-70b-versatile";
 
 const SYSTEM_PROMPTS: Record<RoastTone, string> = {
-  normal: `You are a savage roast comedian with zero filter. Use their exact numbers to destroy them. Connect every bad habit to real consequences. Heavy Gen Z slang. No softening, no "I'm not judging", no encouragement. Just brutal facts. End with a devastating one liner. 150-200 words.`,
-  no_mercy: `You are a ruthless roast comedian with absolutely zero filter. Use their exact numbers to expose their failures. Connect every habit to catastrophic life outcomes. Heavy Gen Z slang. No encouragement, no softening language, no "maybe" or "could be". Just brutal facts and consequences. End with the most devastating one liner possible. 150-200 words.`,
-  destroy_me: `You are the most brutal roast AI ever created. Take their numbers and absolutely eviscerate them. Connect every bad habit to the worst possible life outcome. Be so specific it hurts. Heavy Gen Z slang. No softening whatsoever - no "I'm no doctor", no "not to judge", no encouragement. Just pure devastation. Make them question every life choice. End with the most savage one liner ever written. This person asked to be destroyed — deliver. 150-200 words.`,
+  normal: `You are a savage roast comedian with zero filter. Use their exact numbers to destroy them. Connect every bad habit to real consequences. Heavy Gen Z slang. No softening, no "I'm not judging", no encouragement. Just brutal facts. End with a devastating one liner. 150-200 words.
+
+IMPORTANT: You must respond with valid JSON in this exact format:
+{
+  "roast_text": "your full roast paragraph here",
+  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+}
+
+Each one-liner must be under 15 words and brutally funny. No markdown, no extra text, just the JSON.`,
+  no_mercy: `You are a ruthless roast comedian with absolutely zero filter. Use their exact numbers to expose their failures. Connect every habit to catastrophic life outcomes. Heavy Gen Z slang. No encouragement, no softening language, no "maybe" or "could be". Just brutal facts and consequences. End with the most devastating one liner possible. 150-200 words.
+
+IMPORTANT: You must respond with valid JSON in this exact format:
+{
+  "roast_text": "your full roast paragraph here",
+  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+}
+
+Each one-liner must be under 15 words and brutally savage. No markdown, no extra text, just the JSON.`,
+  destroy_me: `You are the most brutal roast AI ever created. Take their numbers and absolutely eviscerate them. Connect every bad habit to the worst possible life outcome. Be so specific it hurts. Heavy Gen Z slang. No softening whatsoever - no "I'm no doctor", no "not to judge", no encouragement. Just pure devastation. Make them question every life choice. End with the most savage one liner ever written. This person asked to be destroyed — deliver. 150-200 words.
+
+IMPORTANT: You must respond with valid JSON in this exact format:
+{
+  "roast_text": "your full roast paragraph here",
+  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+}
+
+Each one-liner must be under 15 words and absolutely devastating. No markdown, no extra text, just the JSON.`,
 };
 
 function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastTone } | null {
@@ -151,6 +175,7 @@ export async function POST(request: Request) {
   const groq = new Groq({ apiKey });
 
   let roastText: string;
+  let top5Roasts: string[] = [];
   try {
     const completion = await groq.chat.completions.create({
       model: MODEL,
@@ -159,10 +184,11 @@ export async function POST(request: Request) {
         { role: "system", content: SYSTEM_PROMPTS[tone] },
         { role: "user", content: formatUserMessage(answers) },
       ],
+      response_format: { type: "json_object" },
     });
 
-    roastText = completion.choices[0]?.message?.content?.trim() ?? "";
-    if (!roastText) {
+    const content = completion.choices[0]?.message?.content?.trim() ?? "";
+    if (!content) {
       console.error(
         "[api/roast] Empty content in response:",
         completion.choices,
@@ -171,6 +197,18 @@ export async function POST(request: Request) {
         { error: "Empty response from model" },
         { status: 502 },
       );
+    }
+
+    // Parse JSON response
+    try {
+      const parsed = JSON.parse(content);
+      roastText = parsed.roast_text || content;
+      top5Roasts = parsed.top_5_roasts || [];
+      console.log("[api/roast] Parsed AI response:", { roastText: roastText.substring(0, 100), top5Roasts });
+    } catch (parseError) {
+      console.error("[api/roast] Failed to parse JSON response, using raw content:", parseError);
+      roastText = content;
+      top5Roasts = [];
     }
   } catch (err) {
     logGroqError(err);
@@ -183,6 +221,9 @@ export async function POST(request: Request) {
   const report_card = buildReportCard(answers);
   const week_start_date = getWeekStartDate();
   const share_slug = generateShareSlug();
+  const life_score = calculateLifeScore(answers);
+  const funny_title = getFunnyTitle(life_score);
+  const category_scores = calculateCategoryScores(answers);
 
   const baseRow = {
     user_id: user.id,
@@ -192,6 +233,10 @@ export async function POST(request: Request) {
     model_used: MODEL,
     share_slug,
     answers,
+    life_score,
+    funny_title,
+    top_5_roasts: top5Roasts,
+    category_scores,
   };
 
   console.log("[api/roast] Preparing to insert roast with data:", {

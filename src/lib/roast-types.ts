@@ -9,6 +9,19 @@ export type ReportCard = {
   fitness?: Grade;
 };
 
+export type CategoryScore = {
+  score: number;
+  grade: Grade;
+};
+
+export type CategoryScores = {
+  sleep: CategoryScore;
+  fitness: CategoryScore;
+  discipline: CategoryScore;
+  focus: CategoryScore;
+  spending: CategoryScore;
+};
+
 export type OnboardingAnswers = {
   phoneHours: number;
   worstApp: string;
@@ -31,4 +44,8 @@ export type RoastRow = {
   share_slug: string;
   tone?: RoastTone;
   created_at?: string;
+  life_score?: number;
+  funny_title?: string;
+  top_5_roasts?: string[];
+  category_scores?: CategoryScores;
 };
