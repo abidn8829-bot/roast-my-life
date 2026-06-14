@@ -17,7 +17,8 @@ const LOADING_MESSAGES = [
 const BASE_QUESTIONS = [
   {
     key: "phoneHours" as const,
-    label: "How many hours a day are you on your phone?",
+    label: "How many hours a day are you glued to your phone, pretending to be productive?",
+    emoji: "📱",
     type: "number" as const,
     min: 1,
     max: 20,
@@ -25,13 +26,15 @@ const BASE_QUESTIONS = [
   },
   {
     key: "worstApp" as const,
-    label: "What app do you waste the most time on?",
+    label: "Which app is currently winning the battle for your soul?",
+    emoji: "🎭",
     type: "text" as const,
     placeholder: "TikTok, Instagram…",
   },
   {
     key: "sleepHours" as const,
-    label: "How many hours of sleep do you get on average?",
+    label: "How many hours of sleep are you sacrificing for absolutely no reason?",
+    emoji: "😴",
     type: "number" as const,
     min: 1,
     max: 12,
@@ -39,14 +42,16 @@ const BASE_QUESTIONS = [
   },
   {
     key: "foodDeliverySpend" as const,
-    label: "How much do you spend on food delivery per week in dollars?",
+    label: "How much money do you throw at food delivery because cooking is apparently impossible?",
+    emoji: "💸",
     type: "number" as const,
     min: 0,
     placeholder: "75",
   },
   {
     key: "neverDoThing" as const,
-    label: "What's one thing you keep saying you'll do but never do?",
+    label: "What's your biggest broken promise to yourself?",
+    emoji: "🤥",
     type: "text" as const,
     placeholder: "Go to the gym, read more…",
   },
@@ -55,7 +60,8 @@ const BASE_QUESTIONS = [
 const PRO_QUESTIONS = [
   {
     key: "socialMediaHours" as const,
-    label: "How many hours do you spend on social media per day?",
+    label: "How many hours do you doomscroll social media daily?",
+    emoji: "👀",
     type: "number" as const,
     min: 0,
     max: 20,
@@ -63,7 +69,8 @@ const PRO_QUESTIONS = [
   },
   {
     key: "workoutFrequency" as const,
-    label: "How many times did you workout this week?",
+    label: "How many times did you actually move your body this week?",
+    emoji: "🏃",
     type: "number" as const,
     min: 0,
     max: 14,
@@ -74,10 +81,10 @@ const PRO_QUESTIONS = [
 type Step = number | "tone" | "loading";
 
 const inputClass =
-  "w-full rounded-md border border-neutral-800 bg-[#141414] px-3 py-2.5 text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2";
+  "w-full rounded-xl border-2 border-neutral-800 bg-[#141414] px-5 py-4 text-xl text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2 transition-all";
 
 const labelClass =
-  "text-lg font-medium leading-relaxed text-[#FAFAFA] break-words whitespace-normal";
+  "text-2xl sm:text-3xl font-bold leading-relaxed text-[#FAFAFA] break-words whitespace-normal text-center";
 
 export function OnboardingWizard() {
   const router = useRouter();
@@ -264,75 +271,83 @@ export function OnboardingWizard() {
   const q = allQuestions[slideIndex];
 
   return (
-    <div className="w-full max-w-md">
-      <div className="mb-6 flex items-center justify-between text-sm text-neutral-500">
-        <span>
-          {slideIndex + 1} / {allQuestions.length}
-        </span>
-        <div className="flex gap-1">
+    <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-2xl">
+        {/* Progress indicator */}
+        <div className="mb-8 flex items-center justify-center gap-2">
           {allQuestions.map((_, i) => (
             <span
               key={i}
-              className={`h-1.5 w-6 rounded-full transition-colors ${
-                i <= slideIndex ? "bg-[#FF3D00]" : "bg-neutral-800"
+              className={`h-2 w-8 rounded-full transition-all ${
+                i === slideIndex ? "bg-[#FF3D00] scale-110" : i < slideIndex ? "bg-[#FF3D00]/50" : "bg-neutral-800"
               }`}
             />
           ))}
         </div>
-      </div>
 
-      <div
-        key={q.key}
-        className="transition-opacity duration-300"
-      >
-        <label className="flex flex-col gap-3">
-          <span className={labelClass}>{q.label}</span>
-          {q.type === "text" ? (
-            <textarea
-              rows={3}
-              placeholder={q.placeholder}
-              value={values[q.key]}
-              onChange={(e) => setters[q.key](e.target.value)}
-              className={`${inputClass} resize-y min-h-[2.75rem]`}
-            />
+        {/* Question card */}
+        <div
+          key={q.key}
+          className="flex flex-col items-center gap-8 text-center transition-opacity duration-300"
+        >
+          {/* Big emoji */}
+          <div className="text-9xl animate-bounce" style={{ animationDuration: "2s" }}>
+            {q.emoji}
+          </div>
+
+          {/* Question */}
+          <label className="flex w-full flex-col gap-6">
+            <span className={labelClass}>{q.label}</span>
+            
+            {/* Input */}
+            {q.type === "text" ? (
+              <textarea
+                rows={2}
+                placeholder={q.placeholder}
+                value={values[q.key]}
+                onChange={(e) => setters[q.key](e.target.value)}
+                className={`${inputClass} resize-y min-h-[4rem]`}
+              />
+            ) : (
+              <input
+                type="number"
+                min={q.min}
+                max={q.max}
+                placeholder={q.placeholder}
+                value={values[q.key]}
+                onChange={(e) => setters[q.key](e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") onNext();
+                }}
+                className={inputClass}
+              />
+            )}
+          </label>
+        </div>
+
+        {error ? <p className="mt-4 text-center text-sm text-red-300">{error}</p> : null}
+
+        {/* Navigation buttons */}
+        <div className="mt-12 flex justify-center gap-4">
+          {slideIndex > 0 ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="rounded-xl border border-neutral-700 px-8 py-4 text-lg font-medium text-neutral-300 transition hover:border-neutral-500 hover:bg-neutral-900"
+            >
+              ← Back
+            </button>
           ) : (
-            <input
-              type="number"
-              min={q.min}
-              max={q.max}
-              placeholder={q.placeholder}
-              value={values[q.key]}
-              onChange={(e) => setters[q.key](e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onNext();
-              }}
-              className={inputClass}
-            />
+            <span />
           )}
-        </label>
-      </div>
-
-      {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
-
-      <div className="mt-8 flex justify-between gap-3">
-        {slideIndex > 0 ? (
           <button
             type="button"
-            onClick={onBack}
-            className="rounded-md border border-neutral-700 px-4 py-2.5 text-sm text-neutral-300 transition hover:border-neutral-500"
+            onClick={onNext}
+            className="rounded-xl bg-[#FF3D00] px-8 py-4 text-lg font-medium text-white transition hover:brightness-110 hover:scale-105"
           >
-            Back
+            {slideIndex === allQuestions.length - 1 ? "Choose Tone →" : "Next →"}
           </button>
-        ) : (
-          <span />
-        )}
-        <button
-          type="button"
-          onClick={onNext}
-          className="ml-auto rounded-md bg-[#FF3D00] px-5 py-2.5 text-sm font-medium text-white transition hover:brightness-110"
-        >
-          {slideIndex === allQuestions.length - 1 ? "Choose Tone" : "Next"}
-        </button>
+        </div>
       </div>
     </div>
   );
