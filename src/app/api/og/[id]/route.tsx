@@ -3,13 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "edge";
 
-const LABELS = [
-  { key: "screenTime", label: "Screen Time" },
-  { key: "sleep", label: "Sleep" },
-  { key: "spending", label: "Spending" },
-  { key: "productivity", label: "Productivity" },
-];
-
 function getGradeColor(grade: string): string {
   switch (grade) {
     case "A":
@@ -26,12 +19,18 @@ function getGradeColor(grade: string): string {
   }
 }
 
+function getScoreColor(score: number): string {
+  if (score <= 40) return "#ef4444";
+  if (score <= 70) return "#f59e0b";
+  return "#10b981";
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -39,7 +38,7 @@ export async function GET(
 
   const { data: roast } = await supabase
     .from("roasts")
-    .select("report_card")
+    .select("life_score, funny_title, top_5_roasts, category_scores")
     .eq("id", id)
     .single();
 
@@ -47,7 +46,27 @@ export async function GET(
     return new Response("Roast not found", { status: 404 });
   }
 
-  const card = roast.report_card ?? {};
+  const lifeScore = roast.life_score ?? 50;
+  const funnyTitle = roast.funny_title ?? "Your Life";
+  const topRoasts = roast.top_5_roasts ?? ["You need to do better."];
+  const categoryScores = roast.category_scores;
+
+  // Find worst and best categories
+  let worstCategory = { name: "Unknown", grade: "F", score: 0 };
+  let bestCategory = { name: "Unknown", grade: "A", score: 100 };
+
+  if (categoryScores) {
+    const entries = Object.entries(categoryScores);
+    for (const [name, data] of entries) {
+      const categoryData = data as { score: number; grade: string };
+      if (categoryData.score < worstCategory.score) {
+        worstCategory = { name, grade: categoryData.grade, score: categoryData.score };
+      }
+      if (categoryData.score > bestCategory.score) {
+        bestCategory = { name, grade: categoryData.grade, score: categoryData.score };
+      }
+    }
+  }
 
   return new ImageResponse(
     (
@@ -58,66 +77,184 @@ export async function GET(
           display: "flex",
           flexDirection: "column",
           background: "#0A0A0A",
-          padding: 56,
+          padding: 60,
           fontFamily: "system-ui, sans-serif",
         }}
       >
+        {/* Life Score */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            marginBottom: 40,
+            marginBottom: 30,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 32,
+              fontWeight: 600,
+              letterSpacing: 4,
+              color: "#666",
+              marginBottom: 10,
+            }}
+          >
+            YOUR LIFE SCORE
+          </span>
+          <span
+            style={{
+              fontSize: 180,
+              fontWeight: 900,
+              color: getScoreColor(lifeScore),
+              lineHeight: 1,
+            }}
+          >
+            {lifeScore}
+            <span style={{ fontSize: 80, color: "#666" }}>/100</span>
+          </span>
+        </div>
+
+        {/* Funny Title */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginBottom: 50,
           }}
         >
           <span
             style={{
               fontSize: 48,
+              fontWeight: 700,
+              color: "#FAFAFA",
+              textAlign: "center",
+            }}
+          >
+            {funnyTitle}
+          </span>
+        </div>
+
+        {/* Worst and Best Categories */}
+        <div
+          style={{
+            display: "flex",
+            gap: 30,
+            marginBottom: 50,
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              padding: 30,
+              borderRadius: 20,
+              background: "#141414",
+              border: "2px solid #262626",
+            }}
+          >
+            <span style={{ fontSize: 20, color: "#666", marginBottom: 10 }}>
+              WORST
+            </span>
+            <span
+              style={{
+                fontSize: 36,
+                fontWeight: 700,
+                color: "#FAFAFA",
+                marginBottom: 10,
+              }}
+            >
+              {worstCategory.name.toUpperCase()}
+            </span>
+            <span
+              style={{
+                fontSize: 80,
+                fontWeight: 900,
+                color: getGradeColor(worstCategory.grade),
+              }}
+            >
+              {worstCategory.grade}
+            </span>
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              padding: 30,
+              borderRadius: 20,
+              background: "#141414",
+              border: "2px solid #262626",
+            }}
+          >
+            <span style={{ fontSize: 20, color: "#666", marginBottom: 10 }}>
+              BEST
+            </span>
+            <span
+              style={{
+                fontSize: 36,
+                fontWeight: 700,
+                color: "#FAFAFA",
+                marginBottom: 10,
+              }}
+            >
+              {bestCategory.name.toUpperCase()}
+            </span>
+            <span
+              style={{
+                fontSize: 80,
+                fontWeight: 900,
+                color: getGradeColor(bestCategory.grade),
+              }}
+            >
+              {bestCategory.grade}
+            </span>
+          </div>
+        </div>
+
+        {/* Best Roast One-Liner */}
+        <div
+          style={{
+            padding: 30,
+            borderRadius: 20,
+            background: "#141414",
+            border: "2px solid #FF3D00",
+            marginBottom: 50,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 32,
+              fontWeight: 600,
+              color: "#FAFAFA",
+              lineHeight: 1.4,
+            }}
+          >
+            "{topRoasts[0]}"
+          </span>
+        </div>
+
+        {/* App Name */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            marginTop: "auto",
+          }}
+        >
+          <span
+            style={{
+              fontSize: 36,
               fontWeight: 800,
-              letterSpacing: 6,
+              letterSpacing: 4,
               color: "#FF3D00",
             }}
           >
             ROAST MY LIFE
           </span>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 20,
-            justifyContent: "center",
-          }}
-        >
-          {LABELS.map(({ key, label }) => (
-            <div
-              key={key}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                width: 220,
-                padding: 24,
-                borderRadius: 16,
-                border: "2px solid #262626",
-                background: "#141414",
-              }}
-            >
-              <span style={{ fontSize: 16, color: "#a3a3a3", marginBottom: 8 }}>
-                {label}
-              </span>
-              <span
-                style={{
-                  fontSize: 72,
-                  fontWeight: 800,
-                  color: getGradeColor(card[key] ?? "F"),
-                }}
-              >
-                {card[key] ?? "F"}
-              </span>
-            </div>
-          ))}
         </div>
       </div>
     ),

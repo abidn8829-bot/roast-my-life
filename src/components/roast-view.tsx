@@ -223,6 +223,17 @@ export function RoastView({
       {/* Share Buttons */}
       <ShareButtons roastId={roastId} shareSlug={shareSlug} />
 
+      {/* Copy Roast Button */}
+      {top5Roasts.length > 0 && (
+        <button
+          type="button"
+          onClick={() => copyToClipboard(top5Roasts[0], -1)}
+          className="w-full rounded-lg border border-neutral-800 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50 hover:bg-[#111111]"
+        >
+          {copiedIndex === -1 ? "✓ Copied!" : `📋 Copy: "${top5Roasts[0]}"`}
+        </button>
+      )}
+
       {/* Expandable Full Roast */}
       <section className="flex flex-col gap-4">
         {!showFullRoast ? (
