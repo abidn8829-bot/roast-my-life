@@ -2,12 +2,24 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DashboardView, type DashboardRoast } from "@/components/dashboard-view";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { parseAchievements } from "@/lib/achievements";
 import { getDisplayName } from "@/lib/display-name";
-import { parseAnswers } from "@/lib/parse-answers";
-import { parseReportCard } from "@/lib/parse-report-card";
+import { parseCategoryScores } from "@/lib/parse-category-scores";
+import { calculateStreak } from "@/lib/streak";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+type RoastRow = {
+  id: string;
+  roast_text: string;
+  week_start_date: string;
+  share_slug: string;
+  life_score: number | null;
+  funny_title: string | null;
+  category_scores: unknown;
+  created_at: string;
+};
 
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
@@ -19,100 +31,63 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Fetch user's subscription tier
   const { data: userData } = await supabase
     .from("users")
-    .select("subscription_tier")
+    .select("subscription_tier, achievements")
     .eq("id", user.id)
     .single();
 
   const subscriptionTier = userData?.subscription_tier || "free";
+  const achievements = parseAchievements(userData?.achievements);
 
-  let rows: Array<{
-    id: string;
-    roast_text: string;
-    report_card: unknown;
-    week_start_date: string;
-    share_slug: string;
-    answers?: unknown;
-    created_at: string;
-  }> | null = null;
-
-  // Filter roasts based on tier
   let query = supabase
     .from("roasts")
     .select(
-      "id, roast_text, report_card, week_start_date, share_slug, answers, created_at",
+      "id, roast_text, week_start_date, share_slug, life_score, funny_title, category_scores, created_at",
     )
     .eq("user_id", user.id)
-    .order("week_start_date", { ascending: false })
     .order("created_at", { ascending: false });
 
   if (subscriptionTier === "free") {
-    // Free tier: only last 7 days
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     query = query.gte("created_at", sevenDaysAgo.toISOString());
   }
 
-  // Pro tier: no limit, but still reasonable limit for performance
   const limit = subscriptionTier === "pro" ? 100 : 12;
-  query = query.limit(limit);
+  const { data, error } = await query.limit(limit);
 
-  const { data, error } = await query;
-
-  if (error?.code === "42703" || error?.message?.includes("answers")) {
-    let fallbackQuery = supabase
-      .from("roasts")
-      .select(
-        "id, roast_text, report_card, week_start_date, share_slug, created_at",
-      )
-      .eq("user_id", user.id)
-      .order("week_start_date", { ascending: false })
-      .order("created_at", { ascending: false });
-
-    if (subscriptionTier === "free") {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      fallbackQuery = fallbackQuery.gte("created_at", sevenDaysAgo.toISOString());
-    }
-
-    const fallback = await fallbackQuery.limit(limit);
-    rows = fallback.data;
-    if (fallback.error) {
-      console.error("[dashboard] fetch error:", fallback.error.message);
-    }
-  } else {
-    rows = data;
-    if (error) {
-      console.error("[dashboard] fetch error:", error.message);
-    }
+  if (error) {
+    console.error("[dashboard] fetch error:", error.message);
   }
 
+  const rows = (data ?? []) as RoastRow[];
+
   const roasts: DashboardRoast[] = [];
-  for (const row of rows ?? []) {
-    const report_card = parseReportCard(row.report_card);
-    if (!report_card) continue;
+  for (const row of rows) {
     roasts.push({
       id: row.id,
       roast_text: row.roast_text,
-      report_card,
       week_start_date: row.week_start_date,
       share_slug: row.share_slug,
-      answers: parseAnswers(row.answers),
+      life_score: row.life_score,
+      funny_title: row.funny_title,
+      category_scores: parseCategoryScores(row.category_scores),
+      created_at: row.created_at,
     });
   }
 
+  const streak = calculateStreak(rows.map((r) => r.created_at));
   const name = getDisplayName(user);
 
   return (
     <main className="min-h-screen bg-[#0A0A0A] px-4 py-10 text-[#FAFAFA]">
-      <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
         <DashboardHeader isPro={subscriptionTier === "pro"} name={name} />
         {subscriptionTier === "free" && (
           <div className="rounded-xl border border-neutral-800 bg-[#111111] p-4">
             <p className="text-sm text-neutral-300">
-              You're on the free plan — 1 roast per day
+              You&apos;re on the free plan — 1 roast per day
             </p>
             {process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL && (
               <a
@@ -126,7 +101,12 @@ export default async function DashboardPage() {
             )}
           </div>
         )}
-        <DashboardView name={name} roasts={roasts} isPro={subscriptionTier === "pro"} />
+        <DashboardView
+          name={name}
+          roasts={roasts}
+          streak={streak}
+          achievements={achievements}
+        />
       </div>
     </main>
   );

@@ -1,5 +1,6 @@
 import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
+import { unlockAchievements } from "@/lib/achievements";
 import { buildReportCard, calculateCategoryScores, calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
 import type { OnboardingAnswers, RoastTone } from "@/lib/roast-types";
@@ -269,6 +270,12 @@ export async function POST(request: Request) {
   }
 
   console.log("[api/roast] Successfully inserted roast with ID:", data?.id);
+
+  try {
+    await unlockAchievements(supabase, user.id, life_score);
+  } catch (err) {
+    console.error("[api/roast] Failed to unlock achievements:", err);
+  }
 
   const roastId = data?.id ? String(data.id) : "";
   if (!roastId) {

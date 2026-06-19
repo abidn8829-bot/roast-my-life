@@ -1,179 +1,334 @@
 import Link from "next/link";
-import { gradeColor } from "@/lib/grades";
+import { ACHIEVEMENTS, type UserAchievements } from "@/lib/achievements";
 import { formatWeekLabel, snippet } from "@/lib/format-week";
-import { getWeekStartDate } from "@/lib/week-start";
-import type { OnboardingAnswers, ReportCard, Grade } from "@/lib/roast-types";
+import type { CategoryScores } from "@/lib/roast-types";
 
 export type DashboardRoast = {
   id: string;
   roast_text: string;
-  report_card: ReportCard;
   week_start_date: string;
   share_slug: string;
-  answers: OnboardingAnswers | null;
+  life_score: number | null;
+  funny_title: string | null;
+  category_scores: CategoryScores | null;
+  created_at: string;
+};
+
+type CategoryDelta = {
+  key: keyof CategoryScores;
+  label: string;
+  current: number;
+  delta: number;
 };
 
 type Props = {
   name: string;
   roasts: DashboardRoast[];
-  isPro: boolean;
+  streak: number;
+  achievements: UserAchievements;
 };
 
-const BASE_GRADE_LABELS: { key: keyof ReportCard; label: string }[] = [
-  { key: "screenTime", label: "Screen Time" },
+const CATEGORY_LABELS: { key: keyof CategoryScores; label: string }[] = [
   { key: "sleep", label: "Sleep" },
-  { key: "spending", label: "Spending" },
-  { key: "productivity", label: "Productivity" },
-];
-
-const PRO_GRADE_LABELS: { key: keyof ReportCard; label: string }[] = [
-  { key: "socialMedia", label: "Social Media" },
   { key: "fitness", label: "Fitness" },
+  { key: "discipline", label: "Discipline" },
+  { key: "focus", label: "Focus" },
+  { key: "spending", label: "Spending" },
 ];
 
-function calculateAverageGrade(grades: (Grade | undefined)[]): Grade {
-  const validGrades = grades.filter((g): g is Grade => g !== undefined);
-  if (validGrades.length === 0) return "C";
-  
-  const gradeValues: Record<Grade, number> = { A: 4, B: 3, C: 2, D: 1, F: 0 };
-  const sum = validGrades.reduce((acc, grade) => acc + gradeValues[grade], 0);
-  const avg = sum / validGrades.length;
-  
-  if (avg >= 3.5) return "A";
-  if (avg >= 2.5) return "B";
-  if (avg >= 1.5) return "C";
-  if (avg >= 0.5) return "D";
-  return "F";
+function getScoreColor(score: number): string {
+  if (score <= 40) return "text-red-400";
+  if (score <= 70) return "text-amber-400";
+  return "text-emerald-400";
 }
 
-function statValue(
-  key: keyof ReportCard,
-  answers: OnboardingAnswers | null,
-): string {
-  if (!answers) return "—";
-  switch (key) {
-    case "screenTime":
-      return `${answers.phoneHours}h / day`;
-    case "sleep":
-      return `${answers.sleepHours}h avg`;
-    case "spending":
-      return `$${answers.foodDeliverySpend} / wk`;
-    case "productivity":
-      return answers.neverDoThing.length > 28
-        ? `${answers.neverDoThing.slice(0, 28)}…`
-        : answers.neverDoThing;
-    case "socialMedia":
-      return answers.socialMediaHours !== undefined
-        ? `${answers.socialMediaHours}h / day`
-        : "—";
-    case "fitness":
-      return answers.workoutFrequency !== undefined
-        ? `${answers.workoutFrequency} / wk`
-        : "—";
-    default:
-      return "—";
-  }
+function getScoreGlow(score: number): string {
+  if (score <= 40) return "shadow-[0_0_60px_rgba(239,68,68,0.25)]";
+  if (score <= 70) return "shadow-[0_0_60px_rgba(245,158,11,0.2)]";
+  return "shadow-[0_0_60px_rgba(16,185,129,0.2)]";
 }
 
-export function DashboardView({ name, roasts, isPro }: Props) {
-  const currentWeek = getWeekStartDate();
-  const thisWeek =
-    roasts.find((r) => r.week_start_date === currentWeek) ?? roasts[0] ?? null;
+function computeCategoryDeltas(
+  current: CategoryScores | null,
+  previous: CategoryScores | null,
+): CategoryDelta[] {
+  if (!current) return [];
+  return CATEGORY_LABELS.map(({ key, label }) => {
+    const cur = current[key].score;
+    const prev = previous?.[key]?.score;
+    const delta = prev !== undefined ? cur - prev : 0;
+    return { key, label, current: cur, delta };
+  });
+}
 
-  // Compute grade labels based on tier and available data
-  const gradeLabels = isPro && thisWeek?.report_card
-    ? [...BASE_GRADE_LABELS, ...PRO_GRADE_LABELS.filter(l => thisWeek.report_card[l.key] !== undefined)]
-    : BASE_GRADE_LABELS;
-
-  const seenWeeks = new Set<string>();
-  const previous: DashboardRoast[] = [];
-  for (const r of roasts) {
-    if (thisWeek && r.id === thisWeek.id) continue;
-    if (seenWeeks.has(r.week_start_date)) continue;
-    seenWeeks.add(r.week_start_date);
-    previous.push(r);
-    if (previous.length >= 4) break;
+function ScoreTrend({ scores }: { scores: number[] }) {
+  if (scores.length < 2) {
+    return (
+      <p className="text-sm text-neutral-500">
+        Need at least 2 roasts to see a trend
+      </p>
+    );
   }
+
+  const width = 280;
+  const height = 80;
+  const padding = 12;
+  const min = Math.min(...scores, 0);
+  const max = Math.max(...scores, 100);
+  const range = max - min || 1;
+
+  const points = scores.map((score, i) => {
+    const x =
+      padding + (i / (scores.length - 1)) * (width - padding * 2);
+    const y =
+      height - padding - ((score - min) / range) * (height - padding * 2);
+    return { x, y, score };
+  });
+
+  const pathD = points
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
+    .join(" ");
+
+  const trend =
+    scores[scores.length - 1]! > scores[0]!
+      ? "up"
+      : scores[scores.length - 1]! < scores[0]!
+        ? "down"
+        : "flat";
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-8 pb-12">
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500">
+          Score trend
+        </span>
+        <span className="text-xs text-neutral-400">
+          {trend === "up" && "📈 Trending up"}
+          {trend === "down" && "📉 Trending down"}
+          {trend === "flat" && "➡️ Holding steady"}
+        </span>
+      </div>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full h-20"
+        aria-label="Life score trend over last roasts"
+      >
+        <defs>
+          <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#FF3D00" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#FF3D00" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path
+          d={`${pathD} L ${points[points.length - 1]!.x} ${height - padding} L ${points[0]!.x} ${height - padding} Z`}
+          fill="url(#trendGradient)"
+        />
+        <path
+          d={pathD}
+          fill="none"
+          stroke="#FF3D00"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.x} cy={p.y} r="5" fill="#0A0A0A" stroke="#FF3D00" strokeWidth="2" />
+            <text
+              x={p.x}
+              y={p.y - 10}
+              textAnchor="middle"
+              fill="#a3a3a3"
+              fontSize="10"
+              fontWeight="600"
+            >
+              {p.score}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+export function DashboardView({ name, roasts, streak, achievements }: Props) {
+  const latest = roasts[0] ?? null;
+  const previous = roasts[1] ?? null;
+
+  const scoresWithValues = roasts
+    .filter((r) => r.life_score !== null)
+    .slice(0, 4)
+    .reverse()
+    .map((r) => r.life_score!);
+
+  const allScores = roasts
+    .map((r) => r.life_score)
+    .filter((s): s is number => s !== null);
+
+  const bestScore = allScores.length > 0 ? Math.max(...allScores) : null;
+  const worstScore = allScores.length > 0 ? Math.min(...allScores) : null;
+
+  const categoryDeltas = computeCategoryDeltas(
+    latest?.category_scores ?? null,
+    previous?.category_scores ?? null,
+  );
+
+  const improved = categoryDeltas.filter((c) => c.delta > 0);
+  const worsened = categoryDeltas.filter((c) => c.delta < 0);
+
+  const recentRoasts = roasts.slice(0, 3);
+
+  return (
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-6 pb-12">
       <header>
         <h1 className="text-2xl font-bold text-[#FAFAFA]">
           Hey {name} <span aria-hidden>👋</span>
         </h1>
-        <p className="mt-1 text-sm text-neutral-400">Your weekly reality check</p>
+        <p className="mt-1 text-sm text-neutral-400">
+          Your damage report, updated weekly
+        </p>
       </header>
 
-      {thisWeek ? (
+      {latest && latest.life_score !== null ? (
         <>
-          <Link
-            href={`/roast/${thisWeek.id}`}
-            className="block rounded-xl border border-neutral-800 bg-[#111111] p-5 transition hover:border-[#FF3D00]/40"
+          {/* Hero — Life Score */}
+          <section
+            className={`relative overflow-hidden rounded-2xl border border-neutral-800 bg-gradient-to-b from-[#141414] to-[#0A0A0A] p-8 text-center ${getScoreGlow(latest.life_score)}`}
           >
-            <p className="text-xs font-semibold uppercase tracking-widest text-[#FF3D00]">
-              This week&apos;s roast
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#FF3D00]">
+              Life Score
             </p>
-            <p className="mt-3 text-sm leading-relaxed text-neutral-300">
-              {snippet(thisWeek.roast_text)}
+            <p
+              className={`mt-2 text-7xl font-black tabular-nums ${getScoreColor(latest.life_score)}`}
+            >
+              {latest.life_score}
             </p>
-            <div className="mt-4 grid grid-cols-4 gap-2">
-              {gradeLabels.map(({ key, label }: { key: keyof ReportCard; label: string }) => (
-                <div
-                  key={key}
-                  className={`rounded-lg border px-1 py-2 text-center ${gradeColor(thisWeek.report_card[key]!)}`}
-                >
-                  <span className="block text-[9px] uppercase text-neutral-500">
-                    {label.split(" ")[0]}
-                  </span>
-                  <span className="text-lg font-bold">
-                    {thisWeek.report_card[key]!}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Link>
-
-          <section>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-500">
-              Your stats
-            </h2>
-            <div className="grid grid-cols-2 gap-3">
-              {gradeLabels.map(({ key, label }: { key: keyof ReportCard; label: string }) => (
-                <div
-                  key={key}
-                  className="rounded-xl border border-neutral-800 bg-[#141414] p-4"
-                >
-                  <p className="text-xs text-neutral-500">{label}</p>
-                  <p className="mt-1 text-lg font-semibold text-[#FAFAFA]">
-                    {statValue(key, thisWeek.answers)}
-                  </p>
-                  <span
-                    className={`mt-2 inline-block rounded px-2 py-0.5 text-xs font-bold ${gradeColor(thisWeek.report_card[key]!)}`}
-                  >
-                    {thisWeek.report_card[key]!}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <p className="mt-3 text-lg font-semibold text-neutral-200">
+              {latest.funny_title ?? "Certified Disaster"}
+            </p>
+            <p className="mt-1 text-xs text-neutral-500">out of 100</p>
           </section>
+
+          {/* Streak */}
+          {streak > 0 && (
+            <div className="rounded-xl border border-[#FF3D00]/30 bg-[#FF3D00]/10 px-5 py-4 text-center">
+              <p className="text-base font-semibold text-[#FAFAFA]">
+                {streak} day{streak !== 1 ? "s" : ""} of self inflicted emotional
+                damage 🔥
+              </p>
+            </div>
+          )}
+
+          {/* Best / Worst */}
+          {allScores.length > 1 && bestScore !== null && worstScore !== null && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/30 p-4 text-center">
+                <p className="text-xs uppercase tracking-widest text-emerald-500">
+                  Best ever
+                </p>
+                <p className="mt-1 text-3xl font-black text-emerald-400">
+                  {bestScore}
+                </p>
+              </div>
+              <div className="rounded-xl border border-red-800/50 bg-red-950/30 p-4 text-center">
+                <p className="text-xs uppercase tracking-widest text-red-500">
+                  Worst ever
+                </p>
+                <p className="mt-1 text-3xl font-black text-red-400">
+                  {worstScore}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Score trend */}
+          {scoresWithValues.length >= 2 && (
+            <section className="rounded-xl border border-neutral-800 bg-[#111111] p-5">
+              <ScoreTrend scores={scoresWithValues} />
+            </section>
+          )}
+
+          {/* Category breakdown */}
+          {categoryDeltas.length > 0 && (
+            <section className="rounded-xl border border-neutral-800 bg-[#111111] p-5">
+              <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">
+                Category breakdown
+              </h2>
+              {previous ? (
+                <div className="space-y-4">
+                  {improved.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-medium text-emerald-400">
+                        Improved vs last time
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {improved.map((c) => (
+                          <span
+                            key={c.key}
+                            className="rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-1.5 text-sm text-emerald-300"
+                          >
+                            {c.label} ↑ +{c.delta}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {worsened.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-medium text-red-400">
+                        Got worse vs last time
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {worsened.map((c) => (
+                          <span
+                            key={c.key}
+                            className="rounded-lg border border-red-800/50 bg-red-950/40 px-3 py-1.5 text-sm text-red-300"
+                          >
+                            {c.label} ↓ {c.delta}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {improved.length === 0 && worsened.length === 0 && (
+                    <p className="text-sm text-neutral-400">
+                      No changes since last roast — consistency is… something
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {categoryDeltas.map((c) => (
+                    <div
+                      key={c.key}
+                      className="rounded-lg border border-neutral-800 bg-[#141414] px-3 py-2 text-center"
+                    >
+                      <p className="text-xs text-neutral-500">{c.label}</p>
+                      <p className="text-lg font-bold text-[#FAFAFA]">
+                        {Math.round(c.current / 10)}/10
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </>
       ) : (
-        <div className="rounded-xl border border-dashed border-neutral-700 bg-[#111111] p-8 text-center">
-          <p className="text-4xl" aria-hidden>
+        <div className="rounded-2xl border border-dashed border-neutral-700 bg-[#111111] p-10 text-center">
+          <p className="text-5xl" aria-hidden>
             🔥
           </p>
-          <p className="mt-3 text-neutral-400">
-            No roasts yet — get roasted!
+          <p className="mt-4 text-lg font-semibold text-neutral-200">
+            No Life Score yet
           </p>
-          <Link
-            href="/onboarding"
-            className="mt-4 inline-block rounded-lg bg-[#FF3D00] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
-          >
-            Get Roasted Now
-          </Link>
+          <p className="mt-2 text-sm text-neutral-400">
+            Get roasted once to unlock your dashboard
+          </p>
         </div>
       )}
 
+      {/* CTA */}
       <Link
         href="/onboarding"
         className="block w-full rounded-xl bg-[#FF3D00] px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110"
@@ -181,70 +336,79 @@ export function DashboardView({ name, roasts, isPro }: Props) {
         Get Roasted This Week
       </Link>
 
-      {previous.length > 0 ? (
+      {/* Last 3 roast reports */}
+      {recentRoasts.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-500">
-            Previous roasts
+            Recent roasts
           </h2>
-          <ul className="flex flex-col gap-2">
-            {previous.map((r) => (
-              <li key={r.id}>
-                <Link
-                  href={`/roast/${r.id}`}
-                  className="flex items-center justify-between rounded-lg border border-neutral-800 bg-[#141414] px-4 py-3 transition hover:border-neutral-600"
-                >
-                  <span className="text-sm text-neutral-300">
-                    Week of {formatWeekLabel(r.week_start_date)}
-                  </span>
-                  <span className="flex gap-1.5">
-                    {gradeLabels.map(({ key }: { key: keyof ReportCard; label: string }) => (
-                      <span
-                        key={key}
-                        className={`rounded px-1.5 py-0.5 text-xs font-bold ${gradeColor(r.report_card[key]!)}`}
-                      >
-                        {r.report_card[key]!}
-                      </span>
-                    ))}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {isPro && roasts.length >= 2 && (
-        <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-500">
-            Grade trend (last 8 weeks)
-          </h2>
-          <div className="rounded-xl border border-neutral-800 bg-[#141414] p-4">
-            <div className="space-y-3">
-              {BASE_GRADE_LABELS.map(({ key, label }) => {
-                const gradeValues = roasts.slice(0, 8).reverse().map(r => r.report_card[key]);
-                const avgGrade = calculateAverageGrade(gradeValues);
-                return (
-                  <div key={key} className="flex items-center gap-3">
-                    <span className="w-24 text-xs text-neutral-400">{label}</span>
-                    <div className="flex-1 flex gap-1">
-                      {gradeValues.map((grade, i) => (
-                        <div
-                          key={i}
-                          className={`h-6 flex-1 rounded ${gradeColor(grade!)}`}
-                          title={`Week ${i + 1}: ${grade}`}
-                        />
-                      ))}
-                    </div>
-                    <span className={`text-sm font-bold ${gradeColor(avgGrade)}`}>
-                      {avgGrade}
-                    </span>
+          <div className="flex flex-col gap-3">
+            {recentRoasts.map((r) => (
+              <Link
+                key={r.id}
+                href={`/roast/${r.id}`}
+                className="group block rounded-xl border border-neutral-800 bg-[#141414] p-4 transition hover:border-[#FF3D00]/40 hover:bg-[#1a1a1a]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-neutral-500">
+                      Week of {formatWeekLabel(r.week_start_date)}
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-neutral-300 group-hover:text-neutral-200">
+                      {snippet(r.roast_text, 120)}
+                    </p>
+                    {r.funny_title && (
+                      <p className="mt-2 text-xs font-medium text-[#FF3D00]">
+                        {r.funny_title}
+                      </p>
+                    )}
                   </div>
-                );
-              })}
-            </div>
+                  {r.life_score !== null && (
+                    <span
+                      className={`shrink-0 rounded-lg border border-neutral-700 bg-[#0A0A0A] px-3 py-2 text-xl font-black tabular-nums ${getScoreColor(r.life_score)}`}
+                    >
+                      {r.life_score}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            ))}
           </div>
         </section>
       )}
+
+      {/* Achievement badges */}
+      <section className="rounded-xl border border-neutral-800 bg-[#111111] p-5">
+        <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">
+          Achievements
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {ACHIEVEMENTS.map((achievement) => {
+            const unlocked = Boolean(achievements[achievement.id]);
+            return (
+              <div
+                key={achievement.id}
+                className={`relative rounded-xl border p-4 text-center transition ${
+                  unlocked
+                    ? "border-[#FF3D00]/40 bg-[#FF3D00]/10"
+                    : "border-neutral-800 bg-[#0A0A0A] opacity-50 grayscale"
+                }`}
+                title={achievement.description}
+              >
+                <p className="text-2xl">{unlocked ? achievement.emoji : "🔒"}</p>
+                <p
+                  className={`mt-2 text-xs font-bold ${unlocked ? "text-[#FAFAFA]" : "text-neutral-500"}`}
+                >
+                  {achievement.title}
+                </p>
+                <p className="mt-1 text-[10px] leading-tight text-neutral-500">
+                  {achievement.description}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }
