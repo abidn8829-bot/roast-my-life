@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseReportCard } from "@/lib/parse-report-card";
-import type { CategoryScores, OnboardingAnswers, ReportCard } from "@/lib/roast-types";
+import type { CategoryScores, OnboardingAnswers, ReportCard, RoastMode } from "@/lib/roast-types";
 
 export type OwnRoast = {
   id: string;
@@ -13,6 +13,7 @@ export type OwnRoast = {
   funny_title?: string;
   top_5_roasts?: string[];
   category_scores?: CategoryScores;
+  mode?: RoastMode;
 };
 
 export async function fetchOwnRoastById(
@@ -22,7 +23,7 @@ export async function fetchOwnRoastById(
 ): Promise<OwnRoast | null> {
   const { data, error } = await supabase
     .from("roasts")
-    .select("id, roast_text, report_card, share_slug, answers, life_score, funny_title, top_5_roasts, category_scores")
+    .select("id, roast_text, report_card, share_slug, answers, life_score, funny_title, top_5_roasts, category_scores, mode")
     .eq("id", roastId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -66,5 +67,6 @@ export async function fetchOwnRoastById(
     funny_title: data.funny_title,
     top_5_roasts: data.top_5_roasts,
     category_scores: data.category_scores as CategoryScores | undefined,
+    mode: data.mode as RoastMode | undefined,
   };
 }

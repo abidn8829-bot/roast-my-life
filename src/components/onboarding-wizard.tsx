@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { OnboardingAnswers, RoastTone } from "@/lib/roast-types";
+import type { OnboardingAnswers, RoastTone, RoastMode } from "@/lib/roast-types";
 import posthog from "posthog-js";
 import { ToneSelector } from "@/components/tone-selector";
 import { UpgradeModal } from "@/components/upgrade-modal";
@@ -78,7 +78,7 @@ const PRO_QUESTIONS = [
   },
 ];
 
-type Step = number | "tone" | "loading";
+type Step = number | "mode" | "tone" | "loading";
 
 const inputClass =
   "w-full rounded-xl border-2 border-neutral-800 bg-[#141414] px-5 py-4 text-xl text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2 transition-all";
@@ -93,6 +93,7 @@ export function OnboardingWizard() {
   const [error, setError] = useState<string | null>(null);
   const [isPro, setIsPro] = useState(false);
   const [selectedTone, setSelectedTone] = useState<RoastTone>("normal");
+  const [selectedMode, setSelectedMode] = useState<RoastMode>("roast");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
@@ -173,6 +174,7 @@ export function OnboardingWizard() {
       body: JSON.stringify({
         ...buildAnswers(),
         tone: selectedTone,
+        mode: selectedMode,
       }),
     });
     const data = (await res.json()) as { id?: string; error?: string };
@@ -181,13 +183,13 @@ export function OnboardingWizard() {
 
     if (!res.ok || !roastId) {
       console.error("[onboarding] roast API failed:", res.status, data);
-      
+
       // Check if it's a daily limit error
       if (res.status === 429 && data.error?.includes("free roast today")) {
         setShowUpgradeModal(true);
         return;
       }
-      
+
       setError(data.error ?? "Something went wrong. Try again.");
       setStep(allQuestions.length - 1);
       return;
@@ -196,7 +198,7 @@ export function OnboardingWizard() {
     posthog.capture('roast_generated');
     router.push(`/roast/${encodeURIComponent(roastId)}`);
     router.refresh();
-  }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, selectedTone, isPro, router, allQuestions]);
+  }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, selectedTone, selectedMode, isPro, router, allQuestions]);
 
   useEffect(() => {
     if (step !== "loading") return;
@@ -222,7 +224,7 @@ export function OnboardingWizard() {
     if (step < allQuestions.length - 1) {
       setStep(step + 1);
     } else {
-      setStep("tone");
+      setStep("mode");
     }
   }
 
@@ -230,6 +232,11 @@ export function OnboardingWizard() {
     if (typeof step !== "number" || step === 0) return;
     setError(null);
     setStep(step - 1);
+  }
+
+  function onModeSelect(mode: RoastMode) {
+    setSelectedMode(mode);
+    setStep("tone");
   }
 
   function onToneSelect(tone: RoastTone) {
@@ -250,16 +257,56 @@ export function OnboardingWizard() {
     );
   }
 
+  if (step === "mode") {
+    return (
+      <div className="w-full max-w-md text-center">
+        <h2 className="mb-8 text-3xl font-bold text-[#FAFAFA]">Choose your mode</h2>
+        <div className="flex flex-col gap-4">
+          <button
+            type="button"
+            onClick={() => onModeSelect("roast")}
+            className="rounded-xl border-2 border-[#FF3D00] bg-[#FF3D00]/10 px-6 py-8 text-center transition hover:bg-[#FF3D00]/20"
+          >
+            <div className="text-5xl mb-2">🔥</div>
+            <div className="text-xl font-bold text-[#FAFAFA]">Roast Mode</div>
+            <div className="text-sm text-neutral-400 mt-1">Brutal honesty, zero filter</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => isPro ? onModeSelect("coach") : setShowUpgradeModal(true)}
+            disabled={!isPro}
+            className={`rounded-xl border-2 px-6 py-8 text-center transition ${
+              isPro
+                ? "border-[#10b981] bg-[#10b981]/10 hover:bg-[#10b981]/20"
+                : "border-neutral-800 bg-neutral-900 opacity-50 cursor-not-allowed"
+            }`}
+          >
+            <div className="text-5xl mb-2">📈</div>
+            <div className="text-xl font-bold text-[#FAFAFA]">Coach Mode</div>
+            <div className="text-sm text-neutral-400 mt-1">
+              {isPro ? "Constructive advice, actionable tips" : "Pro only 🔒"}
+            </div>
+          </button>
+        </div>
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          reason="pro_feature"
+        />
+      </div>
+    );
+  }
+
   if (step === "tone") {
     return (
       <>
-        <ToneSelector 
-          onSelect={onToneSelect} 
-          isPro={isPro} 
+        <ToneSelector
+          onSelect={onToneSelect}
+          isPro={isPro}
           onUpgradeRequest={() => setShowUpgradeModal(true)}
         />
-        <UpgradeModal 
-          isOpen={showUpgradeModal} 
+        <UpgradeModal
+          isOpen={showUpgradeModal}
           onClose={() => setShowUpgradeModal(false)}
           reason="pro_feature"
         />
@@ -267,7 +314,7 @@ export function OnboardingWizard() {
     );
   }
 
-  const slideIndex = step;
+  const slideIndex = typeof step === "number" ? step : 0;
   const q = allQuestions[slideIndex];
 
   return (

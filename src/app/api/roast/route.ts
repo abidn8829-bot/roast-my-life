@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { unlockAchievements } from "@/lib/achievements";
 import { buildReportCard, calculateCategoryScores, calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
-import type { OnboardingAnswers, RoastTone } from "@/lib/roast-types";
+import type { OnboardingAnswers, RoastTone, RoastMode } from "@/lib/roast-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
@@ -40,7 +40,17 @@ IMPORTANT: You must respond with valid JSON in this exact format:
 Each one-liner must be under 15 words and absolutely devastating. No markdown, no extra text, just the JSON.`,
 };
 
-function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastTone } | null {
+const COACH_SYSTEM_PROMPT = `You are a supportive life coach who gives constructive, actionable advice. Use their exact numbers to provide specific, practical recommendations. Instead of judging, focus on realistic improvements. Give concrete steps they can take this week. Be encouraging but honest about areas for growth. End with 3 specific, actionable improvements for this week. 150-200 words.
+
+IMPORTANT: You must respond with valid JSON in this exact format:
+{
+  "roast_text": "your full coach report paragraph here",
+  "top_5_roasts": ["actionable tip 1", "actionable tip 2", "actionable tip 3", "actionable tip 4", "actionable tip 5"]
+}
+
+Each tip must be under 15 words and practical. No markdown, no extra text, just the JSON.`;
+
+function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastTone; mode: RoastMode } | null {
   if (!body || typeof body !== "object") return null;
   const b = body as Record<string, unknown>;
   const phoneHours = Number(b.phoneHours);
@@ -51,9 +61,12 @@ function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastT
     typeof b.neverDoThing === "string" ? b.neverDoThing.trim() : "";
   const socialMediaHours = b.socialMediaHours ? Number(b.socialMediaHours) : undefined;
   const workoutFrequency = b.workoutFrequency ? Number(b.workoutFrequency) : undefined;
-  const tone = (typeof b.tone === "string" && ["normal", "no_mercy", "destroy_me"].includes(b.tone)) 
-    ? b.tone as RoastTone 
+  const tone = (typeof b.tone === "string" && ["normal", "no_mercy", "destroy_me"].includes(b.tone))
+    ? b.tone as RoastTone
     : "normal";
+  const mode = (typeof b.mode === "string" && ["roast", "coach"].includes(b.mode))
+    ? b.mode as RoastMode
+    : "roast";
 
   if (
     !Number.isFinite(phoneHours) ||
@@ -81,6 +94,7 @@ function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastT
       workoutFrequency,
     },
     tone,
+    mode,
   };
 }
 
@@ -170,19 +184,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid answers" }, { status: 400 });
   }
 
-  const { answers, tone } = parsed;
-  console.log("[api/roast] Parsed answers:", { answers, tone });
+  const { answers, tone, mode } = parsed;
+  console.log("[api/roast] Parsed answers:", { answers, tone, mode });
 
   const groq = new Groq({ apiKey });
 
   let roastText: string;
   let top5Roasts: string[] = [];
   try {
+    const systemPrompt = mode === "coach" ? COACH_SYSTEM_PROMPT : SYSTEM_PROMPTS[tone];
     const completion = await groq.chat.completions.create({
       model: MODEL,
       max_tokens: 1000,
       messages: [
-        { role: "system", content: SYSTEM_PROMPTS[tone] },
+        { role: "system", content: systemPrompt },
         { role: "user", content: formatUserMessage(answers) },
       ],
       response_format: { type: "json_object" },
@@ -238,6 +253,8 @@ export async function POST(request: Request) {
     funny_title,
     top_5_roasts: top5Roasts,
     category_scores,
+    tone,
+    mode,
   };
 
   console.log("[api/roast] Preparing to insert roast with data:", {

@@ -34,6 +34,8 @@ export type OnboardingAnswers = {
 
 export type RoastTone = "normal" | "no_mercy" | "destroy_me";
 
+export type RoastMode = "roast" | "coach";
+
 export type RoastRow = {
   id: string;
   user_id: string;
@@ -43,6 +45,7 @@ export type RoastRow = {
   model_used: string;
   share_slug: string;
   tone?: RoastTone;
+  mode?: RoastMode;
   created_at?: string;
   life_score?: number;
   funny_title?: string;

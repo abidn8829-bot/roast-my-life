@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ShareButtons } from "@/components/share-buttons";
 import { gradeColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
-import type { CategoryScores, Grade, OnboardingAnswers, ReportCard } from "@/lib/roast-types";
+import type { CategoryScores, Grade, OnboardingAnswers, ReportCard, RoastMode } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Props = {
@@ -23,6 +23,7 @@ type Props = {
   categoryScores?: CategoryScores;
   currentStreak?: number;
   longestStreak?: number;
+  mode?: RoastMode;
 };
 
 export function RoastView({
@@ -39,6 +40,7 @@ export function RoastView({
   categoryScores,
   currentStreak = 0,
   longestStreak = 0,
+  mode = "roast",
 }: Props) {
   const router = useRouter();
   const [reaction, setReaction] = useState<string | null>(initialReaction);
@@ -262,7 +264,7 @@ export function RoastView({
             onClick={() => setShowFullRoast(true)}
             className="w-full rounded-lg border border-neutral-800 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50 hover:bg-[#111111]"
           >
-            Read full roast
+            Read full {mode === "coach" ? "coach report" : "roast"}
           </button>
         ) : (
           <div className="rounded-xl border border-neutral-800 bg-[#111111] p-6">
