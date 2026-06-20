@@ -21,6 +21,8 @@ type Props = {
   funnyTitle?: string;
   top5Roasts?: string[];
   categoryScores?: CategoryScores;
+  currentStreak?: number;
+  longestStreak?: number;
 };
 
 export function RoastView({
@@ -35,6 +37,8 @@ export function RoastView({
   funnyTitle = "Your Life",
   top5Roasts = [],
   categoryScores,
+  currentStreak = 0,
+  longestStreak = 0,
 }: Props) {
   const router = useRouter();
   const [reaction, setReaction] = useState<string | null>(initialReaction);
@@ -140,6 +144,15 @@ export function RoastView({
     spending: "Your spending habits are financially suicidal.",
   };
 
+  function getStreakMessage(streak: number): string {
+    if (streak === 1) return "Day 1 of facing reality 👀";
+    if (streak === 3) return "3 days of self inflicted damage 🔥";
+    if (streak === 7) return "7 day streak — therapy would be cheaper";
+    if (streak === 30) return "30 days — you're either improving or masochistic 💀";
+    if (streak >= 100) return `${streak} days — you need a new hobby at this point`;
+    return `${streak} day streak`;
+  }
+
   return (
     <div className="flex w-full max-w-2xl flex-col gap-8 pb-12">
       {/* Life Score Section */}
@@ -160,6 +173,13 @@ export function RoastView({
         <p className="text-xs text-neutral-500">
           Week {weekCount} of facing reality
         </p>
+        {currentStreak > 0 && (
+          <div className="mt-2 rounded-full border border-[#FF3D00] bg-[#FF3D00]/10 px-4 py-2">
+            <p className="text-sm font-semibold text-[#FF3D00]">
+              {getStreakMessage(currentStreak)}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Category Scorecards */}

@@ -25,6 +25,8 @@ type Props = {
   name: string;
   roasts: DashboardRoast[];
   streak: number;
+  currentStreak: number;
+  longestStreak: number;
   achievements: UserAchievements;
 };
 
@@ -46,6 +48,15 @@ function getScoreGlow(score: number): string {
   if (score <= 40) return "shadow-[0_0_60px_rgba(239,68,68,0.25)]";
   if (score <= 70) return "shadow-[0_0_60px_rgba(245,158,11,0.2)]";
   return "shadow-[0_0_60px_rgba(16,185,129,0.2)]";
+}
+
+function getStreakMessage(streak: number): string {
+  if (streak === 1) return "Day 1 of facing reality 👀";
+  if (streak === 3) return "3 days of self inflicted damage 🔥";
+  if (streak === 7) return "7 day streak — therapy would be cheaper";
+  if (streak === 30) return "30 days — you're either improving or masochistic 💀";
+  if (streak >= 100) return `${streak} days — you need a new hobby at this point`;
+  return `${streak} day streak`;
 }
 
 function computeCategoryDeltas(
@@ -151,7 +162,7 @@ function ScoreTrend({ scores }: { scores: number[] }) {
   );
 }
 
-export function DashboardView({ name, roasts, streak, achievements }: Props) {
+export function DashboardView({ name, roasts, streak, currentStreak, longestStreak, achievements }: Props) {
   const latest = roasts[0] ?? null;
   const previous = roasts[1] ?? null;
 
@@ -210,12 +221,16 @@ export function DashboardView({ name, roasts, streak, achievements }: Props) {
           </section>
 
           {/* Streak */}
-          {streak > 0 && (
+          {currentStreak > 0 && (
             <div className="rounded-xl border border-[#FF3D00]/30 bg-[#FF3D00]/10 px-5 py-4 text-center">
-              <p className="text-base font-semibold text-[#FAFAFA]">
-                {streak} day{streak !== 1 ? "s" : ""} of self inflicted emotional
-                damage 🔥
+              <p className="text-base font-semibold text-[#FF3D00]">
+                {getStreakMessage(currentStreak)}
               </p>
+              {longestStreak > currentStreak && (
+                <p className="mt-1 text-xs text-neutral-500">
+                  Best: {longestStreak} days
+                </p>
+              )}
             </div>
           )}
 

@@ -44,6 +44,13 @@ export default async function RoastDetailPage({
     const uniqueWeeks = new Set(weekData?.map(r => r.week_start_date) || []);
     const weekCount = uniqueWeeks.size;
 
+    // Fetch user streak data
+    const { data: userData } = await supabase
+      .from("users")
+      .select("current_streak, longest_streak")
+      .eq("id", user.id)
+      .single();
+
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-[#0A0A0A] px-4 py-12 text-[#FAFAFA]">
         <RoastView
@@ -59,6 +66,8 @@ export default async function RoastDetailPage({
           funnyTitle={roast.funny_title}
           top5Roasts={roast.top_5_roasts}
           categoryScores={roast.category_scores}
+          currentStreak={userData?.current_streak}
+          longestStreak={userData?.longest_streak}
         />
       </main>
     );
@@ -93,7 +102,9 @@ export default async function RoastDetailPage({
   let funnyTitle: string | undefined = undefined;
   let top5Roasts: string[] | undefined = undefined;
   let categoryScores: import("@/lib/roast-types").CategoryScores | undefined = undefined;
-  
+  let currentStreak: number | undefined = undefined;
+  let longestStreak: number | undefined = undefined;
+
   if (user) {
     const owned = await fetchOwnRoastById(supabase, row.id, user.id);
     if (owned) {
@@ -105,15 +116,25 @@ export default async function RoastDetailPage({
       top5Roasts = owned.top_5_roasts;
       categoryScores = owned.category_scores;
     }
-    
+
     // Fetch week count
     const { data: weekData } = await supabase
       .from("roasts")
       .select("week_start_date")
       .eq("user_id", user.id);
-    
+
     const uniqueWeeks = new Set(weekData?.map(r => r.week_start_date) || []);
     weekCount = uniqueWeeks.size;
+
+    // Fetch user streak data
+    const { data: userData } = await supabase
+      .from("users")
+      .select("current_streak, longest_streak")
+      .eq("id", user.id)
+      .single();
+
+    currentStreak = userData?.current_streak;
+    longestStreak = userData?.longest_streak;
   }
 
   return (
@@ -131,6 +152,8 @@ export default async function RoastDetailPage({
         funnyTitle={funnyTitle}
         top5Roasts={top5Roasts}
         categoryScores={categoryScores}
+        currentStreak={currentStreak}
+        longestStreak={longestStreak}
       />
     </main>
   );

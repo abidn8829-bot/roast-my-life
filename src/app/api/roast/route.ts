@@ -271,6 +271,62 @@ export async function POST(request: Request) {
 
   console.log("[api/roast] Successfully inserted roast with ID:", data?.id);
 
+  // Update streak
+  try {
+    const { data: userData } = await supabase
+      .from("users")
+      .select("current_streak, longest_streak")
+      .eq("id", user.id)
+      .single();
+
+    const currentStreak = userData?.current_streak ?? 0;
+    const longestStreak = userData?.longest_streak ?? 0;
+
+    // Get the last roast date
+    const { data: lastRoast } = await supabase
+      .from("roasts")
+      .select("created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(2)
+      .maybeSingle();
+
+    let newStreak = 1;
+    let streakReset = false;
+
+    if (lastRoast && lastRoast.created_at) {
+      const lastDate = new Date(lastRoast.created_at);
+      const today = new Date();
+      const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 1) {
+        // Consecutive day
+        newStreak = currentStreak + 1;
+      } else if (diffDays > 1) {
+        // Streak reset
+        newStreak = 1;
+        streakReset = true;
+      } else {
+        // Same day, don't increment
+        newStreak = currentStreak;
+      }
+    }
+
+    const newLongestStreak = Math.max(longestStreak, newStreak);
+
+    await supabase
+      .from("users")
+      .update({
+        current_streak: newStreak,
+        longest_streak: newLongestStreak,
+      })
+      .eq("id", user.id);
+
+    console.log("[api/roast] Updated streak:", { newStreak, newLongestStreak, streakReset });
+  } catch (err) {
+    console.error("[api/roast] Failed to update streak:", err);
+  }
+
   try {
     await unlockAchievements(supabase, user.id, life_score);
   } catch (err) {

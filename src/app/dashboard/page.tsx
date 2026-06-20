@@ -33,12 +33,14 @@ export default async function DashboardPage() {
 
   const { data: userData } = await supabase
     .from("users")
-    .select("subscription_tier, achievements")
+    .select("subscription_tier, achievements, current_streak, longest_streak")
     .eq("id", user.id)
     .single();
 
   const subscriptionTier = userData?.subscription_tier || "free";
   const achievements = parseAchievements(userData?.achievements);
+  const currentStreak = userData?.current_streak ?? 0;
+  const longestStreak = userData?.longest_streak ?? 0;
 
   let query = supabase
     .from("roasts")
@@ -105,6 +107,8 @@ export default async function DashboardPage() {
           name={name}
           roasts={roasts}
           streak={streak}
+          currentStreak={currentStreak}
+          longestStreak={longestStreak}
           achievements={achievements}
         />
       </div>
