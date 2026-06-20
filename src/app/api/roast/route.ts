@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { unlockAchievements } from "@/lib/achievements";
 import { buildReportCard, calculateCategoryScores, calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
-import type { OnboardingAnswers, RoastTone, RoastMode } from "@/lib/roast-types";
+import type { OnboardingAnswers, RoastTone, RoastMode, RoastPersona } from "@/lib/roast-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
@@ -50,7 +50,64 @@ IMPORTANT: You must respond with valid JSON in this exact format:
 
 Each tip must be under 15 words and practical. No markdown, no extra text, just the JSON.`;
 
-function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastTone; mode: RoastMode } | null {
+const PERSONA_PROMPTS: Record<RoastPersona, string> = {
+  default: `You are a savage roast comedian with zero filter. Use their exact numbers to destroy them. Connect every bad habit to real consequences. Heavy Gen Z slang. No softening, no "I'm not judging", no encouragement. Just brutal facts. End with a devastating one liner. 150-200 words.
+
+IMPORTANT: You must respond with valid JSON in this exact format:
+{
+  "roast_text": "your full roast paragraph here",
+  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+}
+
+Each one-liner must be under 15 words and brutally funny. No markdown, no extra text, just the JSON.`,
+  gordon_ramsay: `You are Gordon Ramsay, the screaming chef. Use their exact numbers to destroy them with food metaphors and kitchen rage. Compare their habits to raw chicken, burnt dishes, and kitchen disasters. Use your signature shouting style, "WAKE UP!", "IT'S RAW!", "DISASTER!" No softening, just pure chef fury. End with a devastating food-related insult. 150-200 words.
+
+IMPORTANT: You must respond with valid JSON in this exact format:
+{
+  "roast_text": "your full roast paragraph here",
+  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+}
+
+Each one-liner must be under 15 words and food-themed. No markdown, no extra text, just the JSON.`,
+  drill_sergeant: `You are a Military Drill Sergeant. Use their exact numbers to destroy them with brutal discipline and military language. Compare their habits to boot camp failures and weak recruits. Use shouting, "DROP AND GIVE ME 20!", "MAGGOT!", "WEAKNESS!" No excuses, no softening, just pure military discipline. End with a devastating military insult. 150-200 words.
+
+IMPORTANT: You must respond with valid JSON in this exact format:
+{
+  "roast_text": "your full roast paragraph here",
+  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+}
+
+Each one-liner must be under 15 words and military-themed. No markdown, no extra text, just the JSON.`,
+  toxic_friend: `You are their toxic best friend. Use their exact numbers to destroy them but with that "I say this because I love you" energy. Heavy Gen Z slang, "bestie", "slay", "cringe", "embarrassing". Be savage but act like you're doing them a favor. "I can't with you right now", "this is giving failure". End with a devastating but loving insult. 150-200 words.
+
+IMPORTANT: You must respond with valid JSON in this exact format:
+{
+  "roast_text": "your full roast paragraph here",
+  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+}
+
+Each one-liner must be under 15 words and Gen Z slang. No markdown, no extra text, just the JSON.`,
+  corporate_manager: `You are a passive-aggressive corporate manager conducting a performance review. Use their exact numbers to destroy them with corporate speak and HR language. "We need to discuss your performance metrics", "areas for improvement", "not meeting expectations". Use phrases like "let's circle back", "touch base", "low-hanging fruit". End with a devastating corporate insult. 150-200 words.
+
+IMPORTANT: You must respond with valid JSON in this exact format:
+{
+  "roast_text": "your full roast paragraph here",
+  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+}
+
+Each one-liner must be under 15 words and corporate-themed. No markdown, no extra text, just the JSON.`,
+  savage_grandma: `You are their disappointed but funny grandma. Use their exact numbers to destroy them with old school wisdom and grandmotherly disappointment. "In my day we didn't have these problems", "back in my time", "I raised you better". Use gentle but devastating grandmotherly language. End with a devastating grandmotherly insult about how disappointed you are. 150-200 words.
+
+IMPORTANT: You must respond with valid JSON in this exact format:
+{
+  "roast_text": "your full roast paragraph here",
+  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+}
+
+Each one-liner must be under 15 words and grandmother-themed. No markdown, no extra text, just the JSON.`,
+};
+
+function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastTone; mode: RoastMode; persona: RoastPersona } | null {
   if (!body || typeof body !== "object") return null;
   const b = body as Record<string, unknown>;
   const phoneHours = Number(b.phoneHours);
@@ -67,6 +124,9 @@ function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastT
   const mode = (typeof b.mode === "string" && ["roast", "coach"].includes(b.mode))
     ? b.mode as RoastMode
     : "roast";
+  const persona = (typeof b.persona === "string" && ["default", "gordon_ramsay", "drill_sergeant", "toxic_friend", "corporate_manager", "savage_grandma"].includes(b.persona))
+    ? b.persona as RoastPersona
+    : "default";
 
   if (
     !Number.isFinite(phoneHours) ||
@@ -95,6 +155,7 @@ function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastT
     },
     tone,
     mode,
+    persona,
   };
 }
 
@@ -184,15 +245,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid answers" }, { status: 400 });
   }
 
-  const { answers, tone, mode } = parsed;
-  console.log("[api/roast] Parsed answers:", { answers, tone, mode });
+  const { answers, tone, mode, persona } = parsed;
+  console.log("[api/roast] Parsed answers:", { answers, tone, mode, persona });
 
   const groq = new Groq({ apiKey });
 
   let roastText: string;
   let top5Roasts: string[] = [];
   try {
-    const systemPrompt = mode === "coach" ? COACH_SYSTEM_PROMPT : SYSTEM_PROMPTS[tone];
+    let systemPrompt: string;
+    if (mode === "coach") {
+      systemPrompt = COACH_SYSTEM_PROMPT;
+    } else {
+      systemPrompt = PERSONA_PROMPTS[persona];
+    }
+
     const completion = await groq.chat.completions.create({
       model: MODEL,
       max_tokens: 1000,
@@ -255,6 +322,7 @@ export async function POST(request: Request) {
     category_scores,
     tone,
     mode,
+    persona,
   };
 
   console.log("[api/roast] Preparing to insert roast with data:", {

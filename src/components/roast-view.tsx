@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ShareButtons } from "@/components/share-buttons";
 import { gradeColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
-import type { CategoryScores, Grade, OnboardingAnswers, ReportCard, RoastMode } from "@/lib/roast-types";
+import type { CategoryScores, Grade, OnboardingAnswers, ReportCard, RoastMode, RoastPersona } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Props = {
@@ -24,6 +24,7 @@ type Props = {
   currentStreak?: number;
   longestStreak?: number;
   mode?: RoastMode;
+  persona?: RoastPersona;
 };
 
 export function RoastView({
@@ -41,6 +42,7 @@ export function RoastView({
   currentStreak = 0,
   longestStreak = 0,
   mode = "roast",
+  persona = "default",
 }: Props) {
   const router = useRouter();
   const [reaction, setReaction] = useState<string | null>(initialReaction);

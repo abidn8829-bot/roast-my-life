@@ -36,6 +36,8 @@ export type RoastTone = "normal" | "no_mercy" | "destroy_me";
 
 export type RoastMode = "roast" | "coach";
 
+export type RoastPersona = "default" | "gordon_ramsay" | "drill_sergeant" | "toxic_friend" | "corporate_manager" | "savage_grandma";
+
 export type RoastRow = {
   id: string;
   user_id: string;
@@ -46,6 +48,7 @@ export type RoastRow = {
   share_slug: string;
   tone?: RoastTone;
   mode?: RoastMode;
+  persona?: RoastPersona;
   created_at?: string;
   life_score?: number;
   funny_title?: string;

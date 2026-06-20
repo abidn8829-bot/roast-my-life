@@ -69,6 +69,7 @@ export default async function RoastDetailPage({
           currentStreak={userData?.current_streak}
           longestStreak={userData?.longest_streak}
           mode={roast.mode}
+          persona={roast.persona}
         />
       </main>
     );
@@ -106,6 +107,7 @@ export default async function RoastDetailPage({
   let currentStreak: number | undefined = undefined;
   let longestStreak: number | undefined = undefined;
   let mode: import("@/lib/roast-types").RoastMode | undefined = undefined;
+  let persona: import("@/lib/roast-types").RoastPersona | undefined = undefined;
 
   if (user) {
     const owned = await fetchOwnRoastById(supabase, row.id, user.id);
@@ -118,6 +120,7 @@ export default async function RoastDetailPage({
       top5Roasts = owned.top_5_roasts;
       categoryScores = owned.category_scores;
       mode = owned.mode;
+      persona = owned.persona;
     }
 
     // Fetch week count
@@ -158,6 +161,7 @@ export default async function RoastDetailPage({
         currentStreak={currentStreak}
         longestStreak={longestStreak}
         mode={mode}
+        persona={persona}
       />
     </main>
   );

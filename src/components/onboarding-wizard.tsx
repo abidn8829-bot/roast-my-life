@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { OnboardingAnswers, RoastTone, RoastMode } from "@/lib/roast-types";
+import type { OnboardingAnswers, RoastTone, RoastMode, RoastPersona } from "@/lib/roast-types";
 import posthog from "posthog-js";
 import { ToneSelector } from "@/components/tone-selector";
+import { PersonaSelector } from "@/components/persona-selector";
 import { UpgradeModal } from "@/components/upgrade-modal";
 
 const LOADING_MESSAGES = [
@@ -78,7 +79,7 @@ const PRO_QUESTIONS = [
   },
 ];
 
-type Step = number | "mode" | "tone" | "loading";
+type Step = number | "mode" | "persona" | "tone" | "loading";
 
 const inputClass =
   "w-full rounded-xl border-2 border-neutral-800 bg-[#141414] px-5 py-4 text-xl text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2 transition-all";
@@ -94,6 +95,7 @@ export function OnboardingWizard() {
   const [isPro, setIsPro] = useState(false);
   const [selectedTone, setSelectedTone] = useState<RoastTone>("normal");
   const [selectedMode, setSelectedMode] = useState<RoastMode>("roast");
+  const [selectedPersona, setSelectedPersona] = useState<RoastPersona>("default");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
@@ -175,6 +177,7 @@ export function OnboardingWizard() {
         ...buildAnswers(),
         tone: selectedTone,
         mode: selectedMode,
+        persona: selectedPersona,
       }),
     });
     const data = (await res.json()) as { id?: string; error?: string };
@@ -198,7 +201,7 @@ export function OnboardingWizard() {
     posthog.capture('roast_generated');
     router.push(`/roast/${encodeURIComponent(roastId)}`);
     router.refresh();
-  }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, selectedTone, selectedMode, isPro, router, allQuestions]);
+  }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, selectedTone, selectedMode, selectedPersona, isPro, router, allQuestions]);
 
   useEffect(() => {
     if (step !== "loading") return;
@@ -236,6 +239,11 @@ export function OnboardingWizard() {
 
   function onModeSelect(mode: RoastMode) {
     setSelectedMode(mode);
+    setStep("persona");
+  }
+
+  function onPersonaSelect(persona: RoastPersona) {
+    setSelectedPersona(persona);
     setStep("tone");
   }
 
@@ -294,6 +302,23 @@ export function OnboardingWizard() {
           reason="pro_feature"
         />
       </div>
+    );
+  }
+
+  if (step === "persona") {
+    return (
+      <>
+        <PersonaSelector
+          onSelect={onPersonaSelect}
+          isPro={isPro}
+          onUpgradeRequest={() => setShowUpgradeModal(true)}
+        />
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          onClose={() => setShowUpgradeModal(false)}
+          reason="pro_feature"
+        />
+      </>
     );
   }
 
