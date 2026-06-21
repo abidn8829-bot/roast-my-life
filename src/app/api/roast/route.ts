@@ -350,6 +350,7 @@ export async function POST(request: Request) {
   });
 
   console.log("[api/roast] Full insert object keys:", Object.keys(baseRow));
+  console.log("[api/roast] Full insert object:", JSON.stringify(baseRow, null, 2));
 
   let { data, error } = await supabase
     .from("roasts")
@@ -358,6 +359,7 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
+    console.error("[api/roast] Full Supabase error object:", JSON.stringify(error, null, 2));
     console.error("[api/roast] Supabase insert error:", {
       code: error.code,
       message: error.message,
