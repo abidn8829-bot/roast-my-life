@@ -332,7 +332,24 @@ export async function POST(request: Request) {
     week_start_date: baseRow.week_start_date,
     model_used: baseRow.model_used,
     share_slug: baseRow.share_slug,
+    life_score: baseRow.life_score,
+    life_score_type: typeof baseRow.life_score,
+    funny_title: baseRow.funny_title,
+    funny_title_type: typeof baseRow.funny_title,
+    top_5_roasts: baseRow.top_5_roasts,
+    top_5_roasts_type: typeof baseRow.top_5_roasts,
+    top_5_roasts_length: baseRow.top_5_roasts?.length,
+    category_scores: baseRow.category_scores,
+    category_scores_type: typeof baseRow.category_scores,
+    tone: baseRow.tone,
+    tone_type: typeof baseRow.tone,
+    mode: baseRow.mode,
+    mode_type: typeof baseRow.mode,
+    persona: baseRow.persona,
+    persona_type: typeof baseRow.persona,
   });
+
+  console.log("[api/roast] Full insert object keys:", Object.keys(baseRow));
 
   let { data, error } = await supabase
     .from("roasts")
