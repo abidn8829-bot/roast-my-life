@@ -13,6 +13,8 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  console.log("[ShareButtons] Props:", { roastId, shareSlug });
+
   const shareUrl = roastShareUrl(shareSlug);
 
   const fetchReportCardPng = useCallback(async () => {
