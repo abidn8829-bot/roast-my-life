@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { OnboardingAnswers, RoastTone, RoastMode, RoastPersona } from "@/lib/roast-types";
 import posthog from "posthog-js";
 import { ToneSelector } from "@/components/tone-selector";
@@ -97,6 +97,7 @@ export function OnboardingWizard() {
   const [selectedMode, setSelectedMode] = useState<RoastMode>("roast");
   const [selectedPersona, setSelectedPersona] = useState<RoastPersona>("default");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     posthog.capture('onboarding_started');
@@ -114,7 +115,6 @@ export function OnboardingWizard() {
   const [neverDoThing, setNeverDoThing] = useState("");
   const [socialMediaHours, setSocialMediaHours] = useState("");
   const [workoutFrequency, setWorkoutFrequency] = useState("");
-  const roastStarted = useRef(false);
 
   const allQuestions = [...BASE_QUESTIONS, ...(isPro ? PRO_QUESTIONS : [])];
 
@@ -170,6 +170,14 @@ export function OnboardingWizard() {
 
   const generateRoast = useCallback(async () => {
     setError(null);
+    setIsGenerating(true);
+
+    // Show loading state only after a delay to avoid flash for immediate errors
+    const loadingTimeout = setTimeout(() => {
+      setStep("loading");
+      setLoadingMsgIndex(0);
+    }, 500);
+
     const res = await fetch("/api/roast", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -180,12 +188,16 @@ export function OnboardingWizard() {
         persona: selectedPersona,
       }),
     });
+
+    clearTimeout(loadingTimeout);
+
     const data = (await res.json()) as { id?: string; error?: string };
     const roastId =
       typeof data.id === "string" ? data.id.trim() : String(data.id ?? "");
 
     if (!res.ok || !roastId) {
       console.error("[onboarding] roast API failed:", res.status, data);
+      setIsGenerating(false);
 
       // Check if it's a daily limit error
       if (res.status === 429 && data.error?.includes("free roast today")) {
@@ -210,12 +222,6 @@ export function OnboardingWizard() {
     }, 2000);
     return () => clearInterval(interval);
   }, [step]);
-
-  useEffect(() => {
-    if (step !== "loading" || roastStarted.current) return;
-    roastStarted.current = true;
-    void generateRoast();
-  }, [step, generateRoast]);
 
   function onNext() {
     if (typeof step !== "number") return;
@@ -249,8 +255,7 @@ export function OnboardingWizard() {
 
   function onToneSelect(tone: RoastTone) {
     setSelectedTone(tone);
-    setStep("loading");
-    setLoadingMsgIndex(0);
+    void generateRoast();
   }
 
   if (step === "loading") {
