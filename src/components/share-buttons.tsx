@@ -25,19 +25,29 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
     setLoading(true);
     setStatus(null);
     try {
+      console.log("[downloadImage] Starting download for roastId:", roastId);
       const response = await fetch(`/api/og/${roastId}`);
+      console.log("[downloadImage] Response status:", response.status, response.ok);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status}`);
+      }
       const blob = await response.blob();
+      console.log("[downloadImage] Blob size:", blob.size, "type:", blob.type);
       const url = URL.createObjectURL(blob);
+      console.log("[downloadImage] Object URL created:", url);
       const a = document.createElement("a");
       a.href = url;
       a.download = "roast-my-life.png";
       document.body.appendChild(a);
+      console.log("[downloadImage] Triggering download click");
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      console.log("[downloadImage] Download completed successfully");
       setStatus("Image saved!");
       posthog.capture('roast_shared');
-    } catch {
+    } catch (error) {
+      console.error("[downloadImage] Download failed:", error);
       setStatus("Download failed");
     } finally {
       setLoading(false);
