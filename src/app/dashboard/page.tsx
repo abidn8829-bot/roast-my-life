@@ -110,6 +110,7 @@ export default async function DashboardPage() {
           currentStreak={currentStreak}
           longestStreak={longestStreak}
           achievements={achievements}
+          isPro={subscriptionTier === "pro"}
         />
       </div>
     </main>

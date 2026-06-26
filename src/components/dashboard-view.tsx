@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { ACHIEVEMENTS, type UserAchievements } from "@/lib/achievements";
 import { formatWeekLabel, snippet } from "@/lib/format-week";
 import type { CategoryScores } from "@/lib/roast-types";
+import { UpgradeModal } from "@/components/upgrade-modal";
 
 export type DashboardRoast = {
   id: string;
@@ -28,6 +32,7 @@ type Props = {
   currentStreak: number;
   longestStreak: number;
   achievements: UserAchievements;
+  isPro: boolean;
 };
 
 const CATEGORY_LABELS: { key: keyof CategoryScores; label: string }[] = [
@@ -162,9 +167,17 @@ function ScoreTrend({ scores }: { scores: number[] }) {
   );
 }
 
-export function DashboardView({ name, roasts, streak, currentStreak, longestStreak, achievements }: Props) {
+export function DashboardView({ name, roasts, streak, currentStreak, longestStreak, achievements, isPro }: Props) {
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const latest = roasts[0] ?? null;
   const previous = roasts[1] ?? null;
+
+  // Check if user has already roasted today (for free users)
+  const hasRoastedToday = !isPro && latest && (() => {
+    const today = new Date().toISOString().split('T')[0];
+    const roastDate = new Date(latest.created_at).toISOString().split('T')[0];
+    return today === roastDate;
+  })();
 
   const scoresWithValues = roasts
     .filter((r) => r.life_score !== null)
@@ -344,12 +357,28 @@ export function DashboardView({ name, roasts, streak, currentStreak, longestStre
       )}
 
       {/* CTA */}
-      <Link
-        href="/onboarding"
-        className="block w-full rounded-xl bg-[#FF3D00] px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110"
-      >
-        Get Roasted This Week
-      </Link>
+      {hasRoastedToday ? (
+        <button
+          type="button"
+          onClick={() => setShowUpgradeModal(true)}
+          className="block w-full rounded-xl bg-[#FF3D00] px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110"
+        >
+          Get Roasted This Week
+        </button>
+      ) : (
+        <Link
+          href="/onboarding"
+          className="block w-full rounded-xl bg-[#FF3D00] px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110"
+        >
+          Get Roasted This Week
+        </Link>
+      )}
+
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        reason="daily_limit"
+      />
 
       {/* Last 3 roast reports */}
       {recentRoasts.length > 0 && (

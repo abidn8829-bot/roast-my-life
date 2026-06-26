@@ -30,6 +30,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  console.log("[api/og] Generating OG image for roastId:", id);
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -43,8 +44,11 @@ export async function GET(
     .single();
 
   if (!roast) {
+    console.error("[api/og] Roast not found for id:", id);
     return new Response("Roast not found", { status: 404 });
   }
+
+  console.log("[api/og] Roast data found:", { life_score: roast.life_score, funny_title: roast.funny_title });
 
   const lifeScore = roast.life_score ?? 50;
   const funnyTitle = roast.funny_title ?? "Your Life";
