@@ -25,12 +25,15 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
     setLoading(true);
     setStatus(null);
     try {
-      const blob = await fetchReportCardPng();
+      const response = await fetch(`/api/og/${roastId}`);
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = "roast-my-life.png";
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
       setStatus("Image saved!");
       posthog.capture('roast_shared');
@@ -40,7 +43,7 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
       setLoading(false);
       window.setTimeout(() => setStatus(null), 3000);
     }
-  }, [fetchReportCardPng]);
+  }, [roastId]);
 
   const whatsappHref = `https://wa.me/?text=${encodeURIComponent(
     `Check my Roast My Life results! ${shareUrl}`,
