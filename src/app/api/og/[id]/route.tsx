@@ -37,18 +37,23 @@ export async function GET(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 
-  const { data: roast } = await supabase
+  const { data: roast, error } = await supabase
     .from("roasts")
     .select("life_score, funny_title, top_5_roasts, category_scores")
     .eq("id", id)
     .single();
+
+  if (error) {
+    console.error("[api/og] Supabase error:", error);
+    return new Response(`Database error: ${error.message}`, { status: 500 });
+  }
 
   if (!roast) {
     console.error("[api/og] Roast not found for id:", id);
     return new Response("Roast not found", { status: 404 });
   }
 
-  console.log("[api/og] Roast data found:", { life_score: roast.life_score, funny_title: roast.funny_title });
+  console.log("[api/og] Roast data found:", { life_score: roast.life_score, funny_title: roast.funny_title, top_5_roasts: roast.top_5_roasts, category_scores: roast.category_scores });
 
   const lifeScore = roast.life_score ?? 50;
   const funnyTitle = roast.funny_title ?? "Your Life";
