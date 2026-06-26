@@ -65,7 +65,7 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
 
   async function onInstagram() {
     await downloadImage();
-    setStatus("Image saved! Now open Instagram and share it as a story 📸");
+    setStatus("Image saved! Open Instagram and share it as a story 📸");
     window.setTimeout(() => setStatus(null), 3500);
     posthog.capture('roast_shared');
   }
