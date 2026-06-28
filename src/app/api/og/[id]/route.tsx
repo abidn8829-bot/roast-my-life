@@ -37,6 +37,19 @@ export async function GET(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 
+  // First check if roast exists at all
+  const { data: roastExists, error: existsError } = await supabase
+    .from("roasts")
+    .select("id")
+    .eq("id", id)
+    .single();
+
+  if (existsError || !roastExists) {
+    console.error("[api/og] Roast not found for id:", id, existsError);
+    return new Response("Roast not found", { status: 404 });
+  }
+
+  // Now try to get the required fields
   const { data: roast, error } = await supabase
     .from("roasts")
     .select("life_score, funny_title, top_5_roasts, category_scores")
@@ -44,13 +57,44 @@ export async function GET(
     .single();
 
   if (error) {
-    console.error("[api/og] Supabase error:", error);
+    console.error("[api/og] Supabase error fetching roast data:", error);
+    // If the error is about missing columns, return a fallback image
+    if (error.code === 'PGRST116' || error.message.includes('column')) {
+      console.log("[api/og] Roast exists but missing required fields, using fallback");
+      return new ImageResponse(
+        (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              background: "#0A0A0A",
+              padding: 60,
+              fontFamily: "system-ui, sans-serif",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 48,
+                fontWeight: 700,
+                color: "#FF3D00",
+                textAlign: "center",
+              }}
+            >
+              ROAST MY LIFE
+            </span>
+          </div>
+        ),
+        {
+          width: 1080,
+          height: 1920,
+        },
+      );
+    }
     return new Response(`Database error: ${error.message}`, { status: 500 });
-  }
-
-  if (!roast) {
-    console.error("[api/og] Roast not found for id:", id);
-    return new Response("Roast not found", { status: 404 });
   }
 
   console.log("[api/og] Roast data found:", { life_score: roast.life_score, funny_title: roast.funny_title, top_5_roasts: roast.top_5_roasts, category_scores: roast.category_scores });
