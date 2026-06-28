@@ -51,6 +51,7 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
     } catch (error) {
       console.error("[downloadImage] Download failed:", error);
       setStatus("Download failed");
+      alert("Download failed, please try again");
     } finally {
       setLoading(false);
       window.setTimeout(() => setStatus(null), 3000);
