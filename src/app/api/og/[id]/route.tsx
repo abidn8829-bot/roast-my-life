@@ -60,14 +60,18 @@ export async function GET(
     const topRoasts = Array.isArray(roastData.top_5_roasts) && roastData.top_5_roasts.length > 0 ? roastData.top_5_roasts : ["You need to do better."];
     const categoryScores = roastData.category_scores;
 
+    console.log("[api/og] Category scores raw:", categoryScores);
+
     // Find worst and best categories
     let worstCategory = { name: "Unknown", grade: "F", score: 0 };
     let bestCategory = { name: "Unknown", grade: "A", score: 100 };
 
-    if (categoryScores && typeof categoryScores === "object") {
+    if (categoryScores && typeof categoryScores === "object" && Object.keys(categoryScores).length > 0) {
       const entries = Object.entries(categoryScores);
+      console.log("[api/og] Category entries:", entries);
       for (const [name, data] of entries) {
         const categoryData = data as { score: number; grade: string };
+        console.log("[api/og] Processing category:", name, categoryData);
         if (categoryData.score < worstCategory.score) {
           worstCategory = { name, grade: categoryData.grade ?? "F", score: categoryData.score };
         }
@@ -75,7 +79,11 @@ export async function GET(
           bestCategory = { name, grade: categoryData.grade ?? "A", score: categoryData.score };
         }
       }
+    } else {
+      console.log("[api/og] No valid category scores found, using defaults");
     }
+
+    console.log("[api/og] Final categories:", { worst: worstCategory, best: bestCategory });
 
     const bestRoast = topRoasts[0] ?? "You need to do better.";
 
