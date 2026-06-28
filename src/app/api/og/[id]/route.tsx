@@ -72,11 +72,14 @@ export async function GET(
       for (const [name, data] of entries) {
         const categoryData = data as { score: number; grade: string };
         console.log("[api/og] Processing category:", name, categoryData);
-        if (categoryData.score < worstCategory.score) {
-          worstCategory = { name, grade: categoryData.grade ?? "F", score: categoryData.score };
+        // Use default values if category data is empty
+        const score = categoryData.score ?? 50;
+        const grade = categoryData.grade ?? "C";
+        if (score < worstCategory.score) {
+          worstCategory = { name, grade, score };
         }
-        if (categoryData.score > bestCategory.score) {
-          bestCategory = { name, grade: categoryData.grade ?? "A", score: categoryData.score };
+        if (score > bestCategory.score) {
+          bestCategory = { name, grade, score };
         }
       }
     } else {
