@@ -63,8 +63,8 @@ export async function GET(
     console.log("[api/og] Category scores raw:", categoryScores);
 
     // Find worst and best categories
-    let worstCategory = { name: "Unknown", grade: "F", score: 0 };
-    let bestCategory = { name: "Unknown", grade: "A", score: 100 };
+    let worstCategory = { name: "Unknown", grade: "F", score: Infinity };
+    let bestCategory = { name: "Unknown", grade: "A", score: -Infinity };
 
     if (categoryScores && typeof categoryScores === "object" && Object.keys(categoryScores).length > 0) {
       const entries = Object.entries(categoryScores);
@@ -75,15 +75,22 @@ export async function GET(
         // Use default values if category data is empty
         const score = categoryData.score ?? 50;
         const grade = categoryData.grade ?? "C";
+        const displayName = name.charAt(0).toUpperCase() + name.slice(1);
         if (score < worstCategory.score) {
-          worstCategory = { name, grade, score };
+          worstCategory = { name: displayName, grade, score };
         }
         if (score > bestCategory.score) {
-          bestCategory = { name, grade, score };
+          bestCategory = { name: displayName, grade, score };
         }
       }
-    } else {
-      console.log("[api/og] No valid category scores found, using defaults");
+    }
+
+    // If no categories were found (all scores were default/empty), use defaults
+    if (worstCategory.score === Infinity) {
+      worstCategory = { name: "Unknown", grade: "F", score: 0 };
+    }
+    if (bestCategory.score === -Infinity) {
+      bestCategory = { name: "Unknown", grade: "A", score: 100 };
     }
 
     console.log("[api/og] Final categories:", { worst: worstCategory, best: bestCategory });
