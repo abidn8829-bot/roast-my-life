@@ -37,72 +37,27 @@ export async function GET(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   );
 
-  // First check if roast exists at all
-  const { data: roastExists, error: existsError } = await supabase
-    .from("roasts")
-    .select("id")
-    .eq("id", id)
-    .single();
-
-  if (existsError || !roastExists) {
-    console.error("[api/og] Roast not found for id:", id, existsError);
-    return new Response("Roast not found", { status: 404 });
-  }
-
-  // Now try to get the required fields
+  // Use the RLS-bypassing function to get roast data
   const { data: roast, error } = await supabase
-    .from("roasts")
-    .select("life_score, funny_title, top_5_roasts, category_scores")
-    .eq("id", id)
-    .single();
+    .rpc("get_roast_for_og", { p_id: id });
 
   if (error) {
-    console.error("[api/og] Supabase error fetching roast data:", error);
-    // If the error is about missing columns, return a fallback image
-    if (error.code === 'PGRST116' || error.message.includes('column')) {
-      console.log("[api/og] Roast exists but missing required fields, using fallback");
-      return new ImageResponse(
-        (
-          <div
-            style={{
-              width: "100%",
-              height: "100%",
-              display: "flex",
-              flexDirection: "column",
-              background: "#0A0A0A",
-              padding: 60,
-              fontFamily: "system-ui, sans-serif",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <span
-              style={{
-                fontSize: 48,
-                fontWeight: 700,
-                color: "#FF3D00",
-                textAlign: "center",
-              }}
-            >
-              ROAST MY LIFE
-            </span>
-          </div>
-        ),
-        {
-          width: 1080,
-          height: 1920,
-        },
-      );
-    }
+    console.error("[api/og] Supabase error:", error);
     return new Response(`Database error: ${error.message}`, { status: 500 });
   }
 
-  console.log("[api/og] Roast data found:", { life_score: roast.life_score, funny_title: roast.funny_title, top_5_roasts: roast.top_5_roasts, category_scores: roast.category_scores });
+  if (!roast || roast.length === 0) {
+    console.error("[api/og] Roast not found for id:", id);
+    return new Response("Roast not found", { status: 404 });
+  }
 
-  const lifeScore = roast.life_score ?? 50;
-  const funnyTitle = roast.funny_title ?? "Your Life";
-  const topRoasts = roast.top_5_roasts ?? ["You need to do better."];
-  const categoryScores = roast.category_scores;
+  const roastData = roast[0];
+  console.log("[api/og] Roast data found:", { life_score: roastData.life_score, funny_title: roastData.funny_title, top_5_roasts: roastData.top_5_roasts, category_scores: roastData.category_scores });
+
+  const lifeScore = roastData.life_score ?? 50;
+  const funnyTitle = roastData.funny_title ?? "Your Life";
+  const topRoasts = roastData.top_5_roasts ?? ["You need to do better."];
+  const categoryScores = roastData.category_scores;
 
   // Find worst and best categories
   let worstCategory = { name: "Unknown", grade: "F", score: 0 };
