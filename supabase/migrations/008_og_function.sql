@@ -11,7 +11,12 @@ language sql
 security definer
 set search_path = public
 as $$
-  select r.id, r.life_score, r.funny_title, r.top_5_roasts, r.category_scores
+  select 
+    r.id, 
+    coalesce(r.life_score, 50) as life_score, 
+    coalesce(r.funny_title, 'Your Life') as funny_title, 
+    coalesce(r.top_5_roasts, '["You need to do better."]'::jsonb) as top_5_roasts, 
+    coalesce(r.category_scores, '{}'::jsonb) as category_scores
   from public.roasts r
   where r.id = p_id
   limit 1;
