@@ -4,7 +4,16 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export async function POST() {
+export async function GET(request: Request) {
+  // Verify cron secret to prevent unauthorized access
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ") || authHeader.slice(7) !== cronSecret) {
+    console.error("[send-weekly-email] Unauthorized request");
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const supabase = await createSupabaseServerClient();
     
