@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DashboardView, type DashboardRoast } from "@/components/dashboard-view";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { UpgradeBanner } from "@/components/upgrade-banner";
 import { parseAchievements } from "@/lib/achievements";
 import { getDisplayName } from "@/lib/display-name";
 import { parseCategoryScores } from "@/lib/parse-category-scores";
@@ -86,23 +87,7 @@ export default async function DashboardPage() {
     <main className="min-h-screen bg-[#0A0A0A] px-4 py-10 text-[#FAFAFA]">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
         <DashboardHeader isPro={subscriptionTier === "pro"} name={name} />
-        {subscriptionTier === "free" && (
-          <div className="rounded-xl border border-neutral-800 bg-[#111111] p-4">
-            <p className="text-sm text-neutral-300">
-              You&apos;re on the free plan — 1 roast per day
-            </p>
-            {process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL && (
-              <a
-                href={process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-block rounded-lg bg-[#FF3D00] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
-              >
-                Upgrade to Pro for unlimited roasts 🔥
-              </a>
-            )}
-          </div>
-        )}
+        {subscriptionTier === "free" && <UpgradeBanner />}
         <DashboardView
           name={name}
           roasts={roasts}

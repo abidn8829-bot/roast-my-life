@@ -45,7 +45,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-xl font-bold text-[#FAFAFA] mb-3">Subscription and Payments</h2>
             <p className="leading-relaxed">
-              We offer free and paid subscription tiers. Paid subscriptions are processed through Gumroad. By subscribing, you agree to Gumroad's terms of service. Refunds are handled according to Gumroad's refund policy.
+              We offer free and paid subscription tiers. Pro subscriptions will be available soon. Join our waitlist to be notified when Pro launches. Payment processing details will be available at launch.
             </p>
           </section>
 

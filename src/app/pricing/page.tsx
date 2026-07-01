@@ -1,6 +1,12 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
+import { ProWaitlistModal } from "@/components/pro-waitlist-modal";
 
 export default function PricingPage() {
+  const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
+
   return (
     <main className="min-h-screen bg-[#0A0A0A] px-4 py-10 text-[#FAFAFA]">
       <div className="mx-auto w-full max-w-lg">
@@ -76,23 +82,12 @@ export default function PricingPage() {
                 5 categories graded
               </li>
             </ul>
-            {process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL ? (
-              <a
-                href={process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full rounded-lg bg-[#FF3D00] px-4 py-3 text-center text-sm font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110"
-              >
-                Upgrade Now
-              </a>
-            ) : (
-              <button
-                disabled
-                className="block w-full rounded-lg bg-neutral-700 px-4 py-3 text-center text-sm font-semibold text-neutral-400 cursor-not-allowed"
-              >
-                Coming Soon
-              </button>
-            )}
+            <button
+              onClick={() => setShowProWaitlistModal(true)}
+              className="block w-full rounded-lg bg-[#FF3D00] px-4 py-3 text-center text-sm font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110"
+            >
+              Join Pro Waitlist 🔥
+            </button>
           </div>
 
           {/* Elite Tier */}
@@ -131,6 +126,11 @@ export default function PricingPage() {
           </div>
         </div>
       </div>
+
+      <ProWaitlistModal
+        isOpen={showProWaitlistModal}
+        onClose={() => setShowProWaitlistModal(false)}
+      />
     </main>
   );
 }
