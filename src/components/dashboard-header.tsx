@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { UpgradeModal } from "@/components/upgrade-modal";
+import { ProWaitlistModal } from "@/components/pro-waitlist-modal";
 import { LogoutButton } from "@/components/logout-button";
 
 type Props = {
@@ -11,7 +11,7 @@ type Props = {
 };
 
 export function DashboardHeader({ isPro, name }: Props) {
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
 
   return (
     <>
@@ -27,10 +27,10 @@ export function DashboardHeader({ isPro, name }: Props) {
               </span>
             ) : (
               <button
-                onClick={() => setShowUpgradeModal(true)}
+                onClick={() => setShowProWaitlistModal(true)}
                 className="text-xs text-neutral-500 hover:text-[#FF3D00] transition"
               >
-                Free Plan — Upgrade to Pro →
+                Free Plan — Join Pro Waitlist 🔥
               </button>
             )}
           </div>
@@ -42,10 +42,9 @@ export function DashboardHeader({ isPro, name }: Props) {
           <LogoutButton />
         </div>
       </div>
-      <UpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        reason="pro_feature"
+      <ProWaitlistModal
+        isOpen={showProWaitlistModal}
+        onClose={() => setShowProWaitlistModal(false)}
       />
     </>
   );
