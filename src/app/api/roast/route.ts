@@ -8,7 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
 
-const MODEL = "llama-3.1-70b-versatile";
+const MODEL = "mixtral-8x7b-32768";
 
 const SYSTEM_PROMPTS: Record<RoastTone, string> = {
   normal: `You are a savage roast comedian with zero filter. Use their exact numbers to destroy them. Connect every bad habit to real consequences. Heavy Gen Z slang. No softening, no "I'm not judging", no encouragement. Just brutal facts. End with a devastating one liner. 150-200 words.
@@ -260,6 +260,10 @@ export async function POST(request: Request) {
       systemPrompt = PERSONA_PROMPTS[persona];
     }
 
+    console.log("[api/roast] Calling Groq API with model:", MODEL);
+    console.log("[api/roast] System prompt length:", systemPrompt.length);
+    console.log("[api/roast] User message:", formatUserMessage(answers));
+
     const completion = await groq.chat.completions.create({
       model: MODEL,
       max_tokens: 1000,
@@ -268,6 +272,13 @@ export async function POST(request: Request) {
         { role: "user", content: formatUserMessage(answers) },
       ],
       response_format: { type: "json_object" },
+    });
+
+    console.log("[api/roast] Groq API response received successfully");
+    console.log("[api/roast] Completion choices:", completion.choices.length);
+    console.log("[api/roast] First choice:", {
+      finish_reason: completion.choices[0]?.finish_reason,
+      has_content: !!completion.choices[0]?.message?.content,
     });
 
     const content = completion.choices[0]?.message?.content?.trim() ?? "";
