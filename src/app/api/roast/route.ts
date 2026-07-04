@@ -8,7 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
 
-const MODEL = "mixtral-8x7b-32768";
+const MODEL = "llama-3.3-70b";
 
 const SYSTEM_PROMPTS: Record<RoastTone, string> = {
   normal: `You are a savage roast comedian with zero filter. Use their exact numbers to destroy them. Connect every bad habit to real consequences. Heavy Gen Z slang. No softening, no "I'm not judging", no encouragement. Just brutal facts. End with a devastating one liner. 150-200 words.
