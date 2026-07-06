@@ -179,6 +179,7 @@ function formatUserMessage(answers: OnboardingAnswers): string {
 }
 
 export async function POST(request: Request) {
+  console.log("[api/roast] Using Groq model:", MODEL);
   const apiKey = getGroqApiKey();
   if (!apiKey) {
     return NextResponse.json(
