@@ -103,6 +103,7 @@ export function OnboardingWizard() {
   const [continuityMemory, setContinuityMemory] = useState<unknown>(null);
   const [previousRoastText, setPreviousRoastText] = useState<string | null>(null);
   const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false);
+  const [hasUsedTodayRoast, setHasUsedTodayRoast] = useState(false);
 
   useEffect(() => {
     posthog.capture('onboarding_started');
@@ -113,14 +114,21 @@ export function OnboardingWizard() {
     ])
       .then(([tierData, answersData]) => {
         setIsPro(tierData.tier === 'pro');
+        setHasUsedTodayRoast(answersData.hasUsedTodayRoast);
         if (answersData.isReturning) {
           setIsReturningUser(true);
           setPreviousAnswers(answersData.answers);
           setContinuityMemory(answersData.continuityMemory);
           setPreviousRoastText(answersData.previousRoastText);
-          setStep("checkin"); // Go to check-in screen first for returning users
-          // Generate follow-up question
-          generateFollowUpQuestion(answersData.previousRoastText, answersData.answers, answersData.continuityMemory);
+          // Only show check-in if they haven't used today's roast
+          if (!answersData.hasUsedTodayRoast) {
+            setStep("checkin");
+            // Generate follow-up question
+            generateFollowUpQuestion(answersData.previousRoastText, answersData.answers, answersData.continuityMemory);
+          } else {
+            // Show Pro waitlist modal if they've used today's roast
+            setShowProWaitlistModal(true);
+          }
         }
       })
       .catch(() => {
