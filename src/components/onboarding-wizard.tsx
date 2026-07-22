@@ -97,14 +97,31 @@ export function OnboardingWizard() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
   const [followUpAnswer, setFollowUpAnswer] = useState("");
+  const [isReturningUser, setIsReturningUser] = useState(false);
+  const [previousAnswers, setPreviousAnswers] = useState<OnboardingAnswers | null>(null);
+  const [isCheckingReturning, setIsCheckingReturning] = useState(true);
 
   useEffect(() => {
     posthog.capture('onboarding_started');
-    // Check if user is pro
-    fetch('/api/user/tier')
-      .then(res => res.json())
-      .then(data => setIsPro(data.tier === 'pro'))
-      .catch(() => setIsPro(false));
+    // Check if user is pro and if they're a returning user
+    Promise.all([
+      fetch('/api/user/tier').then(res => res.json()),
+      fetch('/api/user/previous-answers').then(res => res.json()),
+    ])
+      .then(([tierData, answersData]) => {
+        setIsPro(tierData.tier === 'pro');
+        if (answersData.isReturning) {
+          setIsReturningUser(true);
+          setPreviousAnswers(answersData.answers);
+          setStep("tone");
+        }
+      })
+      .catch(() => {
+        setIsPro(false);
+      })
+      .finally(() => {
+        setIsCheckingReturning(false);
+      });
   }, []);
 
   const [phoneHours, setPhoneHours] = useState("");
@@ -151,6 +168,11 @@ export function OnboardingWizard() {
   }
 
   function buildAnswers(): OnboardingAnswers {
+    // If returning user, use previous answers
+    if (isReturningUser && previousAnswers) {
+      return previousAnswers;
+    }
+
     const answers: OnboardingAnswers = {
       phoneHours: Number(phoneHours),
       worstApp: worstApp.trim(),
@@ -259,6 +281,17 @@ export function OnboardingWizard() {
   function onFollowUpSubmit() {
     if (!followUpAnswer.trim()) return;
     void generateRoast();
+  }
+
+  if (isCheckingReturning) {
+    return (
+      <div className="w-full max-w-md text-center">
+        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[#FF3D00] border-t-transparent" />
+        <p className="text-lg text-[#FAFAFA] animate-pulse">
+          Checking your profile...
+        </p>
+      </div>
+    );
   }
 
   if (step === "followup") {
