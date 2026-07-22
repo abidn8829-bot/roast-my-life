@@ -10,6 +10,20 @@ import { getWeekStartDate } from "@/lib/week-start";
 
 const MODEL = "llama-3.3-70b-versatile";
 
+const FOLLOW_UP_SYSTEM_PROMPT = `You are a savage roast comedian who remembers everything. Based on the user's previous roast and their current habits, ask ONE intelligent follow-up question to dig deeper into their failures. The question should be specific, brutal, and expose a pattern of bad behavior. Keep it under 20 words. No markdown, no extra text, just the question.`;
+
+const CONTINUITY_MEMORY_SYSTEM_PROMPT = `You are building a lightweight memory for a roast AI. Based on the user's roast and habits, extract 3-5 key facts about them that would be useful for future roasts. Focus on patterns, specific failures, and memorable details. Return as a JSON object with a "facts" array of strings. Each fact should be under 15 words. No markdown, no extra text, just the JSON.
+
+Example format:
+{
+  "facts": [
+    "Addicted to TikTok for 2+ hours daily",
+    "Never goes to gym despite promising",
+    "Spends $50/week on food delivery",
+    "Sleeps 8 hours but wastes time"
+  ]
+}`;
+
 const SYSTEM_PROMPTS: Record<RoastTone, string> = {
   normal: `You are a savage roast comedian with zero filter. Use their exact numbers to destroy them. Connect every bad habit to real consequences. Heavy Gen Z slang. No softening, no "I'm not judging", no encouragement. Just brutal facts. End with a devastating one liner. 150-200 words.
 
@@ -107,7 +121,7 @@ IMPORTANT: You must respond with valid JSON in this exact format:
 Each one-liner must be under 15 words and grandmother-themed. No markdown, no extra text, just the JSON.`,
 };
 
-function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastTone; mode: RoastMode; persona: RoastPersona } | null {
+function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastTone; mode: RoastMode; persona: RoastPersona; followUpAnswer?: string } | null {
   if (!body || typeof body !== "object") return null;
   const b = body as Record<string, unknown>;
   const phoneHours = Number(b.phoneHours);
@@ -118,6 +132,7 @@ function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastT
     typeof b.neverDoThing === "string" ? b.neverDoThing.trim() : "";
   const socialMediaHours = b.socialMediaHours ? Number(b.socialMediaHours) : undefined;
   const workoutFrequency = b.workoutFrequency ? Number(b.workoutFrequency) : undefined;
+  const followUpAnswer = typeof b.followUpAnswer === "string" ? b.followUpAnswer.trim() : undefined;
   const tone = (typeof b.tone === "string" && ["normal", "no_mercy", "destroy_me"].includes(b.tone))
     ? b.tone as RoastTone
     : "normal";
@@ -156,10 +171,11 @@ function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastT
     tone,
     mode,
     persona,
+    followUpAnswer,
   };
 }
 
-function formatUserMessage(answers: OnboardingAnswers): string {
+function formatUserMessage(answers: OnboardingAnswers, continuityMemory: unknown, followUpAnswer?: string, previousRoastText?: string): string {
   let message = `Roast this person based on their habits:
 
 - Phone screen time: ${answers.phoneHours} hours per day
@@ -173,6 +189,18 @@ function formatUserMessage(answers: OnboardingAnswers): string {
   }
   if (answers.workoutFrequency !== undefined) {
     message += `\n- Workouts this week: ${answers.workoutFrequency}`;
+  }
+
+  if (continuityMemory) {
+    message += `\n\nPrevious context (what I remember about them): ${JSON.stringify(continuityMemory)}`;
+  }
+
+  if (previousRoastText) {
+    message += `\n\nPrevious roast: "${previousRoastText}"`;
+  }
+
+  if (followUpAnswer) {
+    message += `\n\nTheir answer to my follow-up question: "${followUpAnswer}"`;
   }
 
   return message;
@@ -246,10 +274,62 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid answers" }, { status: 400 });
   }
 
-  const { answers, tone, mode, persona } = parsed;
-  console.log("[api/roast] Parsed answers:", { answers, tone, mode, persona });
+  const { answers, tone, mode, persona, followUpAnswer } = parsed;
+  console.log("[api/roast] Parsed answers:", { answers, tone, mode, persona, followUpAnswer });
+
+  // Check if this is a returning user (has previous roasts)
+  const { data: previousRoasts } = await supabase
+    .from("roasts")
+    .select("id, roast_text, continuity_memory, created_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const isReturningUser = previousRoasts && previousRoasts.length > 0;
+  const previousRoast = isReturningUser ? previousRoasts[0] : null;
+  const continuityMemory = previousRoast?.continuity_memory || null;
+
+  console.log("[api/roast] Is returning user:", isReturningUser);
+  console.log("[api/roast] Continuity memory:", continuityMemory);
 
   const groq = new Groq({ apiKey });
+
+  // If returning user and no follow-up answer, generate follow-up question
+  if (isReturningUser && !followUpAnswer) {
+    try {
+      const followUpPrompt = `Previous roast: "${previousRoast?.roast_text}"
+Current habits:
+- Phone screen time: ${answers.phoneHours} hours per day
+- Biggest time-waster app: ${answers.worstApp}
+- Average sleep: ${answers.sleepHours} hours per night
+- Weekly food delivery spending: $${answers.foodDeliverySpend}
+- Keeps saying they'll do but never does: "${answers.neverDoThing}"
+${answers.socialMediaHours ? `- Social media hours per day: ${answers.socialMediaHours}` : ''}
+${answers.workoutFrequency ? `- Workouts this week: ${answers.workoutFrequency}` : ''}
+
+Continuity memory: ${JSON.stringify(continuityMemory)}`;
+
+      const completion = await groq.chat.completions.create({
+        model: MODEL,
+        max_tokens: 50,
+        messages: [
+          { role: "system", content: FOLLOW_UP_SYSTEM_PROMPT },
+          { role: "user", content: followUpPrompt },
+        ],
+      });
+
+      const followUpQuestion = completion.choices[0]?.message?.content?.trim() || "Still making the same mistakes?";
+      console.log("[api/roast] Generated follow-up question:", followUpQuestion);
+
+      return NextResponse.json({
+        followUpQuestion,
+        requiresFollowUp: true,
+      });
+    } catch (error) {
+      console.error("[api/roast] Error generating follow-up question:", error);
+      // If follow-up generation fails, proceed with roast generation
+    }
+  }
 
   let roastText: string;
   let top5Roasts: string[] = [];
@@ -263,14 +343,14 @@ export async function POST(request: Request) {
 
     console.log("[api/roast] Calling Groq API with model:", MODEL);
     console.log("[api/roast] System prompt length:", systemPrompt.length);
-    console.log("[api/roast] User message:", formatUserMessage(answers));
+    console.log("[api/roast] User message:", formatUserMessage(answers, continuityMemory, followUpAnswer, previousRoast?.roast_text));
 
     const completion = await groq.chat.completions.create({
       model: MODEL,
       max_tokens: 1000,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: formatUserMessage(answers) },
+        { role: "user", content: formatUserMessage(answers, continuityMemory, followUpAnswer, previousRoast?.roast_text) },
       ],
       response_format: { type: "json_object" },
     });
@@ -320,6 +400,40 @@ export async function POST(request: Request) {
   const funny_title = getFunnyTitle(life_score);
   const category_scores = calculateCategoryScores(answers);
 
+  // Generate continuity memory
+  let newContinuityMemory = continuityMemory || { facts: [] };
+  try {
+    const memoryPrompt = `Roast: "${roastText}"
+Habits:
+- Phone screen time: ${answers.phoneHours} hours per day
+- Biggest time-waster app: ${answers.worstApp}
+- Average sleep: ${answers.sleepHours} hours per night
+- Weekly food delivery spending: $${answers.foodDeliverySpend}
+- Keeps saying they'll do but never does: "${answers.neverDoThing}"
+${answers.socialMediaHours ? `- Social media hours per day: ${answers.socialMediaHours}` : ''}
+${answers.workoutFrequency ? `- Workouts this week: ${answers.workoutFrequency}` : ''}`;
+
+    const memoryCompletion = await groq.chat.completions.create({
+      model: MODEL,
+      max_tokens: 200,
+      messages: [
+        { role: "system", content: CONTINUITY_MEMORY_SYSTEM_PROMPT },
+        { role: "user", content: memoryPrompt },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const memoryContent = memoryCompletion.choices[0]?.message?.content?.trim() || "";
+    if (memoryContent) {
+      const parsedMemory = JSON.parse(memoryContent);
+      newContinuityMemory = parsedMemory;
+      console.log("[api/roast] Generated continuity memory:", newContinuityMemory);
+    }
+  } catch (memoryError) {
+    console.error("[api/roast] Error generating continuity memory:", memoryError);
+    // Use previous memory or empty if generation fails
+  }
+
   const baseRow = {
     user_id: user.id,
     roast_text: roastText,
@@ -335,6 +449,7 @@ export async function POST(request: Request) {
     tone,
     mode,
     persona,
+    continuity_memory: newContinuityMemory,
   };
 
   console.log("[api/roast] Preparing to insert roast with data:", {

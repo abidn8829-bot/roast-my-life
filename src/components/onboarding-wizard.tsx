@@ -78,7 +78,7 @@ const PRO_QUESTIONS = [
   },
 ];
 
-type Step = number | "tone" | "loading";
+type Step = number | "tone" | "loading" | "followup";
 
 const inputClass =
   "w-full rounded-xl border-2 border-neutral-800 bg-[#141414] px-5 py-4 text-xl text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2 transition-all";
@@ -95,6 +95,8 @@ export function OnboardingWizard() {
   const [selectedTone, setSelectedTone] = useState<RoastTone>("normal");
   const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
+  const [followUpAnswer, setFollowUpAnswer] = useState("");
 
   useEffect(() => {
     posthog.capture('onboarding_started');
@@ -183,14 +185,23 @@ export function OnboardingWizard() {
         tone: selectedTone,
         mode: "roast",
         persona: "default",
+        followUpAnswer: followUpAnswer || undefined,
       }),
     });
 
     clearTimeout(loadingTimeout);
 
-    const data = (await res.json()) as { id?: string; error?: string };
+    const data = (await res.json()) as { id?: string; error?: string; followUpQuestion?: string; requiresFollowUp?: boolean };
     const roastId =
       typeof data.id === "string" ? data.id.trim() : String(data.id ?? "");
+
+    // Check if follow-up question is required
+    if (data.requiresFollowUp && data.followUpQuestion) {
+      setFollowUpQuestion(data.followUpQuestion);
+      setStep("followup");
+      setIsGenerating(false);
+      return;
+    }
 
     if (!res.ok || !roastId) {
       console.error("[onboarding] roast API failed:", res.status, data);
@@ -243,6 +254,47 @@ export function OnboardingWizard() {
   function onToneSelect(tone: RoastTone) {
     setSelectedTone(tone);
     void generateRoast();
+  }
+
+  function onFollowUpSubmit() {
+    if (!followUpAnswer.trim()) return;
+    void generateRoast();
+  }
+
+  if (step === "followup") {
+    return (
+      <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-12">
+        <div className="w-full max-w-2xl text-center">
+          <div className="text-9xl mb-8">🔥</div>
+          <h2 className="text-3xl sm:text-4xl font-bold text-[#FAFAFA] mb-6">
+            One more thing...
+          </h2>
+          <p className="text-xl text-neutral-300 mb-8">
+            {followUpQuestion}
+          </p>
+          <textarea
+            rows={3}
+            placeholder="Your answer..."
+            value={followUpAnswer}
+            onChange={(e) => setFollowUpAnswer(e.target.value)}
+            className={`${inputClass} resize-y min-h-[6rem] mb-6`}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onFollowUpSubmit();
+              }
+            }}
+          />
+          <button
+            onClick={onFollowUpSubmit}
+            disabled={!followUpAnswer.trim()}
+            className="w-full rounded-xl bg-[#FF3D00] px-8 py-4 text-xl font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Get Roasted →
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (step === "loading") {
