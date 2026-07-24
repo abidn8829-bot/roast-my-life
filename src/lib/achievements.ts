@@ -20,17 +20,18 @@ export type AchievementDef = {
   description: string;
   emoji: string;
   target?: number;
+  hint: string;
 };
 
 export const ACHIEVEMENTS: AchievementDef[] = [
-  { id: "first_roast", title: "First Roast", description: "Survived your first reality check", emoji: "🎯" },
-  { id: "second_roast", title: "Returned for Second Roast", description: "Came back for another serving of honesty", emoji: "🔁", target: 2 },
-  { id: "three_day_streak", title: "3-Day Streak", description: "3 days of self-inflicted emotional damage", emoji: "🔥", target: 3 },
-  { id: "seven_day_streak", title: "7-Day Streak", description: "A full week of facing the allegations", emoji: "⚡", target: 7 },
-  { id: "first_follow_up_completed", title: "First Follow-up Completed", description: "Answered for your habits instead of disappearing", emoji: "💬" },
-  { id: "first_running_joke_created", title: "First Running Joke Created", description: "Congratulations, your bad habit has lore", emoji: "📺" },
-  { id: "running_joke_retired", title: "Running Joke Retired", description: "Improved enough to cancel your own bit", emoji: "🏁" },
-  { id: "ten_roasts_completed", title: "10 Roasts Completed", description: "Ten documented episodes of personal chaos", emoji: "🔟", target: 10 },
+  { id: "first_roast", title: "First Roast", description: "Survived your first reality check", emoji: "🎯", hint: "Complete your first roast" },
+  { id: "second_roast", title: "Returned for Second Roast", description: "Came back for another serving of honesty", emoji: "🔁", target: 2, hint: "Complete 2 roasts total" },
+  { id: "three_day_streak", title: "3-Day Streak", description: "3 days of self-inflicted emotional damage", emoji: "🔥", target: 3, hint: "Check in 3 days in a row" },
+  { id: "seven_day_streak", title: "7-Day Streak", description: "A full week of facing the allegations", emoji: "⚡", target: 7, hint: "Check in 7 days in a row" },
+  { id: "first_follow_up_completed", title: "First Follow-up Completed", description: "Answered for your habits instead of disappearing", emoji: "💬", hint: "Answer one check-in question" },
+  { id: "first_running_joke_created", title: "First Running Joke Created", description: "Congratulations, your bad habit has lore", emoji: "📺", target: 2, hint: "Have the same theme come up in 2 check-ins" },
+  { id: "running_joke_retired", title: "Running Joke Retired", description: "Improved enough to cancel your own bit", emoji: "🏁", hint: "Improve enough that a running joke gets marked resolved" },
+  { id: "ten_roasts_completed", title: "10 Roasts Completed", description: "Ten documented episodes of personal chaos", emoji: "🔟", target: 10, hint: "Complete 10 roasts total" },
 ];
 
 export function parseAchievements(raw: unknown): UserAchievements {
@@ -61,7 +62,11 @@ function getProgress(rows: RoastHistoryRow[]): Progress {
   const roastCount = rows.length;
   const streak = calculateStreak(rows.map((row) => row.created_at));
   const followUpCompleted = rows.some((row) => memoryFlag(row.continuity_memory, "lastResponse") || memoryFlag(row.continuity_memory, "lastAnswer"));
-  const runningJokeCreated = rows.some((row) => memoryFlag(row.continuity_memory, "activeTheme") || memoryFlag(row.continuity_memory, "activeTopic"));
+  const maxCallbackCount = rows.reduce((max, row) => {
+    const memory = row.continuity_memory as Record<string, unknown> | null;
+    const count = typeof memory?.callbackCount === "number" ? memory.callbackCount : 0;
+    return Math.max(max, count);
+  }, 0);
   const runningJokeRetired = rows.some((row) => {
     const memory = row.continuity_memory as Record<string, unknown> | null;
     return memory?.resolved === true;
@@ -72,7 +77,7 @@ function getProgress(rows: RoastHistoryRow[]): Progress {
     three_day_streak: Math.min(streak, 3),
     seven_day_streak: Math.min(streak, 7),
     first_follow_up_completed: followUpCompleted ? 1 : 0,
-    first_running_joke_created: runningJokeCreated ? 1 : 0,
+    first_running_joke_created: Math.min(maxCallbackCount, 2),
     running_joke_retired: runningJokeRetired ? 1 : 0,
     ten_roasts_completed: Math.min(roastCount, 10),
   };

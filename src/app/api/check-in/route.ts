@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   try { body = await request.json() as Record<string, unknown>; } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
   const { data: previous, error: previousError } = await supabase.from("roasts")
-    .select("id, roast_text, report_card, answers, category_scores, tone, mode, persona, continuity_memory")
+    .select("id, roast_text, report_card, answers, category_scores, tone, mode, persona, continuity_memory, top_5_roasts")
     .eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (previousError || !previous) return NextResponse.json({ error: "No previous roast found" }, { status: 404 });
   const categoryScores = previous.category_scores as CategoryScores | null;
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       const completion = await groq.chat.completions.create({
         model: MODEL, max_tokens: 100, response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "Return strict JSON only: {\"category\":\"sleep|fitness|discipline|focus|spending\",\"activeTheme\":\"short current habit arc\",\"question\":\"short, specific roast-voice check-in question\",\"challenge\":\"small concrete challenge\"}. Continue the current activeTheme with a callback unless its memory says resolved; then retire it and choose a fresh theme. Choose exactly one category." },
+          { role: "system", content: "Return strict JSON only: {\"category\":\"sleep|fitness|discipline|focus|spending\",\"activeTheme\":\"short current habit arc\",\"question\":\"short, specific roast-voice check-in question\",\"challenge\":\"small concrete challenge\"}. Continue the current activeTheme with a callback unless its memory says resolved; then retire it and choose a fresh theme. If continuity_memory.challenge exists, the question must directly ask about completion of that specific challenge. Choose exactly one category." },
           { role: "user", content: `Previous roast: ${previous.roast_text}\nCurrent category grades: ${JSON.stringify(categoryScores)}\nCurrent arc memory: ${JSON.stringify(previous.continuity_memory ?? {})}` },
         ],
       });
@@ -71,6 +71,7 @@ export async function POST(request: Request) {
 
   const updatedCategoryScores: CategoryScores = { ...categoryScores, [category]: { score: GRADE_SCORES[result.new_grade], grade: result.new_grade, reaction_line: result.reaction_line } };
   const lifeScore = calculateLifeScore(updatedCategoryScores);
+  let funnyTitle = getFunnyTitle(lifeScore);
   let nextMemory: Record<string, unknown> = {
     ...(previous.continuity_memory as Record<string, unknown> ?? {}),
     activeTheme: activeTheme || "current habits",
@@ -78,26 +79,29 @@ export async function POST(request: Request) {
     lastResponse: answer,
     callbackCount: Number((previous.continuity_memory as Record<string, unknown> | null)?.callbackCount ?? 0) + 1,
     resolved: false,
+    challenge: (previous.continuity_memory as Record<string, unknown> | null)?.challenge ?? null,
     updatedAt: new Date().toISOString(),
   };
   try {
     const memoryCompletion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 150, response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current arc\",\"followUpQuestion\":\"the question asked\",\"lastResponse\":\"the user answer\",\"callbackCount\":number,\"resolved\":boolean,\"challenge\":\"short concrete challenge\"}. Mark resolved true only if this answer shows meaningful, sustained progress; otherwise keep the same theme and increment callbackCount." },
+        { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current arc\",\"followUpQuestion\":\"the question asked\",\"lastResponse\":\"the user answer\",\"callbackCount\":number,\"resolved\":boolean,\"challenge\":\"short concrete challenge\",\"title\":\"short funny persona label, 2-4 words, reflecting the current theme and direction (improved|same|worse)\"}. Mark resolved true only if this answer shows meaningful, sustained progress; otherwise keep the same theme and increment callbackCount." },
         { role: "user", content: `Previous arc: ${JSON.stringify(previous.continuity_memory ?? {})}\nTheme: ${activeTheme}\nQuestion: ${question}\nAnswer: ${answer}\nGrade result: ${result.new_grade} (${result.direction})` },
       ],
     });
     const parsedMemory = JSON.parse(memoryCompletion.choices[0]?.message?.content ?? "") as Record<string, unknown>;
-    if (typeof parsedMemory.activeTheme === "string" && typeof parsedMemory.followUpQuestion === "string" && typeof parsedMemory.lastResponse === "string" && typeof parsedMemory.callbackCount === "number" && typeof parsedMemory.resolved === "boolean") {
+    if (typeof parsedMemory.activeTheme === "string" && typeof parsedMemory.followUpQuestion === "string" && typeof parsedMemory.lastResponse === "string" && typeof parsedMemory.callbackCount === "number" && typeof parsedMemory.resolved === "boolean" && typeof parsedMemory.challenge === "string") {
       nextMemory = { ...parsedMemory, updatedAt: new Date().toISOString() };
+      if (typeof parsedMemory.title === "string" && parsedMemory.title.trim()) funnyTitle = parsedMemory.title.trim();
     }
   } catch (error) {
     logGroqError(error);
   }
+  if (Number(nextMemory.callbackCount) >= 6) nextMemory.resolved = true;
   const { data: created, error: roastError } = await supabase.from("roasts").insert({
-    user_id: user.id, roast_text: result.reaction_line, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),
-    answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: getFunnyTitle(lifeScore), top_5_roasts: [result.reaction_line], category_scores: updatedCategoryScores,
+    user_id: user.id, roast_text: previous.roast_text, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),
+    answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: previous.top_5_roasts ?? [], category_scores: updatedCategoryScores,
     tone: (previous.tone ?? "normal") as RoastTone, mode: (previous.mode ?? "roast") as RoastMode, persona: (previous.persona ?? "default") as RoastPersona, continuity_memory: nextMemory,
   }).select("id").single();
   if (roastError || !created) return NextResponse.json({ error: "Failed to save check-in roast" }, { status: 500 });

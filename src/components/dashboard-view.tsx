@@ -64,6 +64,10 @@ function getScoreGlow(score: number): string {
   return "shadow-[0_0_60px_rgba(16,185,129,0.2)]";
 }
 
+function formatUnlockedDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 function getStreakMessage(streak: number): string {
   if (streak === 1) return "Day 1 of facing reality 👀";
   if (streak === 3) return "3 days of self inflicted damage 🔥";
@@ -441,13 +445,15 @@ export function DashboardView({ name, roasts, scoreHistory, streak, currentStrea
             const state = achievements[achievement.id];
             const unlocked = Boolean(state?.unlocked_at);
             const progress = state?.progress ?? 0;
+            const target = achievement.target;
+            const progressPct = target ? Math.min(100, Math.round((progress / target) * 100)) : 0;
             return (
               <div
                 key={achievement.id}
-                className={`relative rounded-xl border p-4 text-center transition ${
+                className={`relative rounded-xl border p-4 text-center transition-all duration-300 ease-out ${
                   unlocked
-                    ? "border-[#FF3D00]/40 bg-[#FF3D00]/10"
-                    : "border-neutral-800 bg-[#0A0A0A] opacity-50 grayscale"
+                    ? "scale-105 border-[#FF3D00]/40 bg-[#FF3D00]/10 shadow-[0_0_20px_rgba(255,61,0,0.35)]"
+                    : "scale-100 border-neutral-800 bg-[#0A0A0A] opacity-50 grayscale"
                 }`}
                 title={achievement.description}
               >
@@ -460,9 +466,28 @@ export function DashboardView({ name, roasts, scoreHistory, streak, currentStrea
                 <p className="mt-1 text-[10px] leading-tight text-neutral-500">
                   {achievement.description}
                 </p>
-                {!unlocked && achievement.target && (
-                  <p className="mt-2 text-[10px] font-medium text-neutral-400">
-                    {progress}/{achievement.target}
+                {target ? (
+                  <div className="mt-2">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-800">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ease-out ${unlocked ? "bg-[#FF3D00]" : "bg-[#FF3D00]/40"}`}
+                        style={{ width: `${unlocked ? 100 : progressPct}%` }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[10px] font-medium text-neutral-400">
+                      {unlocked ? target : progress}/{target}
+                    </p>
+                  </div>
+                ) : unlocked ? (
+                  <p className="mt-2 text-[10px] font-semibold text-[#FF3D00]">✓ Unlocked</p>
+                ) : null}
+                {unlocked ? (
+                  <p className="mt-1 text-[10px] text-neutral-500">
+                    Unlocked {formatUnlockedDate(state!.unlocked_at!)}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-[10px] italic leading-tight text-neutral-600">
+                    Earn by: {achievement.hint}
                   </p>
                 )}
               </div>

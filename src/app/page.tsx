@@ -1,13 +1,101 @@
 import Link from "next/link";
 
+function EmberMark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
+      <path
+        d="M4 24L12.5 15.5L18 20L27 8"
+        stroke="#FF3D00"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M19 8H27V16"
+        stroke="#FF3D00"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+const CAPABILITIES = [
+  {
+    emoji: "🧠",
+    title: "Remembers your patterns",
+    desc: "Every conversation builds a profile of your habits and goals.",
+  },
+  {
+    emoji: "🎯",
+    title: "Personalized check-ins",
+    desc: "Questions tailored to your specific arc, not generic reminders.",
+  },
+  {
+    emoji: "📈",
+    title: "Tracks real progress",
+    desc: "Grades your improvement in specific areas, shows the trend.",
+  },
+  {
+    emoji: "🔥",
+    title: "Roasts with precision",
+    desc: "Jokes get sharper because the AI actually knows you.",
+  },
+  {
+    emoji: "🔄",
+    title: "Rotates accountability",
+    desc: "When you improve one area, it moves to the next challenge.",
+  },
+  {
+    emoji: "⚡",
+    title: "Builds streaks that stick",
+    desc: "Daily micro-commits that compound into real change.",
+  },
+];
+
+const STEPS = [
+  {
+    number: "01",
+    icon: "📝",
+    title: "Answer a few questions",
+    desc: "The AI builds your initial profile — habits, goals, the stuff you'd rather not admit.",
+  },
+  {
+    number: "02",
+    icon: "💬",
+    title: "Daily check-ins",
+    desc: "Personalized questions based on your last roast, not a generic reminder.",
+  },
+  {
+    number: "03",
+    icon: "📊",
+    title: "Watch yourself improve",
+    desc: "Your grades update, themes rotate, accountability compounds.",
+  },
+];
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#0A0A0A] text-[#FAFAFA]">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');
+        .font-display { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.02em; }
+      `}</style>
+
       {/* Navbar */}
       <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0A0A0A]/95 backdrop-blur-sm">
-        <span className="text-[#FF3D00] font-black text-xl tracking-widest">
-          ROAST MY LIFE
-        </span>
+        <div className="flex items-center gap-2">
+          <EmberMark className="h-6 w-6" />
+          <span className="font-display text-2xl tracking-wide">
+            Ember<span className="text-[#FF3D00]">.ai</span>
+          </span>
+        </div>
         <div className="flex gap-3">
           <Link
             href="/login"
@@ -17,155 +105,120 @@ export default function Home() {
           </Link>
           <Link
             href="/signup"
-            className="px-4 py-2 text-sm bg-[#FF3D00] text-white rounded-lg hover:bg-[#e63600] transition font-bold"
+            className="px-4 py-2 text-sm bg-[#FF3D00] text-white rounded-lg hover:bg-[#e63600] hover:scale-[1.03] transition font-bold"
           >
-            Roast Me
+            Get Started
           </Link>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="flex flex-col items-center justify-center text-center px-6 py-24">
-        <div className="inline-block bg-[#FF3D00]/10 border border-[#FF3D00]/30 text-[#FF3D00] text-xs font-mono tracking-widest px-4 py-2 rounded-full mb-6">
-          AI POWERED SELF DESTRUCTION
-        </div>
-        <h1 className="text-6xl md:text-8xl font-black tracking-tight mb-6 leading-none">
-          YOUR LIFE.<br />
-          <span className="text-[#FF3D00]">ROASTED.</span>
-        </h1>
-        <p className="text-lg text-white/60 max-w-md mb-10">
-          Answer 5 questions. Get brutally roasted by AI. Share your shame with the world.
-        </p>
-        <Link
-          href="/signup"
-          className="px-10 py-4 bg-[#FF3D00] text-white font-black text-xl rounded-xl hover:bg-[#e63600] transition tracking-wide"
-        >
-          ROAST ME NOW →
-        </Link>
-      </section>
-
-      {/* Sample Roast Card */}
-      <section className="px-6 py-12 flex justify-center">
-        <div className="w-full max-w-lg bg-[#141414] border border-white/10 rounded-2xl p-6">
-          <div className="text-[#FF3D00] font-mono text-xs tracking-widest mb-4">
-            SAMPLE ROAST 🔥
+      <section className="grid grid-cols-1 md:grid-cols-[1.2fr_1fr] gap-12 items-center px-6 py-20 md:py-32 max-w-6xl mx-auto">
+        <div>
+          <div className="inline-block bg-[#FF3D00]/10 border border-[#FF3D00]/30 text-[#FF3D00] text-xs font-mono tracking-widest px-4 py-2 rounded-full mb-8">
+            AI ACCOUNTABILITY COACH
           </div>
-          <p className="text-white/70 text-sm leading-relaxed italic mb-6">
-            "bestie you spend 8 hours a day on TikTok but only 4 hours sleeping?
-            your brain is literally running on fumes and trending audios. you've
-            spent $400 this month on Uber Eats which is wild because you also
-            said you'd start cooking. that was 6 months ago. your future self
-            is not okay. your future self is actually in shambles."
+          <h1 className="font-display text-6xl md:text-7xl leading-[0.95] mb-6">
+            Ember<span className="text-[#FF3D00]">.ai</span>
+          </h1>
+          <p className="text-2xl md:text-3xl font-semibold leading-tight mb-6 max-w-xl">
+            The AI accountability coach that{" "}
+            <span className="text-[#FF3D00]">roasts you into taking action</span>.
           </p>
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              { label: "Screen Time", grade: "F", color: "text-[#FF3D00]" },
-              { label: "Sleep", grade: "D", color: "text-orange-400" },
-              { label: "Spending", grade: "C", color: "text-amber-400" },
-              { label: "Productivity", grade: "F", color: "text-[#FF3D00]" },
-            ].map((item) => (
-              <div
-                key={item.label}
-                className="bg-[#1A1A1A] border border-white/10 rounded-xl p-3 text-center"
-              >
-                <div className="text-white/40 text-xs mb-1">{item.label}</div>
-                <div className={`text-2xl font-black ${item.color}`}>
-                  {item.grade}
-                </div>
-              </div>
-            ))}
+          <p className="text-base md:text-lg text-white/60 max-w-md mb-10 leading-relaxed">
+            An AI companion that remembers your patterns, tracks your progress,
+            and calls you out when you slip — all with humor that lands because
+            it actually knows you.
+          </p>
+          <Link
+            href="/signup"
+            className="inline-block px-8 py-4 bg-[#FF3D00] text-white font-bold text-lg rounded-xl hover:bg-[#e63600] hover:scale-[1.02] transition"
+          >
+            Start your arc →
+          </Link>
+        </div>
+
+        <div className="hidden md:flex items-center justify-center">
+          <div className="relative w-full max-w-xs aspect-square rounded-full border border-[#FF3D00]/20 flex items-center justify-center">
+            <div className="absolute inset-6 rounded-full border border-[#FF3D00]/10" />
+            <EmberMark className="h-28 w-28" />
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="px-6 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          {[
-            {
-              emoji: "🔥",
-              title: "Brutally Honest",
-              desc: "No sugarcoating. No encouragement. Just the cold hard truth about your habits.",
-            },
-            {
-              emoji: "🎯",
-              title: "Scarily Accurate",
-              desc: "Uses your real numbers to call you out. Specific, personal, and devastatingly accurate.",
-            },
-            {
-              emoji: "📸",
-              title: "Built to Share",
-              desc: "Get a shareable Report Card image. Post it. Let your friends suffer too.",
-            },
-          ].map((f) => (
+      {/* What Ember Does */}
+      <section className="px-6 py-20 md:py-28 max-w-6xl mx-auto">
+        <div className="mb-12 max-w-lg">
+          <h2 className="font-display text-4xl md:text-5xl mb-3">
+            What Ember Does
+          </h2>
+          <p className="text-white/50 text-base">
+            Not another habit tracker. An AI that actually pays attention.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {CAPABILITIES.map((c) => (
             <div
-              key={f.title}
-              className="bg-[#141414] border border-white/10 rounded-2xl p-6"
+              key={c.title}
+              className="bg-[#111111] border border-[#FF3D00]/20 rounded-2xl p-6 transition hover:-translate-y-1 hover:border-[#FF3D00]/40"
             >
-              <div className="text-3xl mb-3">{f.emoji}</div>
-              <div className="font-bold text-lg mb-2">{f.title}</div>
-              <div className="text-white/50 text-sm leading-relaxed">{f.desc}</div>
+              <div className="text-3xl mb-4">{c.emoji}</div>
+              <div className="font-bold text-lg mb-2">{c.title}</div>
+              <div className="text-white/50 text-sm leading-relaxed">{c.desc}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section className="px-6 py-16">
-        <h2 className="text-center text-white/30 font-mono text-xs tracking-widest mb-8">
-          PEOPLE WHO HAVE BEEN DESTROYED
+      {/* How It Works */}
+      <section className="px-6 py-20 md:py-28 max-w-6xl mx-auto">
+        <h2 className="font-display text-4xl md:text-5xl mb-16 text-center">
+          How It Works
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          {[
-            {
-              name: "sarah k.",
-              handle: "@sarahkofficial",
-              text: "i got an F in screen time and a D in sleep and honestly i deserved it. showed my therapist. she agreed.",
-            },
-            {
-              name: "zaid m.",
-              handle: "@zaidbuilds",
-              text: "bro this app called me out for spending $340 on uber eats in ONE month. i am not okay. 10/10 would recommend.",
-            },
-            {
-              name: "priya s.",
-              handle: "@priyavibes",
-              text: "the roast said my bed is 'just a suggestion at this point' because i sleep 4 hours. i felt that in my soul.",
-            },
-          ].map((t) => (
+        <div className="flex flex-col md:flex-row gap-10 md:gap-6">
+          {STEPS.map((step, i) => (
             <div
-              key={t.handle}
-              className="bg-[#141414] border border-white/10 rounded-2xl p-6"
+              key={step.number}
+              className={`flex-1 ${i === 1 ? "md:mt-10" : ""}`}
             >
-              <p className="text-white/70 text-sm leading-relaxed italic mb-4">
-                "{t.text}"
-              </p>
-              <div className="text-white/40 text-xs">
-                {t.name} · {t.handle}
+              <div className="flex items-center gap-3 mb-4">
+                <span className="font-display text-3xl text-[#FF3D00]">
+                  {step.number}
+                </span>
+                <span className="text-2xl">{step.icon}</span>
               </div>
+              <div className="font-bold text-lg mb-2">{step.title}</div>
+              <p className="text-white/50 text-sm leading-relaxed max-w-xs">
+                {step.desc}
+              </p>
             </div>
           ))}
         </div>
       </section>
 
       {/* Final CTA */}
-      <section className="flex flex-col items-center text-center px-6 py-24">
-        <h2 className="text-4xl md:text-6xl font-black mb-6">
-          READY TO FACE<br />
-          <span className="text-[#FF3D00]">THE TRUTH?</span>
+      <section className="flex flex-col items-center text-center px-6 py-24 md:py-32">
+        <h2 className="font-display text-4xl md:text-6xl mb-4 max-w-2xl">
+          Start your accountability arc.
         </h2>
+        <p className="text-white/50 text-base md:text-lg mb-10">
+          No credit card required. First 7 days free.
+        </p>
         <Link
           href="/signup"
-          className="px-10 py-4 bg-[#FF3D00] text-white font-black text-xl rounded-xl hover:bg-[#e63600] transition tracking-wide"
+          className="px-10 py-4 bg-[#FF3D00] text-white font-black text-xl rounded-xl hover:bg-[#e63600] hover:scale-[1.02] transition tracking-wide"
         >
-          GET ROASTED →
+          Get Started Free →
         </Link>
       </section>
 
       {/* Footer */}
       <footer className="border-t border-white/10 px-6 py-8 text-center text-white/30 text-sm">
         <div className="flex flex-col items-center gap-2">
-          <p>ROAST MY LIFE · Made with 🔥</p>
+          <div className="flex items-center gap-2">
+            <EmberMark className="h-4 w-4" />
+            <span>Ember.ai</span>
+          </div>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:text-[#FAFAFA] transition">
               Privacy
