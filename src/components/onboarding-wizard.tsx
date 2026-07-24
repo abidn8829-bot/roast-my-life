@@ -104,6 +104,34 @@ export function OnboardingWizard() {
   const [previousRoastText, setPreviousRoastText] = useState<string | null>(null);
   const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false);
   const [hasUsedTodayRoast, setHasUsedTodayRoast] = useState(false);
+  const [checkInCategory, setCheckInCategory] = useState<string | null>(null);
+  const [checkInTheme, setCheckInTheme] = useState("");
+  const [checkInChallenge, setCheckInChallenge] = useState("");
+  const [isCustomCheckIn, setIsCustomCheckIn] = useState(false);
+
+  const generateFollowUpQuestion = async () => {
+    setIsGeneratingFollowUp(true);
+    try {
+      const res = await fetch("/api/check-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "question" }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.question && data.category && data.activeTheme && data.challenge) {
+        setFollowUpQuestion(data.question);
+        setCheckInCategory(data.category);
+        setCheckInTheme(data.activeTheme);
+        setCheckInChallenge(data.challenge);
+      }
+    } catch (error) {
+      console.error("Error generating follow-up question:", error);
+      setError("Couldn't load today's check-in. Please try again.");
+    } finally {
+      setIsGeneratingFollowUp(false);
+    }
+  };
 
   useEffect(() => {
     posthog.capture('onboarding_started');
@@ -124,7 +152,7 @@ export function OnboardingWizard() {
           if (!answersData.hasUsedTodayRoast) {
             setStep("checkin");
             // Generate follow-up question
-            generateFollowUpQuestion(answersData.previousRoastText, answersData.answers, answersData.continuityMemory);
+            generateFollowUpQuestion();
           } else {
             // Show Pro waitlist modal if they've used today's roast
             setShowProWaitlistModal(true);
@@ -138,33 +166,6 @@ export function OnboardingWizard() {
         setIsCheckingReturning(false);
       });
   }, []);
-
-  const generateFollowUpQuestion = async (prevRoast: string, answers: OnboardingAnswers, memory: unknown) => {
-    setIsGeneratingFollowUp(true);
-    try {
-      const res = await fetch("/api/roast", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...answers,
-          tone: "normal",
-          mode: "roast",
-          persona: "default",
-          followUpAnswer: "", // Empty to trigger follow-up question generation
-        }),
-      });
-
-      const data = await res.json();
-      if (data.requiresFollowUp && data.followUpQuestion) {
-        setFollowUpQuestion(data.followUpQuestion);
-      }
-    } catch (error) {
-      console.error("Error generating follow-up question:", error);
-      setFollowUpQuestion("How did your habits go yesterday?");
-    } finally {
-      setIsGeneratingFollowUp(false);
-    }
-  };
 
   const [phoneHours, setPhoneHours] = useState("");
   const [worstApp, setWorstApp] = useState("");
@@ -255,7 +256,7 @@ export function OnboardingWizard() {
 
     clearTimeout(loadingTimeout);
 
-    const data = (await res.json()) as { id?: string; error?: string; followUpQuestion?: string; requiresFollowUp?: boolean };
+    const data = (await res.json()) as { id?: string; error?: string; followUpQuestion?: string; requiresFollowUp?: boolean; newlyUnlockedAchievements?: string[] };
     const roastId =
       typeof data.id === "string" ? data.id.trim() : String(data.id ?? "");
 
@@ -283,6 +284,9 @@ export function OnboardingWizard() {
     }
 
     posthog.capture('roast_generated');
+    for (const achievementId of data.newlyUnlockedAchievements ?? []) {
+      posthog.capture("achievement_unlocked", { achievement_id: achievementId });
+    }
     router.push(`/roast/${encodeURIComponent(roastId)}`);
     router.refresh();
   }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, selectedTone, isPro, router, allQuestions]);
@@ -325,9 +329,35 @@ export function OnboardingWizard() {
     void generateRoast();
   }
 
-  function onCheckInSubmit() {
+  async function onCheckInSubmit() {
     if (!followUpAnswer.trim()) return;
-    setStep("tone");
+    if (!checkInCategory) {
+      setError("Today\'s check-in isn't ready yet. Please try again.");
+      return;
+    }
+    setError(null);
+    setIsGenerating(true);
+    try {
+      const res = await fetch("/api/check-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "submit", category: checkInCategory, answer: followUpAnswer.trim(), activeTheme: checkInTheme, question: followUpQuestion }),
+      });
+      const data = await res.json() as { id?: string; error?: string; newlyUnlockedAchievements?: string[] };
+      if (!res.ok || !data.id) {
+        setError(data.error ?? "Couldn't save your check-in. Try again.");
+        return;
+      }
+      for (const achievementId of data.newlyUnlockedAchievements ?? []) {
+        posthog.capture("achievement_unlocked", { achievement_id: achievementId });
+      }
+      router.push(`/roast/${encodeURIComponent(data.id)}`);
+      router.refresh();
+    } catch {
+      setError("Couldn't save your check-in. Try again.");
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   if (isCheckingReturning) {
@@ -347,7 +377,7 @@ export function OnboardingWizard() {
         <div className="w-full max-w-2xl text-center">
           <div className="text-9xl mb-8">🔥</div>
           <h2 className="text-3xl sm:text-4xl font-bold text-[#FAFAFA] mb-4">
-            Today's Check-in
+            Today&apos;s Check-in
           </h2>
           {isGeneratingFollowUp ? (
             <div className="w-full max-w-md text-center">
@@ -361,26 +391,55 @@ export function OnboardingWizard() {
               <p className="text-xl text-neutral-300 mb-8">
                 {followUpQuestion || "How did your habits go yesterday?"}
               </p>
-              <textarea
-                rows={3}
-                placeholder="Your answer..."
-                value={followUpAnswer}
-                onChange={(e) => setFollowUpAnswer(e.target.value)}
-                className={`${inputClass} resize-y min-h-[6rem] mb-6`}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    onCheckInSubmit();
-                  }
-                }}
-              />
+              {checkInChallenge && (
+                <p className="mb-5 text-sm text-neutral-500">Challenge: {checkInChallenge}</p>
+              )}
+              <div className="mb-5 grid gap-3">
+                {[
+                  ["😎", "I actually did it"],
+                  ["😅", "I tried"],
+                  ["🤡", "I failed again"],
+                ].map(([emoji, label]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => { setFollowUpAnswer(label); setIsCustomCheckIn(false); }}
+                    className={`rounded-xl border px-5 py-4 text-left text-lg transition ${followUpAnswer === label && !isCustomCheckIn ? "border-[#FF3D00] bg-[#FF3D00]/10 text-[#FAFAFA]" : "border-neutral-800 bg-[#141414] text-neutral-300 hover:border-neutral-600"}`}
+                  >
+                    <span className="mr-3">{emoji}</span>{label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => { setIsCustomCheckIn(true); setFollowUpAnswer(""); }}
+                  className={`rounded-xl border px-5 py-4 text-left text-lg transition ${isCustomCheckIn ? "border-[#FF3D00] bg-[#FF3D00]/10 text-[#FAFAFA]" : "border-neutral-800 bg-[#141414] text-neutral-300 hover:border-neutral-600"}`}
+                >
+                  <span className="mr-3">✍️</span>Custom answer
+                </button>
+              </div>
+              {isCustomCheckIn && (
+                <textarea
+                  rows={3}
+                  placeholder="Your answer..."
+                  value={followUpAnswer}
+                  onChange={(e) => setFollowUpAnswer(e.target.value)}
+                  className={`${inputClass} resize-y min-h-[6rem] mb-6`}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void onCheckInSubmit();
+                    }
+                  }}
+                />
+              )}
               <button
-                onClick={onCheckInSubmit}
-                disabled={!followUpAnswer.trim()}
+                onClick={() => void onCheckInSubmit()}
+                disabled={!followUpAnswer.trim() || isGenerating}
                 className="w-full rounded-xl bg-[#FF3D00] px-8 py-4 text-xl font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Continue →
               </button>
+              {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
             </>
           )}
         </div>

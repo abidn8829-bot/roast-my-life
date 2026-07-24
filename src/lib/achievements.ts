@@ -3,51 +3,34 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type AchievementId =
   | "first_roast"
+  | "second_roast"
   | "three_day_streak"
-  | "rock_bottom"
-  | "surprisingly_decent"
-  | "serial_procrastinator";
+  | "seven_day_streak"
+  | "first_follow_up_completed"
+  | "first_running_joke_created"
+  | "running_joke_retired"
+  | "ten_roasts_completed";
 
-export type UserAchievements = Partial<Record<AchievementId, string>>;
+export type AchievementState = { unlocked_at?: string; progress?: number };
+export type UserAchievements = Partial<Record<AchievementId, AchievementState>>;
 
 export type AchievementDef = {
   id: AchievementId;
   title: string;
   description: string;
   emoji: string;
+  target?: number;
 };
 
 export const ACHIEVEMENTS: AchievementDef[] = [
-  {
-    id: "first_roast",
-    title: "First Roast",
-    description: "Survived your first reality check",
-    emoji: "🎯",
-  },
-  {
-    id: "three_day_streak",
-    title: "3 Day Streak",
-    description: "3 days of self-inflicted emotional damage",
-    emoji: "🔥",
-  },
-  {
-    id: "rock_bottom",
-    title: "Rock Bottom",
-    description: "Life score below 20 — impressive in the worst way",
-    emoji: "💀",
-  },
-  {
-    id: "surprisingly_decent",
-    title: "Surprisingly Decent",
-    description: "Life score above 70 — who are you?",
-    emoji: "✨",
-  },
-  {
-    id: "serial_procrastinator",
-    title: "Serial Procrastinator",
-    description: 'Said "study" or "gym" 3 times and still never did it',
-    emoji: "📚",
-  },
+  { id: "first_roast", title: "First Roast", description: "Survived your first reality check", emoji: "🎯" },
+  { id: "second_roast", title: "Returned for Second Roast", description: "Came back for another serving of honesty", emoji: "🔁", target: 2 },
+  { id: "three_day_streak", title: "3-Day Streak", description: "3 days of self-inflicted emotional damage", emoji: "🔥", target: 3 },
+  { id: "seven_day_streak", title: "7-Day Streak", description: "A full week of facing the allegations", emoji: "⚡", target: 7 },
+  { id: "first_follow_up_completed", title: "First Follow-up Completed", description: "Answered for your habits instead of disappearing", emoji: "💬" },
+  { id: "first_running_joke_created", title: "First Running Joke Created", description: "Congratulations, your bad habit has lore", emoji: "📺" },
+  { id: "running_joke_retired", title: "Running Joke Retired", description: "Improved enough to cancel your own bit", emoji: "🏁" },
+  { id: "ten_roasts_completed", title: "10 Roasts Completed", description: "Ten documented episodes of personal chaos", emoji: "🔟", target: 10 },
 ];
 
 export function parseAchievements(raw: unknown): UserAchievements {
@@ -55,86 +38,75 @@ export function parseAchievements(raw: unknown): UserAchievements {
   const result: UserAchievements = {};
   for (const { id } of ACHIEVEMENTS) {
     const value = (raw as Record<string, unknown>)[id];
-    if (typeof value === "string") result[id] = value;
+    if (typeof value === "string") result[id] = { unlocked_at: value };
+    if (value && typeof value === "object") {
+      const state = value as Record<string, unknown>;
+      result[id] = {
+        unlocked_at: typeof state.unlocked_at === "string" ? state.unlocked_at : undefined,
+        progress: typeof state.progress === "number" ? state.progress : undefined,
+      };
+    }
   }
   return result;
 }
 
-export function isProcrastinatorAnswer(neverDoThing: string): boolean {
-  const lower = neverDoThing.toLowerCase();
-  return lower.includes("study") || lower.includes("gym");
+type RoastHistoryRow = { created_at: string; continuity_memory: unknown };
+type Progress = Record<AchievementId, number>;
+
+function memoryFlag(memory: unknown, key: string): boolean {
+  return !!memory && typeof memory === "object" && Boolean((memory as Record<string, unknown>)[key]);
 }
 
-type RoastHistoryRow = {
-  created_at: string;
-  answers: unknown;
-};
+function getProgress(rows: RoastHistoryRow[]): Progress {
+  const roastCount = rows.length;
+  const streak = calculateStreak(rows.map((row) => row.created_at));
+  const followUpCompleted = rows.some((row) => memoryFlag(row.continuity_memory, "lastResponse") || memoryFlag(row.continuity_memory, "lastAnswer"));
+  const runningJokeCreated = rows.some((row) => memoryFlag(row.continuity_memory, "activeTheme") || memoryFlag(row.continuity_memory, "activeTopic"));
+  const runningJokeRetired = rows.some((row) => {
+    const memory = row.continuity_memory as Record<string, unknown> | null;
+    return memory?.resolved === true;
+  });
+  return {
+    first_roast: Math.min(roastCount, 1),
+    second_roast: Math.min(roastCount, 2),
+    three_day_streak: Math.min(streak, 3),
+    seven_day_streak: Math.min(streak, 7),
+    first_follow_up_completed: followUpCompleted ? 1 : 0,
+    first_running_joke_created: runningJokeCreated ? 1 : 0,
+    running_joke_retired: runningJokeRetired ? 1 : 0,
+    ten_roasts_completed: Math.min(roastCount, 10),
+  };
+}
 
-function evaluateUnlocks(
-  roastCount: number,
-  streak: number,
-  lifeScore: number,
-  procrastinatorCount: number,
-): AchievementId[] {
-  const unlocked: AchievementId[] = [];
-  if (roastCount >= 1) unlocked.push("first_roast");
-  if (streak >= 3) unlocked.push("three_day_streak");
-  if (lifeScore < 20) unlocked.push("rock_bottom");
-  if (lifeScore > 70) unlocked.push("surprisingly_decent");
-  if (procrastinatorCount >= 3) unlocked.push("serial_procrastinator");
-  return unlocked;
+function isComplete(id: AchievementId, progress: Progress): boolean {
+  const target = ACHIEVEMENTS.find((achievement) => achievement.id === id)?.target ?? 1;
+  return progress[id] >= target;
 }
 
 export async function unlockAchievements(
   supabase: SupabaseClient,
   userId: string,
-  lifeScore: number,
-): Promise<UserAchievements> {
+): Promise<{ achievements: UserAchievements; newlyUnlocked: AchievementId[] }> {
   const [{ data: userRow }, { data: roasts }] = await Promise.all([
     supabase.from("users").select("achievements").eq("id", userId).single(),
-    supabase
-      .from("roasts")
-      .select("created_at, answers")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false }),
+    supabase.from("roasts").select("created_at, continuity_memory").eq("user_id", userId).order("created_at", { ascending: false }),
   ]);
-
   const current = parseAchievements(userRow?.achievements);
-  const rows = (roasts ?? []) as RoastHistoryRow[];
-
-  const streak = calculateStreak(rows.map((r) => r.created_at));
-  let procrastinatorCount = 0;
-  for (const row of rows) {
-    const answers = row.answers as { neverDoThing?: string } | null;
-    if (answers?.neverDoThing && isProcrastinatorAnswer(answers.neverDoThing)) {
-      procrastinatorCount++;
-    }
-  }
-
-  const toUnlock = evaluateUnlocks(
-    rows.length,
-    streak,
-    lifeScore,
-    procrastinatorCount,
-  );
-
-  const now = new Date().toISOString();
+  const progress = getProgress((roasts ?? []) as RoastHistoryRow[]);
   const updated: UserAchievements = { ...current };
-  let changed = false;
+  const newlyUnlocked: AchievementId[] = [];
+  const now = new Date().toISOString();
 
-  for (const id of toUnlock) {
-    if (!updated[id]) {
-      updated[id] = now;
-      changed = true;
+  for (const achievement of ACHIEVEMENTS) {
+    const currentState = updated[achievement.id] ?? {};
+    const state: AchievementState = { ...currentState, progress: progress[achievement.id] };
+    if (!state.unlocked_at && isComplete(achievement.id, progress)) {
+      state.unlocked_at = now;
+      newlyUnlocked.push(achievement.id);
     }
+    updated[achievement.id] = state;
   }
 
-  if (changed) {
-    await supabase
-      .from("users")
-      .update({ achievements: updated })
-      .eq("id", userId);
-  }
-
-  return updated;
+  await supabase.from("users").update({ achievements: updated }).eq("id", userId);
+  return { achievements: updated, newlyUnlocked };
 }

@@ -28,7 +28,8 @@ function parseCategoryScore(raw: unknown): CategoryScore | null {
   const score = Number(o.score);
   const grade = o.grade;
   if (!Number.isFinite(score) || !isGrade(grade)) return null;
-  return { score, grade };
+  const reaction_line = typeof o.reaction_line === "string" ? o.reaction_line : undefined;
+  return { score, grade, reaction_line };
 }
 
 export function parseCategoryScores(raw: unknown): CategoryScores | null {

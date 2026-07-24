@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import posthog from "posthog-js";
 import { ACHIEVEMENTS, type UserAchievements } from "@/lib/achievements";
 import { formatWeekLabel, snippet } from "@/lib/format-week";
 import type { CategoryScores } from "@/lib/roast-types";
@@ -18,6 +19,12 @@ export type DashboardRoast = {
   created_at: string;
 };
 
+export type ScoreHistoryEntry = {
+  life_score: number;
+  category_grades: CategoryScores;
+  recorded_at: string;
+};
+
 type CategoryDelta = {
   key: keyof CategoryScores;
   label: string;
@@ -28,10 +35,12 @@ type CategoryDelta = {
 type Props = {
   name: string;
   roasts: DashboardRoast[];
+  scoreHistory: ScoreHistoryEntry[];
   streak: number;
   currentStreak: number;
   longestStreak: number;
   achievements: UserAchievements;
+  newlyUnlockedAchievements: string[];
   isPro: boolean;
 };
 
@@ -167,10 +176,15 @@ function ScoreTrend({ scores }: { scores: number[] }) {
   );
 }
 
-export function DashboardView({ name, roasts, streak, currentStreak, longestStreak, achievements, isPro }: Props) {
+export function DashboardView({ name, roasts, scoreHistory, streak, currentStreak, longestStreak, achievements, newlyUnlockedAchievements, isPro }: Props) {
   const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
   const latest = roasts[0] ?? null;
-  const previous = roasts[1] ?? null;
+
+  useEffect(() => {
+    for (const achievementId of newlyUnlockedAchievements) {
+      posthog.capture("achievement_unlocked", { achievement_id: achievementId });
+    }
+  }, [newlyUnlockedAchievements]);
 
   // Check if user has already roasted today (for free users)
   const hasRoastedToday = !isPro && latest && (() => {
@@ -179,22 +193,19 @@ export function DashboardView({ name, roasts, streak, currentStreak, longestStre
     return today === roastDate;
   })();
 
-  const scoresWithValues = roasts
-    .filter((r) => r.life_score !== null)
+  const scoresWithValues = scoreHistory
     .slice(0, 4)
     .reverse()
-    .map((r) => r.life_score!);
+    .map((entry) => entry.life_score);
 
-  const allScores = roasts
-    .map((r) => r.life_score)
-    .filter((s): s is number => s !== null);
+  const allScores = scoreHistory.map((entry) => entry.life_score);
 
   const bestScore = allScores.length > 0 ? Math.max(...allScores) : null;
   const worstScore = allScores.length > 0 ? Math.min(...allScores) : null;
 
   const categoryDeltas = computeCategoryDeltas(
-    latest?.category_scores ?? null,
-    previous?.category_scores ?? null,
+    scoreHistory[0]?.category_grades ?? null,
+    scoreHistory[1]?.category_grades ?? null,
   );
 
   const improved = categoryDeltas.filter((c) => c.delta > 0);
@@ -282,7 +293,7 @@ export function DashboardView({ name, roasts, streak, currentStreak, longestStre
               <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">
                 Category breakdown
               </h2>
-              {previous ? (
+              {scoreHistory.length > 1 ? (
                 <div className="space-y-4">
                   {improved.length > 0 && (
                     <div>
@@ -427,7 +438,9 @@ export function DashboardView({ name, roasts, streak, currentStreak, longestStre
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {ACHIEVEMENTS.map((achievement) => {
-            const unlocked = Boolean(achievements[achievement.id]);
+            const state = achievements[achievement.id];
+            const unlocked = Boolean(state?.unlocked_at);
+            const progress = state?.progress ?? 0;
             return (
               <div
                 key={achievement.id}
@@ -447,6 +460,11 @@ export function DashboardView({ name, roasts, streak, currentStreak, longestStre
                 <p className="mt-1 text-[10px] leading-tight text-neutral-500">
                   {achievement.description}
                 </p>
+                {!unlocked && achievement.target && (
+                  <p className="mt-2 text-[10px] font-medium text-neutral-400">
+                    {progress}/{achievement.target}
+                  </p>
+                )}
               </div>
             );
           })}

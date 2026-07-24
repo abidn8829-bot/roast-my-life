@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { DashboardView, type DashboardRoast } from "@/components/dashboard-view";
+import { DashboardView, type DashboardRoast, type ScoreHistoryEntry } from "@/components/dashboard-view";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { UpgradeBanner } from "@/components/upgrade-banner";
-import { parseAchievements } from "@/lib/achievements";
+import { parseAchievements, unlockAchievements } from "@/lib/achievements";
 import { getDisplayName } from "@/lib/display-name";
 import { parseCategoryScores } from "@/lib/parse-category-scores";
 import { calculateStreak } from "@/lib/streak";
@@ -22,6 +22,12 @@ type RoastRow = {
   created_at: string;
 };
 
+type ScoreHistoryRow = {
+  life_score: number;
+  category_grades: unknown;
+  recorded_at: string;
+};
+
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
   const {
@@ -30,6 +36,13 @@ export default async function DashboardPage() {
 
   if (!user) {
     redirect("/login");
+  }
+
+  let newlyUnlockedAchievements: string[] = [];
+  try {
+    newlyUnlockedAchievements = (await unlockAchievements(supabase, user.id)).newlyUnlocked;
+  } catch (error) {
+    console.error("[dashboard] achievement evaluation failed:", error);
   }
 
   const { data: userData } = await supabase
@@ -66,6 +79,22 @@ export default async function DashboardPage() {
 
   const rows = (data ?? []) as RoastRow[];
 
+  const { data: historyData, error: historyError } = await supabase
+    .from("score_history")
+    .select("life_score, category_grades, recorded_at")
+    .eq("user_id", user.id)
+    .order("recorded_at", { ascending: false })
+    .limit(subscriptionTier === "pro" ? 100 : 12);
+  if (historyError) {
+    console.error("[dashboard] score history fetch error:", historyError.message);
+  }
+  const scoreHistory: ScoreHistoryEntry[] = ((historyData ?? []) as ScoreHistoryRow[])
+    .map((row) => {
+      const category_grades = parseCategoryScores(row.category_grades);
+      return category_grades ? { life_score: row.life_score, category_grades, recorded_at: row.recorded_at } : null;
+    })
+    .filter((entry): entry is ScoreHistoryEntry => entry !== null);
+
   const roasts: DashboardRoast[] = [];
   for (const row of rows) {
     roasts.push({
@@ -91,10 +120,12 @@ export default async function DashboardPage() {
         <DashboardView
           name={name}
           roasts={roasts}
+          scoreHistory={scoreHistory}
           streak={streak}
           currentStreak={currentStreak}
           longestStreak={longestStreak}
           achievements={achievements}
+          newlyUnlockedAchievements={newlyUnlockedAchievements}
           isPro={subscriptionTier === "pro"}
         />
       </div>

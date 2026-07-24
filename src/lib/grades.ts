@@ -88,7 +88,15 @@ function scoreToGrade(score: number): Grade {
   return "F";
 }
 
-export function calculateLifeScore(answers: OnboardingAnswers): number {
+export function calculateLifeScore(answers: OnboardingAnswers): number;
+export function calculateLifeScore(categoryScores: CategoryScores): number;
+export function calculateLifeScore(input: OnboardingAnswers | CategoryScores): number {
+  if ("sleep" in input && "fitness" in input && "discipline" in input) {
+    const scores = Object.values(input).map((category) => category.score);
+    return Math.round(scores.reduce((total, score) => total + score, 0) / scores.length);
+  }
+
+  const answers = input;
   let score = 100;
 
   // Screen time penalty

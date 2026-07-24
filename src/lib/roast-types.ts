@@ -12,6 +12,7 @@ export type ReportCard = {
 export type CategoryScore = {
   score: number;
   grade: Grade;
+  reaction_line?: string;
 };
 
 export type CategoryScores = {

@@ -12,23 +12,25 @@ const MODEL = "llama-3.3-70b-versatile";
 
 const FOLLOW_UP_SYSTEM_PROMPT = `You are a savage roast comedian who remembers everything. Based on the user's previous roast and their current habits, ask ONE intelligent follow-up question to dig deeper into their failures. The question should be specific, brutal, and expose a pattern of bad behavior. Keep it under 20 words. No markdown, no extra text, just the question.`;
 
-const CONTINUITY_MEMORY_SYSTEM_PROMPT = `You are building a lightweight memory for a roast AI. Based on the user's roast and habits, extract key information that would be useful for future roasts. Focus on patterns, specific failures, memorable details, running jokes, and the main topic. Return as a JSON object with these fields:
-- activeTopic: the main theme/issue (e.g., "procrastination", "phone addiction")
-- runningJoke: a memorable nickname or joke about them (e.g., "CEO of procrastination")
-- lastRoastSummary: a brief summary of the last roast (under 20 words)
-- followUpQuestion: the follow-up question that was asked
-- lastAnswer: the user's answer to the follow-up question
+const CONTINUITY_MEMORY_SYSTEM_PROMPT = `You are building lightweight current-arc memory for a roast AI. Remember only the current habit storyline, not a transcript. Return a JSON object with these fields:
+- activeTheme: the current theme/issue (e.g., "procrastination", "phone addiction")
+- followUpQuestion: a specific short question for tomorrow
+- lastResponse: the last user response, or an empty string for a new user
+- callbackCount: number, use 0 for a new theme
+- resolved: boolean, false for a new theme
+- challenge: one small concrete challenge for tomorrow
 - updatedAt: current timestamp
 
 Keep all values under 20 words. No markdown, no extra text, just the JSON.
 
 Example format:
 {
-  "activeTopic": "procrastination",
-  "runningJoke": "CEO of procrastination",
-  "lastRoastSummary": "Addicted to phone, never goes to gym",
-  "followUpQuestion": "How did procrastination go yesterday?",
-  "lastAnswer": "I tried but failed",
+  "activeTheme": "procrastination",
+  "followUpQuestion": "Did you study for 30 minutes today?",
+  "lastResponse": "",
+  "callbackCount": 0,
+  "resolved": false,
+  "challenge": "Study for 30 minutes tomorrow",
   "updatedAt": "2026-07-22T12:00:00Z"
 }`;
 
@@ -482,7 +484,7 @@ Continuity memory: ${JSON.stringify(continuityMemory)}`;
   const category_scores = calculateCategoryScores(answers);
 
   // Generate continuity memory
-  let newContinuityMemory = continuityMemory || { activeTopic: "", runningJoke: "", lastRoastSummary: "", followUpQuestion: "", lastAnswer: "", updatedAt: "" };
+  let newContinuityMemory = continuityMemory || { activeTheme: "", followUpQuestion: "", lastResponse: "", callbackCount: 0, resolved: false, challenge: "", updatedAt: "" };
   try {
     const memoryPrompt = `Roast: "${roastText}"
 Habits:
@@ -645,8 +647,10 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     console.error("[api/roast] Failed to update streak:", err);
   }
 
+  let newlyUnlockedAchievements: string[] = [];
   try {
-    await unlockAchievements(supabase, user.id, life_score);
+    const achievementResult = await unlockAchievements(supabase, user.id);
+    newlyUnlockedAchievements = achievementResult.newlyUnlocked;
   } catch (err) {
     console.error("[api/roast] Failed to unlock achievements:", err);
   }
@@ -660,5 +664,5 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     );
   }
 
-  return NextResponse.json({ id: roastId, shareSlug: share_slug });
+  return NextResponse.json({ id: roastId, shareSlug: share_slug, newlyUnlockedAchievements });
 }

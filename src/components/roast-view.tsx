@@ -140,14 +140,6 @@ export function RoastView({
     setTimeout(() => setCopiedIndex(null), 2000);
   }
 
-  const categoryRoasts: Record<string, string> = {
-    sleep: "Your sleep schedule is a disaster waiting to happen.",
-    fitness: "Your workout routine is non-existent.",
-    discipline: "Your discipline is weaker than your excuses.",
-    focus: "Your attention span is microscopic.",
-    spending: "Your spending habits are financially suicidal.",
-  };
-
   function getStreakMessage(streak: number): string {
     if (streak === 1) return "Day 1 of facing reality 👀";
     if (streak === 3) return "3 days of self inflicted damage 🔥";
@@ -203,7 +195,9 @@ export function RoastView({
               <div className="mb-2 text-3xl font-bold text-[#FAFAFA]">
                 {Math.round(data.score / 10)}/10
               </div>
-              <p className="text-xs text-neutral-400">{categoryRoasts[key] || "Needs improvement."}</p>
+              {data.reaction_line && (
+                <p className="text-xs text-neutral-400">{data.reaction_line}</p>
+              )}
             </div>
           ))}
         </section>
