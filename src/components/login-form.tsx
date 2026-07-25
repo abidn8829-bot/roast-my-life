@@ -54,7 +54,7 @@ export function LoginForm() {
     <div className="mx-auto flex w-full max-w-sm flex-col gap-6">
       <div className="text-center mb-4">
         <h1 className="text-3xl font-black tracking-tight text-[#FF3D00] mb-2">
-          ROAST MY LIFE
+          EMBER
         </h1>
         <p className="text-sm text-neutral-400">
           Back for more punishment?

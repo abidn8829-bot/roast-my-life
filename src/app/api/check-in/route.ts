@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       const completion = await groq.chat.completions.create({
         model: MODEL, max_tokens: 100, response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "Return strict JSON only: {\"category\":\"sleep|fitness|discipline|focus|spending\",\"activeTheme\":\"short current habit arc\",\"question\":\"short, specific roast-voice check-in question\",\"challenge\":\"small concrete challenge\"}. Continue the current activeTheme with a callback unless its memory says resolved; then retire it and choose a fresh theme. If continuity_memory.challenge exists, the question must directly ask about completion of that specific challenge. Choose exactly one category." },
+          { role: "system", content: "Return strict JSON only: {\"category\":\"sleep|fitness|discipline|focus|spending\",\"activeTheme\":\"short current habit arc\",\"question\":\"short, specific roast-voice check-in question\",\"challenge\":\"small concrete challenge\"}. Continue the current activeTheme with a callback unless its memory says resolved; then retire it and choose a fresh theme. If continuity_memory.challenge exists, the question must directly ask about completion of that specific challenge. Rotate through exactly 4 of 5 categories (sleep, fitness, discipline, focus, spending). Never ask about spending on consecutive check-ins. Track which category was last asked via continuity_memory.lastAskedCategory and skip it this round. Choose exactly one category." },
           { role: "user", content: `Previous roast: ${previous.roast_text}\nCurrent category grades: ${JSON.stringify(categoryScores)}\nCurrent arc memory: ${JSON.stringify(previous.continuity_memory ?? {})}` },
         ],
       });
@@ -99,8 +99,24 @@ export async function POST(request: Request) {
     logGroqError(error);
   }
   if (Number(nextMemory.callbackCount) >= 6) nextMemory.resolved = true;
+  nextMemory.lastAskedCategory = category;
+
+  let newRoastText: string;
+  try {
+    const roastCompletion = await groq.chat.completions.create({
+      model: MODEL, max_tokens: 150,
+      messages: [
+        { role: "system", content: "You are a gen z brutally honest roast comedian with zero filter. Roast based on exact habits and numbers. Use specific numbers, name exact apps, connect bad habits to real consequences, no sugarcoating, no encouragement. End with one devastating one-liner. 100 words max." },
+        { role: "user", content: `Category just graded: ${category}\nGrade change: ${previousGrade} -> ${result.new_grade} (${result.direction})\nCheck-in answer: ${answer}\nCurrent grades across all categories: ${JSON.stringify(updatedCategoryScores)}\nArc context: ${JSON.stringify(nextMemory)}` },
+      ],
+    });
+    const generatedRoast = roastCompletion.choices[0]?.message?.content?.trim() ?? "";
+    if (!generatedRoast) return NextResponse.json({ error: "Failed to generate check-in roast" }, { status: 502 });
+    newRoastText = generatedRoast;
+  } catch (error) { logGroqError(error); return NextResponse.json({ error: "Failed to generate check-in roast" }, { status: 502 }); }
+
   const { data: created, error: roastError } = await supabase.from("roasts").insert({
-    user_id: user.id, roast_text: previous.roast_text, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),
+    user_id: user.id, roast_text: newRoastText, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),
     answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: previous.top_5_roasts ?? [], category_scores: updatedCategoryScores,
     tone: (previous.tone ?? "normal") as RoastTone, mode: (previous.mode ?? "roast") as RoastMode, persona: (previous.persona ?? "default") as RoastPersona, continuity_memory: nextMemory,
   }).select("id").single();

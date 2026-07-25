@@ -48,7 +48,7 @@ export async function GET(request: Request) {
               <body style="margin: 0; padding: 0; background-color: #0A0A0A; font-family: Arial, sans-serif;">
                 <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
                   <h1 style="color: #FF3D00; font-size: 32px; font-weight: bold; margin-bottom: 20px;">
-                    ROAST MY LIFE
+                    EMBER
                   </h1>
                   <p style="color: #FAFAFA; font-size: 18px; line-height: 1.6; margin-bottom: 30px;">
                     Another week, another chance to disappoint yourself. Come get roasted.
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
                     </a>
                   </div>
                   <p style="color: #666; font-size: 14px; margin-top: 40px;">
-                    You're receiving this because you signed up for Roast My Life.
+                    You're receiving this because you signed up for Ember.
                   </p>
                 </div>
               </body>

@@ -59,7 +59,7 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
   }, [roastId]);
 
   const whatsappHref = `https://wa.me/?text=${encodeURIComponent(
-    `Check my Roast My Life results! ${shareUrl}`,
+    `Check my Ember results! ${shareUrl}`,
   )}`;
 
   const twitterHref = `https://twitter.com/intent/tweet?text=${encodeURIComponent(

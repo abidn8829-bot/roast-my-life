@@ -17,14 +17,14 @@ export default function TermsPage() {
           <section>
             <h2 className="text-xl font-bold text-[#FAFAFA] mb-3">Acceptance of Terms</h2>
             <p className="leading-relaxed">
-              By accessing and using Roast My Life, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our service.
+              By accessing and using Ember, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our service.
             </p>
           </section>
 
           <section>
             <h2 className="text-xl font-bold text-[#FAFAFA] mb-3">Service Description</h2>
             <p className="leading-relaxed">
-              Roast My Life is an AI-powered service that generates personalized roasts based on user-provided data about their habits and lifestyle. The roasts are meant for entertainment purposes and should not be taken as professional advice.
+              Ember is an AI-powered service that generates personalized roasts based on user-provided data about their habits and lifestyle. The roasts are meant for entertainment purposes and should not be taken as professional advice.
             </p>
           </section>
 

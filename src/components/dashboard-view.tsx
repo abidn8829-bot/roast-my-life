@@ -450,27 +450,27 @@ export function DashboardView({ name, roasts, scoreHistory, streak, currentStrea
             return (
               <div
                 key={achievement.id}
-                className={`relative rounded-xl border p-4 text-center transition-all duration-300 ease-out ${
+                className={`relative rounded-xl border p-4 text-center transition-all duration-200 [transition-timing-function:ease] ${
                   unlocked
-                    ? "scale-105 border-[#FF3D00]/40 bg-[#FF3D00]/10 shadow-[0_0_20px_rgba(255,61,0,0.35)]"
-                    : "scale-100 border-neutral-800 bg-[#0A0A0A] opacity-50 grayscale"
+                    ? "border-[#FF3D00] bg-[#FF3D00]/10 shadow-[0_0_12px_rgba(255,61,0,0.4)] hover:scale-105"
+                    : "border-[#1A1A1A] bg-[#0A0A0A] opacity-60"
                 }`}
                 title={achievement.description}
               >
-                <p className="text-2xl">{unlocked ? achievement.emoji : "🔒"}</p>
+                <p className="text-[60px] leading-none">{unlocked ? achievement.emoji : "🔒"}</p>
                 <p
-                  className={`mt-2 text-xs font-bold ${unlocked ? "text-[#FAFAFA]" : "text-neutral-500"}`}
+                  className={`mt-2 text-xs font-bold ${unlocked ? "text-[#FAFAFA]" : "text-neutral-400"}`}
                 >
                   {achievement.title}
                 </p>
-                <p className="mt-1 text-[10px] leading-tight text-neutral-500">
+                <p className={`mt-1 text-[10px] leading-tight ${unlocked ? "text-neutral-300" : "text-neutral-500"}`}>
                   {achievement.description}
                 </p>
                 {target ? (
                   <div className="mt-2">
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-800">
                       <div
-                        className={`h-full rounded-full transition-all duration-300 ease-out ${unlocked ? "bg-[#FF3D00]" : "bg-[#FF3D00]/40"}`}
+                        className={`h-full rounded-full transition-all duration-200 [transition-timing-function:ease] ${unlocked ? "bg-[#FF3D00]" : "bg-emerald-500"}`}
                         style={{ width: `${unlocked ? 100 : progressPct}%` }}
                       />
                     </div>
@@ -482,12 +482,12 @@ export function DashboardView({ name, roasts, scoreHistory, streak, currentStrea
                   <p className="mt-2 text-[10px] font-semibold text-[#FF3D00]">✓ Unlocked</p>
                 ) : null}
                 {unlocked ? (
-                  <p className="mt-1 text-[10px] text-neutral-500">
+                  <p className="mt-1 text-[10px] text-[#FF3D00]">
                     Unlocked {formatUnlockedDate(state!.unlocked_at!)}
                   </p>
                 ) : (
                   <p className="mt-2 text-[10px] italic leading-tight text-neutral-600">
-                    Earn by: {achievement.hint}
+                    Unlock by: {achievement.hint}
                   </p>
                 )}
               </div>

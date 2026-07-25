@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Roast My Life — Get Brutally Roasted by AI",
+  title: "Ember — Get Brutally Roasted by AI",
   description: "Answer 5 questions. Get brutally roasted by AI. Share your shame.",
 };
 

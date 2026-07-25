@@ -18,7 +18,7 @@ export function DashboardHeader({ isPro, name }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/" className="text-sm font-semibold text-[#FF3D00]">
-            Roast My Life
+            Ember
           </Link>
           <div className="flex items-center gap-2">
             {isPro ? (
