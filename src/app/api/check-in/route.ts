@@ -55,22 +55,36 @@ export async function POST(request: Request) {
   const question = typeof body.question === "string" ? body.question.trim() : "";
   if (body.action !== "submit" || !isCategory(category) || !answer) return NextResponse.json({ error: "Invalid check-in submission" }, { status: 400 });
   const previousGrade = categoryScores[category].grade;
-  let result: { new_grade: Grade; direction: "improved" | "same" | "worse"; reaction_line: string };
+  let filteredGradeUpdates: Partial<Record<Category, Grade>>;
+  let suggestionLine: string;
   try {
     const completion = await groq.chat.completions.create({
-      model: MODEL, max_tokens: 150, response_format: { type: "json_object" },
+      model: MODEL, max_tokens: 300, response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: "You are a savage roast comedian. Return strict JSON only: {\"new_grade\":\"A|B|C|D|F\",\"direction\":\"improved|same|worse\",\"reaction_line\":\"short, specific roast-voice reaction to the answer\"}. Judge only the supplied category; do not change other categories. reaction_line must reference the answer, not be generic." },
-        { role: "user", content: `Current theme: ${activeTheme}\nQuestion asked: ${question}\nCategory: ${category}\nPrevious grade: ${previousGrade}\nCheck-in answer: ${answer}` },
+        { role: "system", content: "The user is answering a daily check-in about their habits. Read their answer freely — it may mention one habit, several, or be vague. Determine which of these categories it actually relates to: sleep, fitness, discipline, focus, spending. Only include categories genuinely relevant to what they said. For each relevant category, return an updated letter grade (A/B/C/D/F) based on whether they're improving or slipping. Also write a coaching suggestion_line: 2 sentences max, acknowledge what improved, name what's still struggling, point to one concrete next step. Tone: honest coach, not a joke." },
+        { role: "user", content: `Check-in answer: ${answer}\nQuestion asked: ${question}\nCurrent theme: ${activeTheme}\nCurrent category grades: ${JSON.stringify(categoryScores)}` },
       ],
     });
-    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "") as { new_grade?: unknown; direction?: unknown; reaction_line?: unknown };
-    if (!isGrade(parsed.new_grade) || !["improved", "same", "worse"].includes(String(parsed.direction)) || typeof parsed.reaction_line !== "string" || !parsed.reaction_line.trim()) return NextResponse.json({ error: "Invalid check-in grading response" }, { status: 502 });
-    result = { new_grade: parsed.new_grade, direction: parsed.direction as "improved" | "same" | "worse", reaction_line: parsed.reaction_line.trim() };
+    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "") as { grade_updates?: unknown; suggestion_line?: unknown };
+    if (typeof parsed.suggestion_line !== "string" || !parsed.suggestion_line.trim() || typeof parsed.grade_updates !== "object" || parsed.grade_updates === null) return NextResponse.json({ error: "Invalid check-in grading response" }, { status: 502 });
+    filteredGradeUpdates = {};
+    for (const [key, value] of Object.entries(parsed.grade_updates as Record<string, unknown>)) {
+      if (isCategory(key) && isGrade(value)) filteredGradeUpdates[key] = value;
+    }
+    suggestionLine = parsed.suggestion_line.trim();
   } catch (error) { logGroqError(error); return NextResponse.json({ error: "Failed to grade check-in" }, { status: 502 }); }
 
-  const updatedCategoryScores: CategoryScores = { ...categoryScores, [category]: { score: GRADE_SCORES[result.new_grade], grade: result.new_grade, reaction_line: result.reaction_line } };
+  const updatedCategoryScores: CategoryScores = { ...categoryScores };
+  for (const key of CATEGORIES) {
+    const newGrade = filteredGradeUpdates[key];
+    if (newGrade) updatedCategoryScores[key] = { ...categoryScores[key], score: GRADE_SCORES[newGrade], grade: newGrade };
+  }
   const lifeScore = calculateLifeScore(updatedCategoryScores);
+  const newGradeForCategory = filteredGradeUpdates[category] ?? previousGrade;
+  const result = {
+    new_grade: newGradeForCategory,
+    direction: (GRADE_SCORES[newGradeForCategory] > GRADE_SCORES[previousGrade] ? "improved" : GRADE_SCORES[newGradeForCategory] < GRADE_SCORES[previousGrade] ? "worse" : "same") as "improved" | "same" | "worse",
+  };
   let funnyTitle = getFunnyTitle(lifeScore);
   let nextMemory: Record<string, unknown> = {
     ...(previous.continuity_memory as Record<string, unknown> ?? {}),
@@ -106,8 +120,8 @@ export async function POST(request: Request) {
     const roastCompletion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 150,
       messages: [
-        { role: "system", content: "You are a gen z brutally honest roast comedian with zero filter. Roast based on exact habits and numbers. Use specific numbers, name exact apps, connect bad habits to real consequences, no sugarcoating, no encouragement. End with one devastating one-liner. 100 words max." },
-        { role: "user", content: `Category just graded: ${category}\nGrade change: ${previousGrade} -> ${result.new_grade} (${result.direction})\nCheck-in answer: ${answer}\nCurrent grades across all categories: ${JSON.stringify(updatedCategoryScores)}\nArc context: ${JSON.stringify(nextMemory)}` },
+        { role: "system", content: "You are a gen z brutally honest roast comedian with zero filter. You roast people based on their exact habits and numbers. Rules: use their specific numbers, name the exact apps they mentioned, connect their bad habits to real life consequences, no sugarcoating, no encouragement. End with one devastatingly accurate one-liner. 100 words max." },
+        { role: "user", content: `Current category grades: ${JSON.stringify(updatedCategoryScores)}\nCheck-in answer: ${answer}\nContinuity memory: ${JSON.stringify(nextMemory)}` },
       ],
     });
     const generatedRoast = roastCompletion.choices[0]?.message?.content?.trim() ?? "";
@@ -117,7 +131,7 @@ export async function POST(request: Request) {
 
   const { data: created, error: roastError } = await supabase.from("roasts").insert({
     user_id: user.id, roast_text: newRoastText, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),
-    answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: previous.top_5_roasts ?? [], category_scores: updatedCategoryScores,
+    answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: [suggestionLine], category_scores: updatedCategoryScores,
     tone: (previous.tone ?? "normal") as RoastTone, mode: (previous.mode ?? "roast") as RoastMode, persona: (previous.persona ?? "default") as RoastPersona, continuity_memory: nextMemory,
   }).select("id").single();
   if (roastError || !created) return NextResponse.json({ error: "Failed to save check-in roast" }, { status: 500 });
