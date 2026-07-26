@@ -61,11 +61,13 @@ export async function POST(request: Request) {
     const completion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 300, response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: "The user is answering a daily check-in about their habits. Read their answer freely — it may mention one habit, several, or be vague. Determine which of these categories it actually relates to: sleep, fitness, discipline, focus, spending. Only include categories genuinely relevant to what they said. For each relevant category, return an updated letter grade (A/B/C/D/F) based on whether they're improving or slipping. Also write a coaching suggestion_line: 2 sentences max, acknowledge what improved, name what's still struggling, point to one concrete next step. Tone: honest coach, not a joke." },
+        { role: "system", content: "The user is answering a daily check-in about their habits. Read their answer freely — it may mention one habit, several, or be vague. Determine which of these categories it actually relates to: sleep, fitness, discipline, focus, spending. Only include categories genuinely relevant to what they said. For each relevant category, return an updated letter grade (A/B/C/D/F) based on whether they're improving or slipping. Also write a coaching suggestion_line: 2 sentences max, acknowledge what improved, name what's still struggling, point to one concrete next step. Tone: honest coach, not a joke. Return strict JSON only, in this exact shape: {\"grade_updates\": {\"category\": \"grade\"}, \"suggestion_line\": \"string\"}." },
         { role: "user", content: `Check-in answer: ${answer}\nQuestion asked: ${question}\nCurrent theme: ${activeTheme}\nCurrent category grades: ${JSON.stringify(categoryScores)}` },
       ],
     });
-    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "") as { grade_updates?: unknown; suggestion_line?: unknown };
+    const rawContent = completion.choices[0]?.message?.content ?? "";
+    console.error("[check-in] raw grading response:", rawContent);
+    const parsed = JSON.parse(rawContent) as { grade_updates?: unknown; suggestion_line?: unknown };
     if (typeof parsed.suggestion_line !== "string" || !parsed.suggestion_line.trim() || typeof parsed.grade_updates !== "object" || parsed.grade_updates === null) return NextResponse.json({ error: "Invalid check-in grading response" }, { status: 502 });
     filteredGradeUpdates = {};
     for (const [key, value] of Object.entries(parsed.grade_updates as Record<string, unknown>)) {
