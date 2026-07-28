@@ -79,7 +79,7 @@ export async function POST(request: Request) {
   const updatedCategoryScores: CategoryScores = { ...categoryScores };
   for (const key of CATEGORIES) {
     const newGrade = filteredGradeUpdates[key];
-    if (newGrade) updatedCategoryScores[key] = { ...categoryScores[key], score: GRADE_SCORES[newGrade], grade: newGrade };
+    if (newGrade) updatedCategoryScores[key] = { ...categoryScores[key], score: GRADE_SCORES[newGrade], grade: newGrade, reaction_line: suggestionLine };
   }
   const lifeScore = calculateLifeScore(updatedCategoryScores);
   const newGradeForCategory = filteredGradeUpdates[category] ?? previousGrade;
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
 
   const { data: created, error: roastError } = await supabase.from("roasts").insert({
     user_id: user.id, roast_text: newRoastText, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),
-    answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: [suggestionLine], category_scores: updatedCategoryScores,
+    answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: previous.top_5_roasts ?? [], category_scores: updatedCategoryScores, suggestion_line: suggestionLine,
     tone: (previous.tone ?? "normal") as RoastTone, mode: (previous.mode ?? "roast") as RoastMode, persona: (previous.persona ?? "default") as RoastPersona, continuity_memory: nextMemory,
   }).select("id").single();
   if (roastError || !created) return NextResponse.json({ error: "Failed to save check-in roast" }, { status: 500 });

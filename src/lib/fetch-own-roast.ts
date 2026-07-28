@@ -15,6 +15,7 @@ export type OwnRoast = {
   category_scores?: CategoryScores;
   mode?: RoastMode;
   persona?: RoastPersona;
+  suggestion_line?: string;
 };
 
 export async function fetchOwnRoastById(
@@ -24,7 +25,7 @@ export async function fetchOwnRoastById(
 ): Promise<OwnRoast | null> {
   const { data, error } = await supabase
     .from("roasts")
-    .select("id, roast_text, report_card, share_slug, answers, life_score, funny_title, top_5_roasts, category_scores, mode, persona")
+    .select("id, roast_text, report_card, share_slug, answers, life_score, funny_title, top_5_roasts, category_scores, mode, persona, suggestion_line")
     .eq("id", roastId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -70,5 +71,6 @@ export async function fetchOwnRoastById(
     category_scores: data.category_scores as CategoryScores | undefined,
     mode: data.mode as RoastMode | undefined,
     persona: data.persona as RoastPersona | undefined,
+    suggestion_line: data.suggestion_line ?? undefined,
   };
 }

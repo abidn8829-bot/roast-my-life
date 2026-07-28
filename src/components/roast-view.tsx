@@ -25,6 +25,7 @@ type Props = {
   longestStreak?: number;
   mode?: RoastMode;
   persona?: RoastPersona;
+  suggestionLine?: string;
 };
 
 export function RoastView({
@@ -43,6 +44,7 @@ export function RoastView({
   longestStreak = 0,
   mode = "roast",
   persona = "default",
+  suggestionLine,
 }: Props) {
   const router = useRouter();
   const [reaction, setReaction] = useState<string | null>(initialReaction);
@@ -234,6 +236,18 @@ export function RoastView({
                 </button>
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Improvement Suggestion */}
+      {suggestionLine && suggestionLine.trim() && (
+        <section className="flex flex-col gap-4">
+          <p className="text-center text-sm font-semibold uppercase tracking-widest text-neutral-500">
+            Improvement Suggestion
+          </p>
+          <div className="rounded-xl border border-neutral-800 bg-[#111111] p-4">
+            <p className="text-sm text-[#FAFAFA]">{suggestionLine}</p>
           </div>
         </section>
       )}
