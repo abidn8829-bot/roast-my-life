@@ -74,5 +74,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api).*)"],
+  matcher: ["/((?!api|manifest\\.webmanifest|sw\\.js|icon-192\\.png|icon-512\\.png).*)"],
 };
