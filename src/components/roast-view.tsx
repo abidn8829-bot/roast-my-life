@@ -197,9 +197,6 @@ export function RoastView({
               <div className="mb-2 text-3xl font-bold text-[#FAFAFA]">
                 {Math.round(data.score / 10)}/10
               </div>
-              {data.reaction_line && (
-                <p className="text-xs text-neutral-400">{data.reaction_line}</p>
-              )}
             </div>
           ))}
         </section>

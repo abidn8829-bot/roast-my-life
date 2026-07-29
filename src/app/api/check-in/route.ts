@@ -45,7 +45,12 @@ export async function POST(request: Request) {
       });
       const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "") as { category?: unknown; activeTheme?: unknown; question?: unknown; challenge?: unknown };
       if (!isCategory(parsed.category) || typeof parsed.activeTheme !== "string" || typeof parsed.question !== "string" || typeof parsed.challenge !== "string" || !parsed.question.trim()) return NextResponse.json({ error: "Invalid check-in question response" }, { status: 502 });
-      return NextResponse.json({ category: parsed.category, activeTheme: parsed.activeTheme.trim(), question: parsed.question.trim(), challenge: parsed.challenge.trim() });
+      const lastAskedCategory = (previous.continuity_memory as Record<string, unknown> | null)?.lastAskedCategory;
+      let finalCategory = parsed.category;
+      if (isCategory(lastAskedCategory) && finalCategory === lastAskedCategory) {
+        finalCategory = CATEGORIES[(CATEGORIES.indexOf(lastAskedCategory) + 1) % CATEGORIES.length];
+      }
+      return NextResponse.json({ category: finalCategory, activeTheme: parsed.activeTheme.trim(), question: parsed.question.trim(), challenge: parsed.challenge.trim() });
     } catch (error) { logGroqError(error); return NextResponse.json({ error: "Failed to generate check-in question" }, { status: 502 }); }
   }
 
@@ -61,7 +66,7 @@ export async function POST(request: Request) {
     const completion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 300, response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: "The user is answering a daily check-in about their habits. Read their answer freely — it may mention one habit, several, or be vague. Determine which of these categories it actually relates to: sleep, fitness, discipline, focus, spending. Only include categories genuinely relevant to what they said. For each relevant category, return an updated letter grade (A/B/C/D/F) based on whether they're improving or slipping. Also write a coaching suggestion_line: 2 sentences max, acknowledge what improved, name what's still struggling, point to one concrete next step. Tone: honest coach, not a joke. Return strict JSON only, in this exact shape: {\"grade_updates\": {\"category\": \"grade\"}, \"suggestion_line\": \"string\"}." },
+        { role: "system", content: "The user is answering a daily check-in about their habits. Scan the user's full answer for ANY of the 5 categories they mention — sleep, fitness, discipline, focus, spending — not just the one the question was about. Grade every category genuinely referenced, even if unprompted. Read their answer freely — it may mention one habit, several, or be vague. Only include categories genuinely relevant to what they said. For each relevant category, return an updated letter grade (A/B/C/D/F) based on whether they're improving or slipping. Also write a coaching suggestion_line: 2 sentences max, acknowledge what improved, name what's still struggling, point to one concrete next step. Tone: honest coach, not a joke. Return strict JSON only, in this exact shape: {\"grade_updates\": {\"category\": \"grade\"}, \"suggestion_line\": \"string\"}." },
         { role: "user", content: `Check-in answer: ${answer}\nQuestion asked: ${question}\nCurrent theme: ${activeTheme}\nCurrent category grades: ${JSON.stringify(categoryScores)}` },
       ],
     });
@@ -79,9 +84,16 @@ export async function POST(request: Request) {
   const updatedCategoryScores: CategoryScores = { ...categoryScores };
   for (const key of CATEGORIES) {
     const newGrade = filteredGradeUpdates[key];
-    if (newGrade) updatedCategoryScores[key] = { ...categoryScores[key], score: GRADE_SCORES[newGrade], grade: newGrade, reaction_line: suggestionLine };
+    if (newGrade) updatedCategoryScores[key] = { ...categoryScores[key], score: GRADE_SCORES[newGrade], grade: newGrade };
   }
   const lifeScore = calculateLifeScore(updatedCategoryScores);
+  const categoryDirections: Record<Category, "improved" | "same" | "worsened"> = CATEGORIES.reduce((acc, key) => {
+    const prevScore = GRADE_SCORES[categoryScores[key].grade];
+    const newScore = GRADE_SCORES[updatedCategoryScores[key].grade];
+    acc[key] = newScore > prevScore ? "improved" : newScore < prevScore ? "worsened" : "same";
+    return acc;
+  }, {} as Record<Category, "improved" | "same" | "worsened">);
+  const overallDirection = lifeScore > calculateLifeScore(categoryScores) ? "improved" : "not improved";
   const newGradeForCategory = filteredGradeUpdates[category] ?? previousGrade;
   const result = {
     new_grade: newGradeForCategory,
@@ -122,8 +134,8 @@ export async function POST(request: Request) {
     const roastCompletion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 150,
       messages: [
-        { role: "system", content: "You are a gen z brutally honest roast comedian with zero filter. You roast people based on their exact habits and numbers. Rules: use their specific numbers, name the exact apps they mentioned, connect their bad habits to real life consequences, no sugarcoating, no encouragement. End with one devastatingly accurate one-liner. 100 words max." },
-        { role: "user", content: `Current category grades: ${JSON.stringify(updatedCategoryScores)}\nCheck-in answer: ${answer}\nContinuity memory: ${JSON.stringify(nextMemory)}` },
+        { role: "system", content: "You are a gen z brutally honest roast comedian with zero filter. You roast people based on their exact habits and numbers. Rules: use their specific numbers, name the exact apps they mentioned, connect their bad habits to real life consequences, no sugarcoating, no encouragement. End with one devastatingly accurate one-liner. 100 words max. If the overall check-in shows improvement, stay funny but noticeably lighter and less brutal; if nothing improved or something got worse, keep it at full brutal intensity." },
+        { role: "user", content: `Current category grades: ${JSON.stringify(updatedCategoryScores)}\nCategory directions this check-in: ${JSON.stringify(categoryDirections)}\nOverall direction: ${overallDirection}\nCheck-in answer: ${answer}\nContinuity memory: ${JSON.stringify(nextMemory)}` },
       ],
     });
     const generatedRoast = roastCompletion.choices[0]?.message?.content?.trim() ?? "";
