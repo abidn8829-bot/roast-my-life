@@ -17,6 +17,16 @@ const GRADE_SCORES: Record<Grade, number> = { A: 100, B: 75, C: 60, D: 40, F: 0 
 function isCategory(value: unknown): value is Category { return typeof value === "string" && CATEGORIES.includes(value as Category); }
 function isGrade(value: unknown): value is Grade { return typeof value === "string" && GRADES.includes(value as Grade); }
 
+function getAvailableCategories(coveredCategories: Category[], lastAskedCategory: unknown): { available: Category[]; resetCovered: Category[] } {
+  let available = CATEGORIES.filter((c) => !coveredCategories.includes(c) && c !== lastAskedCategory);
+  let resetCovered = coveredCategories;
+  if (available.length === 0) {
+    resetCovered = [];
+    available = CATEGORIES.filter((c) => c !== lastAskedCategory);
+  }
+  return { available, resetCovered };
+}
+
 export async function POST(request: Request) {
   const apiKey = getGroqApiKey();
   if (!apiKey) return NextResponse.json({ error: "Groq API key not configured" }, { status: 500 });
@@ -36,21 +46,42 @@ export async function POST(request: Request) {
   const groq = new Groq({ apiKey });
   if (body.action === "question") {
     try {
-      const completion = await groq.chat.completions.create({
-        model: MODEL, max_tokens: 100, response_format: { type: "json_object" },
+      const memory = (previous.continuity_memory as Record<string, unknown> | null) ?? {};
+      const lastAskedCategory = memory.lastAskedCategory;
+      const coveredCategories: Category[] = Array.isArray(memory.coveredCategories) ? memory.coveredCategories.filter(isCategory) : [];
+      const { available } = getAvailableCategories(coveredCategories, lastAskedCategory);
+      const finalCategory = available[0];
+
+      const { data: historyRows } = await supabase
+        .from("score_history")
+        .select("category_grades, recorded_at")
+        .eq("user_id", user.id)
+        .order("recorded_at", { ascending: false })
+        .limit(90);
+      let historyFact: { daysAgo: number; wasGrade: Grade; nowGrade: Grade } | null = null;
+      if (historyRows) {
+        const currentGrade = categoryScores[finalCategory].grade;
+        for (let i = 0; i < historyRows.length - 1; i++) {
+          const newerGrade = (historyRows[i].category_grades as CategoryScores)?.[finalCategory]?.grade;
+          const olderGrade = (historyRows[i + 1].category_grades as CategoryScores)?.[finalCategory]?.grade;
+          if (newerGrade && olderGrade && newerGrade !== olderGrade) {
+            const daysAgo = Math.max(0, Math.round((Date.now() - new Date(historyRows[i].recorded_at as string).getTime()) / 86400000));
+            historyFact = { daysAgo, wasGrade: olderGrade, nowGrade: currentGrade };
+            break;
+          }
+        }
+      }
+
+      const questionCompletion = await groq.chat.completions.create({
+        model: MODEL, max_tokens: 120, response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "Return strict JSON only: {\"category\":\"sleep|fitness|discipline|focus|spending\",\"activeTheme\":\"short current habit arc\",\"question\":\"short, specific roast-voice check-in question\",\"challenge\":\"small concrete challenge\"}. Continue the current activeTheme with a callback unless its memory says resolved; then retire it and choose a fresh theme. If continuity_memory.challenge exists, the question must directly ask about completion of that specific challenge. Rotate through exactly 4 of 5 categories (sleep, fitness, discipline, focus, spending). Never ask about spending on consecutive check-ins. Track which category was last asked via continuity_memory.lastAskedCategory and skip it this round. Choose exactly one category." },
-          { role: "user", content: `Previous roast: ${previous.roast_text}\nCurrent category grades: ${JSON.stringify(categoryScores)}\nCurrent arc memory: ${JSON.stringify(previous.continuity_memory ?? {})}` },
+          { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current habit arc\",\"question\":\"short, specific roast-voice check-in question\",\"challenge\":\"small concrete challenge\"}. activeTheme is a short phrase describing the current habit arc for this category — continue naturally from the previous arc memory if it's about the same category, otherwise start a fresh one. Write a brand-new question and challenge about the given category, grounded in the real grade change provided — never reuse or reference a previous challenge. If told this category has never been asked about before, write a fresh baseline question instead of referencing any change. The challenge must never specify a fixed multi-day duration (no '3 days', 'next week', '2 weeks', etc.) — frame it as an open, single-focus action to work on until this category comes up again, since you don't control exactly when that will be. Keep it achievable as a short, concrete action, not a multi-day program." },
+          { role: "user", content: `Category: ${finalCategory}\n${historyFact ? `Last asked about this category ${historyFact.daysAgo} day(s) ago. Grade was ${historyFact.wasGrade}, now ${historyFact.nowGrade}.` : "This category has never been specifically asked about before."}\nPrevious arc memory: ${JSON.stringify(previous.continuity_memory ?? {})}\nPrevious roast: ${previous.roast_text}` },
         ],
       });
-      const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "") as { category?: unknown; activeTheme?: unknown; question?: unknown; challenge?: unknown };
-      if (!isCategory(parsed.category) || typeof parsed.activeTheme !== "string" || typeof parsed.question !== "string" || typeof parsed.challenge !== "string" || !parsed.question.trim()) return NextResponse.json({ error: "Invalid check-in question response" }, { status: 502 });
-      const lastAskedCategory = (previous.continuity_memory as Record<string, unknown> | null)?.lastAskedCategory;
-      let finalCategory = parsed.category;
-      if (isCategory(lastAskedCategory) && finalCategory === lastAskedCategory) {
-        finalCategory = CATEGORIES[(CATEGORIES.indexOf(lastAskedCategory) + 1) % CATEGORIES.length];
-      }
-      return NextResponse.json({ category: finalCategory, activeTheme: parsed.activeTheme.trim(), question: parsed.question.trim(), challenge: parsed.challenge.trim() });
+      const parsedQuestion = JSON.parse(questionCompletion.choices[0]?.message?.content ?? "") as { activeTheme?: unknown; question?: unknown; challenge?: unknown };
+      if (typeof parsedQuestion.activeTheme !== "string" || typeof parsedQuestion.question !== "string" || typeof parsedQuestion.challenge !== "string" || !parsedQuestion.question.trim()) return NextResponse.json({ error: "Invalid check-in question response" }, { status: 502 });
+      return NextResponse.json({ category: finalCategory, activeTheme: parsedQuestion.activeTheme.trim(), question: parsedQuestion.question.trim(), challenge: parsedQuestion.challenge.trim() });
     } catch (error) { logGroqError(error); return NextResponse.json({ error: "Failed to generate check-in question" }, { status: 502 }); }
   }
 
@@ -87,13 +118,20 @@ export async function POST(request: Request) {
     if (newGrade) updatedCategoryScores[key] = { ...categoryScores[key], score: GRADE_SCORES[newGrade], grade: newGrade };
   }
   const lifeScore = calculateLifeScore(updatedCategoryScores);
+  const previousLifeScore = calculateLifeScore(categoryScores);
   const categoryDirections: Record<Category, "improved" | "same" | "worsened"> = CATEGORIES.reduce((acc, key) => {
     const prevScore = GRADE_SCORES[categoryScores[key].grade];
     const newScore = GRADE_SCORES[updatedCategoryScores[key].grade];
     acc[key] = newScore > prevScore ? "improved" : newScore < prevScore ? "worsened" : "same";
     return acc;
   }, {} as Record<Category, "improved" | "same" | "worsened">);
-  const overallDirection = lifeScore > calculateLifeScore(categoryScores) ? "improved" : "not improved";
+  const overallDirection = lifeScore > previousLifeScore ? "improved" : "not improved";
+  const changedCategoryScores: Partial<Record<Category, { was: number; now: number }>> = {};
+  for (const key of CATEGORIES) {
+    if (filteredGradeUpdates[key]) {
+      changedCategoryScores[key] = { was: GRADE_SCORES[categoryScores[key].grade], now: GRADE_SCORES[updatedCategoryScores[key].grade] };
+    }
+  }
   const newGradeForCategory = filteredGradeUpdates[category] ?? previousGrade;
   const result = {
     new_grade: newGradeForCategory,
@@ -127,6 +165,10 @@ export async function POST(request: Request) {
     logGroqError(error);
   }
   if (Number(nextMemory.callbackCount) >= 6) nextMemory.resolved = true;
+  const priorMemory = (previous.continuity_memory as Record<string, unknown> | null) ?? {};
+  const priorCovered: Category[] = Array.isArray(priorMemory.coveredCategories) ? priorMemory.coveredCategories.filter(isCategory) : [];
+  const { resetCovered } = getAvailableCategories(priorCovered, priorMemory.lastAskedCategory);
+  nextMemory.coveredCategories = [...resetCovered, category];
   nextMemory.lastAskedCategory = category;
 
   let newRoastText: string;
@@ -134,8 +176,8 @@ export async function POST(request: Request) {
     const roastCompletion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 150,
       messages: [
-        { role: "system", content: "You are a gen z brutally honest roast comedian with zero filter. You roast people based on their exact habits and numbers. Rules: use their specific numbers, name the exact apps they mentioned, connect their bad habits to real life consequences, no sugarcoating, no encouragement. End with one devastatingly accurate one-liner. 100 words max. If the overall check-in shows improvement, stay funny but noticeably lighter and less brutal; if nothing improved or something got worse, keep it at full brutal intensity." },
-        { role: "user", content: `Current category grades: ${JSON.stringify(updatedCategoryScores)}\nCategory directions this check-in: ${JSON.stringify(categoryDirections)}\nOverall direction: ${overallDirection}\nCheck-in answer: ${answer}\nContinuity memory: ${JSON.stringify(nextMemory)}` },
+        { role: "system", content: "You are a gen z brutally honest roast comedian with zero filter. You roast people based on their exact habits and numbers. Rules: use their specific numbers, name the exact apps they mentioned, connect their bad habits to real life consequences, no sugarcoating, no encouragement. End with one devastatingly accurate one-liner. 100 words max. If the overall check-in shows improvement, stay funny but noticeably lighter and less brutal; if nothing improved or something got worse, keep it at full brutal intensity. Only cite a specific category's numeric score if it appears in \"Categories graded this check-in\" below, always as its exact was-to-now change — never invent, approximate, or reference a score for a category not listed there. The life score is a separate overall 0-100 average across all 5 categories — never present it as if it were a single category's score." },
+        { role: "user", content: `Categories graded this check-in (score is 0-100 for that category only, separate from life score): ${JSON.stringify(changedCategoryScores)}\nCategory directions this check-in, all 5 (qualitative only, no numbers): ${JSON.stringify(categoryDirections)}\nOverall life score (0-100 average across all categories): was ${previousLifeScore}, now ${lifeScore} (${overallDirection})\nCheck-in answer: ${answer}\nContinuity memory: ${JSON.stringify(nextMemory)}` },
       ],
     });
     const generatedRoast = roastCompletion.choices[0]?.message?.content?.trim() ?? "";
