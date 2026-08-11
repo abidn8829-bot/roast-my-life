@@ -27,6 +27,24 @@ function getAvailableCategories(coveredCategories: Category[], lastAskedCategory
   return { available, resetCovered };
 }
 
+type PlanStep = { step: string; why: string };
+function isPlanSteps(value: unknown): value is PlanStep[] {
+  if (!Array.isArray(value) || value.length < 2 || value.length > 3) return false;
+  return value.every((v) => {
+    if (typeof v !== "object" || v === null) return false;
+    const step = (v as Record<string, unknown>).step;
+    const why = (v as Record<string, unknown>).why;
+    return typeof step === "string" && step.trim().length > 0 && typeof why === "string" && why.trim().length > 0;
+  });
+}
+
+type ChallengePlan = { challenge: string; steps: PlanStep[] };
+function isChallengePlan(value: unknown): value is ChallengePlan {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.challenge === "string" && v.challenge.trim().length > 0 && isPlanSteps(v.steps);
+}
+
 export async function POST(request: Request) {
   const apiKey = getGroqApiKey();
   if (!apiKey) return NextResponse.json({ error: "Groq API key not configured" }, { status: 500 });
@@ -73,15 +91,25 @@ export async function POST(request: Request) {
       }
 
       const questionCompletion = await groq.chat.completions.create({
-        model: MODEL, max_tokens: 120, response_format: { type: "json_object" },
+        model: MODEL, max_tokens: 260, response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current habit arc\",\"question\":\"short, specific roast-voice check-in question\",\"challenge\":\"small concrete challenge\"}. activeTheme is a short phrase describing the current habit arc for this category — continue naturally from the previous arc memory if it's about the same category, otherwise start a fresh one. Write a brand-new question and challenge about the given category, grounded in the real grade change provided — never reuse or reference a previous challenge. If told this category has never been asked about before, write a fresh baseline question instead of referencing any change. The challenge must never specify a fixed multi-day duration (no '3 days', 'next week', '2 weeks', etc.) — frame it as an open, single-focus action to work on until this category comes up again, since you don't control exactly when that will be. Keep it achievable as a short, concrete action, not a multi-day program." },
+          { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current habit arc\",\"question\":\"short, specific roast-voice check-in question\",\"challenge\":\"small concrete challenge\",\"planSteps\":[{\"step\":\"concrete action\",\"why\":\"one short sentence why it matters\"}]}. activeTheme is a short phrase describing the current habit arc for this category — continue naturally from the previous arc memory if it's about the same category, otherwise start a fresh one. Write a brand-new question and challenge about the given category, grounded in the real grade change provided — never reuse or reference a previous challenge. If told this category has never been asked about before, write a fresh baseline question instead of referencing any change. The challenge must never specify a fixed multi-day duration (no '3 days', 'next week', '2 weeks', etc.) — frame it as an open, single-focus action to work on until this category comes up again, since you don't control exactly when that will be. Keep it achievable as a short, concrete action, not a multi-day program. planSteps must contain 2 or 3 objects that break that exact challenge down into concrete actions — never reword the challenge itself, only break it into doable steps. Each why must be one short sentence in your blunt coaching voice, specific to this person's real situation — never generic filler like 'this will help you improve.' Never assert, imply, or say the user has 'failed,' is 'clearly struggling,' or has a pattern of failure with a previous challenge unless there is real evidence for it. Real evidence means: historyFact shows the grade has stayed flat or worsened, OR the previous arc memory's callbackCount is 2 or higher (meaning this specific challenge has already survived at least one full check-in cycle without resolving). If callbackCount is 0 or 1, or historyFact is null, treat any previous challenge neutrally — ask how it's going, don't accuse. It is always safer to ask than to assume." },
           { role: "user", content: `Category: ${finalCategory}\n${historyFact ? `Last asked about this category ${historyFact.daysAgo} day(s) ago. Grade was ${historyFact.wasGrade}, now ${historyFact.nowGrade}.` : "This category has never been specifically asked about before."}\nPrevious arc memory: ${JSON.stringify(previous.continuity_memory ?? {})}\nPrevious roast: ${previous.roast_text}` },
         ],
       });
-      const parsedQuestion = JSON.parse(questionCompletion.choices[0]?.message?.content ?? "") as { activeTheme?: unknown; question?: unknown; challenge?: unknown };
+      const parsedQuestion = JSON.parse(questionCompletion.choices[0]?.message?.content ?? "") as { activeTheme?: unknown; question?: unknown; challenge?: unknown; planSteps?: unknown };
       if (typeof parsedQuestion.activeTheme !== "string" || typeof parsedQuestion.question !== "string" || typeof parsedQuestion.challenge !== "string" || !parsedQuestion.question.trim()) return NextResponse.json({ error: "Invalid check-in question response" }, { status: 502 });
-      return NextResponse.json({ category: finalCategory, activeTheme: parsedQuestion.activeTheme.trim(), question: parsedQuestion.question.trim(), challenge: parsedQuestion.challenge.trim() });
+      const planSteps: PlanStep[] = isPlanSteps(parsedQuestion.planSteps) ? parsedQuestion.planSteps.map((s) => ({ step: s.step.trim(), why: s.why.trim() })) : [];
+      const challengeText = parsedQuestion.challenge.trim();
+      const challengePlan: ChallengePlan = { challenge: challengeText, steps: planSteps };
+
+      const { error: stashError } = await supabase
+        .from("roasts")
+        .update({ continuity_memory: { ...(previous.continuity_memory as Record<string, unknown> ?? {}), pendingPlanSteps: challengePlan } })
+        .eq("id", previous.id);
+      if (stashError) console.error("[check-in] failed to stash plan steps:", stashError.message);
+
+      return NextResponse.json({ category: finalCategory, activeTheme: parsedQuestion.activeTheme.trim(), question: parsedQuestion.question.trim(), challenge: challengeText, planSteps });
     } catch (error) { logGroqError(error); return NextResponse.json({ error: "Failed to generate check-in question" }, { status: 502 }); }
   }
 
@@ -170,6 +198,8 @@ export async function POST(request: Request) {
   const { resetCovered } = getAvailableCategories(priorCovered, priorMemory.lastAskedCategory);
   nextMemory.coveredCategories = [...resetCovered, category];
   nextMemory.lastAskedCategory = category;
+  const pendingPlan: ChallengePlan | null = isChallengePlan(priorMemory.pendingPlanSteps) ? priorMemory.pendingPlanSteps : null;
+  delete nextMemory.pendingPlanSteps;
 
   let newRoastText: string;
   try {
@@ -188,7 +218,7 @@ export async function POST(request: Request) {
   const { data: created, error: roastError } = await supabase.from("roasts").insert({
     user_id: user.id, roast_text: newRoastText, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),
     answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: previous.top_5_roasts ?? [], category_scores: updatedCategoryScores, suggestion_line: suggestionLine,
-    tone: (previous.tone ?? "normal") as RoastTone, mode: (previous.mode ?? "roast") as RoastMode, persona: (previous.persona ?? "default") as RoastPersona, continuity_memory: nextMemory,
+    tone: (previous.tone ?? "normal") as RoastTone, mode: (previous.mode ?? "roast") as RoastMode, persona: (previous.persona ?? "default") as RoastPersona, continuity_memory: nextMemory, plan_steps: pendingPlan,
   }).select("id").single();
   if (roastError || !created) return NextResponse.json({ error: "Failed to save check-in roast" }, { status: 500 });
   const { error: historyError } = await supabase.from("score_history").insert({ user_id: user.id, roast_id: created.id, life_score: lifeScore, category_grades: updatedCategoryScores });

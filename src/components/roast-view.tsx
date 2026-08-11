@@ -1,12 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ShareButtons } from "@/components/share-buttons";
 import { gradeColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
 import type { CategoryScores, Grade, OnboardingAnswers, ReportCard, RoastMode, RoastPersona } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+
+type PlanStep = { step: string; why: string };
+type ChallengePlan = { challenge: string; steps: PlanStep[] };
 
 type Props = {
   roastId: string;
@@ -52,6 +55,26 @@ export function RoastView({
   const [checkingLimit, setCheckingLimit] = useState(false);
   const [showFullRoast, setShowFullRoast] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [plan, setPlan] = useState<ChallengePlan | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = createSupabaseBrowserClient();
+      const { data } = await supabase
+        .from("roasts")
+        .select("plan_steps")
+        .eq("id", roastId)
+        .maybeSingle();
+      const planSteps = data?.plan_steps as ChallengePlan | null | undefined;
+      if (!cancelled && planSteps && planSteps.challenge && Array.isArray(planSteps.steps) && planSteps.steps.length > 0) {
+        setPlan(planSteps);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roastId]);
 
   // Get color based on life score
   const getScoreColor = (score: number) => {
@@ -245,6 +268,33 @@ export function RoastView({
           </p>
           <div className="rounded-xl border border-neutral-800 bg-[#111111] p-4">
             <p className="text-sm text-[#FAFAFA]">{suggestionLine}</p>
+          </div>
+        </section>
+      )}
+
+      {/* Your Plan */}
+      {plan && (
+        <section className="flex flex-col gap-4">
+          <p className="text-center text-sm font-semibold uppercase tracking-widest text-neutral-500">
+            Your Plan
+          </p>
+          <div className="rounded-xl border border-neutral-800 bg-[#111111] p-5">
+            <p className="mb-4 text-base font-semibold text-[#FAFAFA]">
+              {plan.challenge}
+            </p>
+            <ol className="flex flex-col gap-4">
+              {plan.steps.map((s, index) => (
+                <li key={index} className="flex gap-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#FF3D00] text-xs font-bold text-[#FF3D00]">
+                    {index + 1}
+                  </span>
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm text-[#FAFAFA]">{s.step}</p>
+                    <p className="text-xs text-neutral-500">{s.why}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
       )}
