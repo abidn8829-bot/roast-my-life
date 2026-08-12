@@ -56,19 +56,13 @@ export default async function DashboardPage() {
   const currentStreak = userData?.current_streak ?? 0;
   const longestStreak = userData?.longest_streak ?? 0;
 
-  let query = supabase
+  const query = supabase
     .from("roasts")
     .select(
       "id, roast_text, week_start_date, share_slug, life_score, funny_title, category_scores, created_at",
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
-
-  if (subscriptionTier === "free") {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    query = query.gte("created_at", sevenDaysAgo.toISOString());
-  }
 
   const limit = subscriptionTier === "pro" ? 100 : 12;
   const { data, error } = await query.limit(limit);
