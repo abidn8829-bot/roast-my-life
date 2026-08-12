@@ -53,7 +53,6 @@ export function RoastView({
   const [reaction, setReaction] = useState<string | null>(initialReaction);
   const [savingReaction, setSavingReaction] = useState(false);
   const [checkingLimit, setCheckingLimit] = useState(false);
-  const [showFullRoast, setShowFullRoast] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [plan, setPlan] = useState<ChallengePlan | null>(null);
 
@@ -203,6 +202,18 @@ export function RoastView({
         )}
       </div>
 
+      {/* Full Roast */}
+      <section className="flex flex-col gap-4">
+        <p className="text-center text-sm font-semibold uppercase tracking-widest text-neutral-500">
+          The Full {mode === "coach" ? "Coach Report" : "Roast"}
+        </p>
+        <div className="rounded-xl border border-[#FF3D00]/40 bg-[#111111] p-6 shadow-[0_0_40px_rgba(255,61,0,0.08)]">
+          <p className="whitespace-pre-wrap text-base leading-relaxed text-[#FAFAFA]">
+            {roastText}
+          </p>
+        </div>
+      </section>
+
       {/* Category Scorecards */}
       {categoryScores && (
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -312,25 +323,6 @@ export function RoastView({
           {copiedIndex === -1 ? "✓ Copied!" : `📋 Copy: "${top5Roasts[0]}"`}
         </button>
       )}
-
-      {/* Expandable Full Roast */}
-      <section className="flex flex-col gap-4">
-        {!showFullRoast ? (
-          <button
-            type="button"
-            onClick={() => setShowFullRoast(true)}
-            className="w-full rounded-lg border border-neutral-800 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50 hover:bg-[#111111]"
-          >
-            Read full {mode === "coach" ? "coach report" : "roast"}
-          </button>
-        ) : (
-          <div className="rounded-xl border border-neutral-800 bg-[#111111] p-6">
-            <p className="whitespace-pre-wrap text-base leading-relaxed text-[#FAFAFA]">
-              {roastText}
-            </p>
-          </div>
-        )}
-      </section>
 
       {/* Reactions */}
       {canReact && (
