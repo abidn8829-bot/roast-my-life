@@ -300,8 +300,8 @@ export function RoastView({
                     {index + 1}
                   </span>
                   <div className="flex flex-col gap-1">
-                    <p className="text-sm text-[#FAFAFA]">{s.step}</p>
-                    <p className="text-xs text-neutral-500">{s.why}</p>
+                    <p className="text-base text-[#FAFAFA]">{s.step}</p>
+                    <p className="text-sm text-neutral-500">{s.why}</p>
                   </div>
                 </li>
               ))}

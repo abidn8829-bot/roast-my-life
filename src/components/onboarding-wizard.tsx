@@ -106,7 +106,6 @@ export function OnboardingWizard() {
   const [hasUsedTodayRoast, setHasUsedTodayRoast] = useState(false);
   const [checkInCategory, setCheckInCategory] = useState<string | null>(null);
   const [checkInTheme, setCheckInTheme] = useState("");
-  const [checkInChallenge, setCheckInChallenge] = useState("");
   const [isCustomCheckIn, setIsCustomCheckIn] = useState(false);
 
   const generateFollowUpQuestion = async () => {
@@ -119,11 +118,10 @@ export function OnboardingWizard() {
       });
 
       const data = await res.json();
-      if (res.ok && data.question && data.category && data.activeTheme && data.challenge) {
+      if (res.ok && data.question && data.category && data.activeTheme) {
         setFollowUpQuestion(data.question);
         setCheckInCategory(data.category);
         setCheckInTheme(data.activeTheme);
-        setCheckInChallenge(data.challenge);
       }
     } catch (error) {
       console.error("Error generating follow-up question:", error);
@@ -391,9 +389,6 @@ export function OnboardingWizard() {
               <p className="text-xl text-neutral-300 mb-8">
                 {followUpQuestion || "How did your habits go yesterday?"}
               </p>
-              {checkInChallenge && (
-                <p className="mb-5 text-sm text-neutral-500">Challenge: {checkInChallenge}</p>
-              )}
               <div className="mb-5 grid gap-3">
                 {[
                   ["😎", "I actually did it"],

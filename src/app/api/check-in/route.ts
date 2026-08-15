@@ -39,11 +39,6 @@ function isPlanSteps(value: unknown): value is PlanStep[] {
 }
 
 type ChallengePlan = { challenge: string; steps: PlanStep[] };
-function isChallengePlan(value: unknown): value is ChallengePlan {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Record<string, unknown>;
-  return typeof v.challenge === "string" && v.challenge.trim().length > 0 && isPlanSteps(v.steps);
-}
 
 export async function POST(request: Request) {
   const apiKey = getGroqApiKey();
@@ -91,25 +86,15 @@ export async function POST(request: Request) {
       }
 
       const questionCompletion = await groq.chat.completions.create({
-        model: MODEL, max_tokens: 260, response_format: { type: "json_object" },
+        model: MODEL, max_tokens: 100, response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current habit arc\",\"question\":\"short, specific roast-voice check-in question\",\"challenge\":\"small concrete challenge\",\"planSteps\":[{\"step\":\"concrete action\",\"why\":\"one short sentence why it matters\"}]}. activeTheme is a short phrase describing the current habit arc for this category — continue naturally from the previous arc memory if it's about the same category, otherwise start a fresh one. Write a brand-new question and challenge about the given category, grounded in the real grade change provided — never reuse or reference a previous challenge. If told this category has never been asked about before, write a fresh baseline question instead of referencing any change. The challenge must never specify a fixed multi-day duration (no '3 days', 'next week', '2 weeks', etc.) — frame it as an open, single-focus action to work on until this category comes up again, since you don't control exactly when that will be. Keep it achievable as a short, concrete action, not a multi-day program. planSteps must contain 2 or 3 objects that break that exact challenge down into concrete actions — never reword the challenge itself, only break it into doable steps. Each why must be one short sentence in your blunt coaching voice, specific to this person's real situation — never generic filler like 'this will help you improve.' Never assert, imply, or say the user has 'failed,' is 'clearly struggling,' or has a pattern of failure with a previous challenge unless there is real evidence for it. Real evidence means: historyFact shows the grade has stayed flat or worsened, OR the previous arc memory's callbackCount is 2 or higher (meaning this specific challenge has already survived at least one full check-in cycle without resolving). If callbackCount is 0 or 1, or historyFact is null, treat any previous challenge neutrally — ask how it's going, don't accuse. It is always safer to ask than to assume." },
+          { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current habit arc\",\"question\":\"short, specific roast-voice check-in question\"}. activeTheme is a short phrase describing the current habit arc for this category — continue naturally from the previous arc memory if it's about the same category, otherwise start a fresh one. Write a brand-new question about the given category, grounded in the real grade change provided. If told this category has never been asked about before, write a fresh baseline question instead of referencing any change. Never assert, imply, or say the user has 'failed,' is 'clearly struggling,' or has a pattern of failure with a previous challenge unless there is real evidence for it. Real evidence means: historyFact shows the grade has stayed flat or worsened, OR the previous arc memory's callbackCount is 2 or higher (meaning this specific challenge has already survived at least one full check-in cycle without resolving). If callbackCount is 0 or 1, or historyFact is null, treat any previous challenge neutrally — ask how it's going, don't accuse. It is always safer to ask than to assume." },
           { role: "user", content: `Category: ${finalCategory}\n${historyFact ? `Last asked about this category ${historyFact.daysAgo} day(s) ago. Grade was ${historyFact.wasGrade}, now ${historyFact.nowGrade}.` : "This category has never been specifically asked about before."}\nPrevious arc memory: ${JSON.stringify(previous.continuity_memory ?? {})}\nPrevious roast: ${previous.roast_text}` },
         ],
       });
-      const parsedQuestion = JSON.parse(questionCompletion.choices[0]?.message?.content ?? "") as { activeTheme?: unknown; question?: unknown; challenge?: unknown; planSteps?: unknown };
-      if (typeof parsedQuestion.activeTheme !== "string" || typeof parsedQuestion.question !== "string" || typeof parsedQuestion.challenge !== "string" || !parsedQuestion.question.trim()) return NextResponse.json({ error: "Invalid check-in question response" }, { status: 502 });
-      const planSteps: PlanStep[] = isPlanSteps(parsedQuestion.planSteps) ? parsedQuestion.planSteps.map((s) => ({ step: s.step.trim(), why: s.why.trim() })) : [];
-      const challengeText = parsedQuestion.challenge.trim();
-      const challengePlan: ChallengePlan = { challenge: challengeText, steps: planSteps };
-
-      const { error: stashError } = await supabase
-        .from("roasts")
-        .update({ continuity_memory: { ...(previous.continuity_memory as Record<string, unknown> ?? {}), pendingPlanSteps: challengePlan } })
-        .eq("id", previous.id);
-      if (stashError) console.error("[check-in] failed to stash plan steps:", stashError.message);
-
-      return NextResponse.json({ category: finalCategory, activeTheme: parsedQuestion.activeTheme.trim(), question: parsedQuestion.question.trim(), challenge: challengeText, planSteps });
+      const parsedQuestion = JSON.parse(questionCompletion.choices[0]?.message?.content ?? "") as { activeTheme?: unknown; question?: unknown };
+      if (typeof parsedQuestion.activeTheme !== "string" || typeof parsedQuestion.question !== "string" || !parsedQuestion.question.trim()) return NextResponse.json({ error: "Invalid check-in question response" }, { status: 502 });
+      return NextResponse.json({ category: finalCategory, activeTheme: parsedQuestion.activeTheme.trim(), question: parsedQuestion.question.trim() });
     } catch (error) { logGroqError(error); return NextResponse.json({ error: "Failed to generate check-in question" }, { status: 502 }); }
   }
 
@@ -165,6 +150,24 @@ export async function POST(request: Request) {
     new_grade: newGradeForCategory,
     direction: (GRADE_SCORES[newGradeForCategory] > GRADE_SCORES[previousGrade] ? "improved" : GRADE_SCORES[newGradeForCategory] < GRADE_SCORES[previousGrade] ? "worse" : "same") as "improved" | "same" | "worse",
   };
+
+  let plan: ChallengePlan | null = null;
+  try {
+    const planCompletion = await groq.chat.completions.create({
+      model: MODEL, max_tokens: 220, response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: "Return strict JSON only: {\"challenge\":\"small concrete challenge\",\"planSteps\":[{\"step\":\"concrete action\",\"why\":\"one short sentence why it matters\"}]}. The challenge must never specify a fixed multi-day duration (no '3 days', 'next week', '2 weeks', etc.) — keep it achievable as a short, concrete action, not a multi-day program. Never reuse or repeat a stale prior ask — write a fresh challenge grounded in what the user just said. planSteps must contain 2 or 3 objects, each a concrete next action with a one-sentence why in your blunt coaching voice — never generic filler like 'this will help you improve.' Branch on direction, which is the deciding signal, not the raw answer wording, since grading already judged whether the evidence supports it. If direction is 'improved' and the answer shows real follow-through, the challenge should push further — a harder version of the same category. If direction is 'same' and the answer shows an attempt, the challenge should target the specific point it broke down instead of just repeating 'try harder.' If direction is 'worse', or the answer is a flat refusal, change the approach entirely instead of repeating the same ask. If the answer gives specific real details, respond directly to those specifics instead of a generic version of the category. Pay attention not just to WHAT the user said, but HOW they said it — frustration, sarcasm, reluctant effort, genuine pride, resignation, dismissiveness, etc. Let that tone shape your wording, not just the plan's content. If the answer is frustrated, dismissive, or sounds like giving up (e.g. rejecting an approach outright), briefly acknowledge that specifically before pivoting to the challenge — don't quietly route around it like it wasn't said. If the answer shows genuine effort or real progress, name that specifically instead of defaulting to a generic plan. The challenge text and the first step's 'why' are where this tone should show up most — they should read like they were written by someone who actually heard what was said, not just extracted the topic from it." },
+        { role: "user", content: `Category: ${category}\nUser's answer: ${answer}\nGrade direction: ${result.direction}` },
+      ],
+    });
+    const parsedPlan = JSON.parse(planCompletion.choices[0]?.message?.content ?? "") as { challenge?: unknown; planSteps?: unknown };
+    if (typeof parsedPlan.challenge === "string" && parsedPlan.challenge.trim() && isPlanSteps(parsedPlan.planSteps)) {
+      plan = { challenge: parsedPlan.challenge.trim(), steps: parsedPlan.planSteps.map((s) => ({ step: s.step.trim(), why: s.why.trim() })) };
+    }
+  } catch (error) {
+    logGroqError(error);
+  }
+
   let funnyTitle = getFunnyTitle(lifeScore);
   let nextMemory: Record<string, unknown> = {
     ...(previous.continuity_memory as Record<string, unknown> ?? {}),
@@ -173,33 +176,31 @@ export async function POST(request: Request) {
     lastResponse: answer,
     callbackCount: Number((previous.continuity_memory as Record<string, unknown> | null)?.callbackCount ?? 0) + 1,
     resolved: false,
-    challenge: (previous.continuity_memory as Record<string, unknown> | null)?.challenge ?? null,
     updatedAt: new Date().toISOString(),
   };
   try {
     const memoryCompletion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 150, response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current arc\",\"followUpQuestion\":\"the question asked\",\"lastResponse\":\"the user answer\",\"callbackCount\":number,\"resolved\":boolean,\"challenge\":\"short concrete challenge\",\"title\":\"short funny persona label, 2-4 words, reflecting the current theme and direction (improved|same|worse)\"}. Mark resolved true only if this answer shows meaningful, sustained progress; otherwise keep the same theme and increment callbackCount." },
+        { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current arc\",\"followUpQuestion\":\"the question asked\",\"lastResponse\":\"the user answer\",\"callbackCount\":number,\"resolved\":boolean,\"title\":\"short funny persona label, 2-4 words, reflecting the current theme and direction (improved|same|worse)\"}. Mark resolved true only if this answer shows meaningful, sustained progress; otherwise keep the same theme and increment callbackCount." },
         { role: "user", content: `Previous arc: ${JSON.stringify(previous.continuity_memory ?? {})}\nTheme: ${activeTheme}\nQuestion: ${question}\nAnswer: ${answer}\nGrade result: ${result.new_grade} (${result.direction})` },
       ],
     });
     const parsedMemory = JSON.parse(memoryCompletion.choices[0]?.message?.content ?? "") as Record<string, unknown>;
-    if (typeof parsedMemory.activeTheme === "string" && typeof parsedMemory.followUpQuestion === "string" && typeof parsedMemory.lastResponse === "string" && typeof parsedMemory.callbackCount === "number" && typeof parsedMemory.resolved === "boolean" && typeof parsedMemory.challenge === "string") {
+    if (typeof parsedMemory.activeTheme === "string" && typeof parsedMemory.followUpQuestion === "string" && typeof parsedMemory.lastResponse === "string" && typeof parsedMemory.callbackCount === "number" && typeof parsedMemory.resolved === "boolean") {
       nextMemory = { ...parsedMemory, updatedAt: new Date().toISOString() };
       if (typeof parsedMemory.title === "string" && parsedMemory.title.trim()) funnyTitle = parsedMemory.title.trim();
     }
   } catch (error) {
     logGroqError(error);
   }
+  nextMemory.challenge = plan?.challenge ?? null;
   if (Number(nextMemory.callbackCount) >= 6) nextMemory.resolved = true;
   const priorMemory = (previous.continuity_memory as Record<string, unknown> | null) ?? {};
   const priorCovered: Category[] = Array.isArray(priorMemory.coveredCategories) ? priorMemory.coveredCategories.filter(isCategory) : [];
   const { resetCovered } = getAvailableCategories(priorCovered, priorMemory.lastAskedCategory);
   nextMemory.coveredCategories = [...resetCovered, category];
   nextMemory.lastAskedCategory = category;
-  const pendingPlan: ChallengePlan | null = isChallengePlan(priorMemory.pendingPlanSteps) ? priorMemory.pendingPlanSteps : null;
-  delete nextMemory.pendingPlanSteps;
 
   let newRoastText: string;
   try {
@@ -218,7 +219,7 @@ export async function POST(request: Request) {
   const { data: created, error: roastError } = await supabase.from("roasts").insert({
     user_id: user.id, roast_text: newRoastText, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),
     answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: previous.top_5_roasts ?? [], category_scores: updatedCategoryScores, suggestion_line: suggestionLine,
-    tone: (previous.tone ?? "normal") as RoastTone, mode: (previous.mode ?? "roast") as RoastMode, persona: (previous.persona ?? "default") as RoastPersona, continuity_memory: nextMemory, plan_steps: pendingPlan,
+    tone: (previous.tone ?? "normal") as RoastTone, mode: (previous.mode ?? "roast") as RoastMode, persona: (previous.persona ?? "default") as RoastPersona, continuity_memory: nextMemory, plan_steps: plan,
   }).select("id").single();
   if (roastError || !created) return NextResponse.json({ error: "Failed to save check-in roast" }, { status: 500 });
   const { error: historyError } = await supabase.from("score_history").insert({ user_id: user.id, roast_id: created.id, life_score: lifeScore, category_grades: updatedCategoryScores });
