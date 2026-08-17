@@ -8,7 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
 
-const MODEL = "llama-3.3-70b-versatile";
+const MODEL = "openai/gpt-oss-120b";
 
 const FOLLOW_UP_SYSTEM_PROMPT = `You are a savage roast comedian who remembers everything. Based on the user's previous roast and their current habits, ask ONE intelligent follow-up question to dig deeper into their failures. The question should be specific, brutal, and expose a pattern of bad behavior. Keep it under 20 words. No markdown, no extra text, just the question.`;
 
@@ -394,7 +394,8 @@ Continuity memory: ${JSON.stringify(continuityMemory)}`;
 
       const completion = await groq.chat.completions.create({
         model: MODEL,
-        max_tokens: 50,
+        max_tokens: 250,
+        reasoning_effort: "low",
         messages: [
           { role: "system", content: FOLLOW_UP_SYSTEM_PROMPT },
           { role: "user", content: followUpPrompt },
@@ -430,7 +431,8 @@ Continuity memory: ${JSON.stringify(continuityMemory)}`;
 
     const completion = await groq.chat.completions.create({
       model: MODEL,
-      max_tokens: 1000,
+      max_tokens: 1200,
+      reasoning_effort: "low",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: formatUserMessage(answers, continuityMemory, followUpAnswer, previousRoast?.roast_text) },
@@ -501,7 +503,8 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
 
     const memoryCompletion = await groq.chat.completions.create({
       model: MODEL,
-      max_tokens: 200,
+      max_tokens: 400,
+      reasoning_effort: "low",
       messages: [
         { role: "system", content: CONTINUITY_MEMORY_SYSTEM_PROMPT },
         { role: "user", content: memoryPrompt },

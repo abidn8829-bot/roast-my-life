@@ -8,7 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
 
-const MODEL = "llama-3.3-70b-versatile";
+const MODEL = "openai/gpt-oss-120b";
 const CATEGORIES = ["sleep", "fitness", "discipline", "focus", "spending"] as const;
 type Category = typeof CATEGORIES[number];
 const GRADES = ["A", "B", "C", "D", "F"] as const;
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
       }
 
       const questionCompletion = await groq.chat.completions.create({
-        model: MODEL, max_tokens: 100, response_format: { type: "json_object" },
+        model: MODEL, max_tokens: 300, reasoning_effort: "low", response_format: { type: "json_object" },
         messages: [
           { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current habit arc\",\"question\":\"short, specific roast-voice check-in question\"}. activeTheme is a short phrase describing the current habit arc for this category — continue naturally from the previous arc memory if it's about the same category, otherwise start a fresh one. Write a brand-new question about the given category, grounded in the real grade change provided. If told this category has never been asked about before, write a fresh baseline question instead of referencing any change. Never assert, imply, or say the user has 'failed,' is 'clearly struggling,' or has a pattern of failure with a previous challenge unless there is real evidence for it. Real evidence means: historyFact shows the grade has stayed flat or worsened, OR the previous arc memory's callbackCount is 2 or higher (meaning this specific challenge has already survived at least one full check-in cycle without resolving). If callbackCount is 0 or 1, or historyFact is null, treat any previous challenge neutrally — ask how it's going, don't accuse. It is always safer to ask than to assume." },
           { role: "user", content: `Category: ${finalCategory}\n${historyFact ? `Last asked about this category ${historyFact.daysAgo} day(s) ago. Grade was ${historyFact.wasGrade}, now ${historyFact.nowGrade}.` : "This category has never been specifically asked about before."}\nPrevious arc memory: ${JSON.stringify(previous.continuity_memory ?? {})}\nPrevious roast: ${previous.roast_text}` },
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
   let suggestionLine: string;
   try {
     const completion = await groq.chat.completions.create({
-      model: MODEL, max_tokens: 300, response_format: { type: "json_object" },
+      model: MODEL, max_tokens: 500, reasoning_effort: "low", response_format: { type: "json_object" },
       messages: [
         { role: "system", content: "The user is answering a daily check-in about their habits. Scan the user's full answer for ANY of the 5 categories they mention — sleep, fitness, discipline, focus, spending — not just the one the question was about. Grade every category genuinely referenced, even if unprompted. Read their answer freely — it may mention one habit, several, or be vague. Only include categories genuinely relevant to what they said. For each relevant category, return an updated letter grade (A/B/C/D/F) based on whether they're improving or slipping. Also write a coaching suggestion_line: 2 sentences max, acknowledge what improved, name what's still struggling, point to one concrete next step. Tone: honest coach, not a joke. Return strict JSON only, in this exact shape: {\"grade_updates\": {\"category\": \"grade\"}, \"suggestion_line\": \"string\"}." },
         { role: "user", content: `Check-in answer: ${answer}\nQuestion asked: ${question}\nCurrent theme: ${activeTheme}\nCurrent category grades: ${JSON.stringify(categoryScores)}` },
@@ -154,7 +154,7 @@ export async function POST(request: Request) {
   let plan: ChallengePlan | null = null;
   try {
     const planCompletion = await groq.chat.completions.create({
-      model: MODEL, max_tokens: 220, response_format: { type: "json_object" },
+      model: MODEL, max_tokens: 420, reasoning_effort: "low", response_format: { type: "json_object" },
       messages: [
         { role: "system", content: "Return strict JSON only: {\"challenge\":\"small concrete challenge\",\"planSteps\":[{\"step\":\"concrete action\",\"why\":\"one short sentence why it matters\"}]}. The challenge must never specify a fixed multi-day duration (no '3 days', 'next week', '2 weeks', etc.) — keep it achievable as a short, concrete action, not a multi-day program. Never reuse or repeat a stale prior ask — write a fresh challenge grounded in what the user just said. planSteps must contain 2 or 3 objects, each a concrete next action with a one-sentence why in your blunt coaching voice — never generic filler like 'this will help you improve.' Branch on direction, which is the deciding signal, not the raw answer wording, since grading already judged whether the evidence supports it. If direction is 'improved' and the answer shows real follow-through, the challenge should push further — a harder version of the same category. If direction is 'same' and the answer shows an attempt, the challenge should target the specific point it broke down instead of just repeating 'try harder.' If direction is 'worse', or the answer is a flat refusal, change the approach entirely instead of repeating the same ask. If the answer gives specific real details, respond directly to those specifics instead of a generic version of the category. Pay attention not just to WHAT the user said, but HOW they said it — frustration, sarcasm, reluctant effort, genuine pride, resignation, dismissiveness, etc. Let that tone shape your wording, not just the plan's content. If the answer is frustrated, dismissive, or sounds like giving up (e.g. rejecting an approach outright), briefly acknowledge that specifically before pivoting to the challenge — don't quietly route around it like it wasn't said. If the answer shows genuine effort or real progress, name that specifically instead of defaulting to a generic plan. The challenge text and the first step's 'why' are where this tone should show up most — they should read like they were written by someone who actually heard what was said, not just extracted the topic from it." },
         { role: "user", content: `Category: ${category}\nUser's answer: ${answer}\nGrade direction: ${result.direction}` },
@@ -180,7 +180,7 @@ export async function POST(request: Request) {
   };
   try {
     const memoryCompletion = await groq.chat.completions.create({
-      model: MODEL, max_tokens: 150, response_format: { type: "json_object" },
+      model: MODEL, max_tokens: 350, reasoning_effort: "low", response_format: { type: "json_object" },
       messages: [
         { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current arc\",\"followUpQuestion\":\"the question asked\",\"lastResponse\":\"the user answer\",\"callbackCount\":number,\"resolved\":boolean,\"title\":\"short funny persona label, 2-4 words, reflecting the current theme and direction (improved|same|worse)\"}. Mark resolved true only if this answer shows meaningful, sustained progress; otherwise keep the same theme and increment callbackCount." },
         { role: "user", content: `Previous arc: ${JSON.stringify(previous.continuity_memory ?? {})}\nTheme: ${activeTheme}\nQuestion: ${question}\nAnswer: ${answer}\nGrade result: ${result.new_grade} (${result.direction})` },
@@ -205,7 +205,7 @@ export async function POST(request: Request) {
   let newRoastText: string;
   try {
     const roastCompletion = await groq.chat.completions.create({
-      model: MODEL, max_tokens: 150,
+      model: MODEL, max_tokens: 350, reasoning_effort: "low",
       messages: [
         { role: "system", content: "You are a gen z brutally honest roast comedian with zero filter. You roast people based on their exact habits and numbers. Rules: use their specific numbers, name the exact apps they mentioned, connect their bad habits to real life consequences, no sugarcoating, no encouragement. End with one devastatingly accurate one-liner. 100 words max. If the overall check-in shows improvement, stay funny but noticeably lighter and less brutal; if nothing improved or something got worse, keep it at full brutal intensity. Only cite a specific category's numeric score if it appears in \"Categories graded this check-in\" below, always as its exact was-to-now change — never invent, approximate, or reference a score for a category not listed there. The life score is a separate overall 0-100 average across all 5 categories — never present it as if it were a single category's score." },
         { role: "user", content: `Categories graded this check-in (score is 0-100 for that category only, separate from life score): ${JSON.stringify(changedCategoryScores)}\nCategory directions this check-in, all 5 (qualitative only, no numbers): ${JSON.stringify(categoryDirections)}\nOverall life score (0-100 average across all categories): was ${previousLifeScore}, now ${lifeScore} (${overallDirection})\nCheck-in answer: ${answer}\nContinuity memory: ${JSON.stringify(nextMemory)}` },
