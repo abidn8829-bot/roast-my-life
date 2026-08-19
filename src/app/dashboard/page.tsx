@@ -45,11 +45,15 @@ export default async function DashboardPage() {
     console.error("[dashboard] achievement evaluation failed:", error);
   }
 
-  const { data: userData } = await supabase
+  const { data: userData, error: userDataError } = await supabase
     .from("users")
     .select("subscription_tier, achievements, current_streak, longest_streak")
     .eq("id", user.id)
     .single();
+
+  if (userDataError) {
+    console.error("[dashboard] user data fetch error:", userDataError.message);
+  }
 
   const subscriptionTier = userData?.subscription_tier || "free";
   const achievements = parseAchievements(userData?.achievements);
