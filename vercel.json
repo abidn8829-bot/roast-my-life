@@ -1,5 +1,5 @@
 {
-  "crons": [{
+  "_crons_disabled": [{
     "path": "/api/send-weekly-email",
     "schedule": "0 9 * * 1"
   }]
