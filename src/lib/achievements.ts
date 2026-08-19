@@ -112,6 +112,8 @@ export async function unlockAchievements(
     updated[achievement.id] = state;
   }
 
-  await supabase.from("users").update({ achievements: updated }).eq("id", userId);
+  console.log("[achievements][diagnostic] about to write:", JSON.stringify(updated));
+  const { error } = await supabase.from("users").update({ achievements: updated }).eq("id", userId).select();
+  if (error) console.error("[achievements] failed to update:", error.message);
   return { achievements: updated, newlyUnlocked };
 }
