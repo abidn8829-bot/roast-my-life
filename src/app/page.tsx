@@ -226,6 +226,9 @@ export default function Home() {
             <Link href="/terms" className="hover:text-[#FAFAFA] transition">
               Terms
             </Link>
+            <Link href="/contact" className="hover:text-[#FAFAFA] transition">
+              Contact
+            </Link>
           </div>
         </div>
       </footer>
