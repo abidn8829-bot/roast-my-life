@@ -180,7 +180,7 @@ function ScoreTrend({ scores }: { scores: number[] }) {
   );
 }
 
-export function DashboardView({ name, roasts, scoreHistory, streak, currentStreak, longestStreak, achievements, newlyUnlockedAchievements, isPro }: Props) {
+export function DashboardView({ name, roasts, scoreHistory, streak, longestStreak, achievements, newlyUnlockedAchievements, isPro }: Props) {
   const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
   const latest = roasts[0] ?? null;
 
@@ -195,6 +195,13 @@ export function DashboardView({ name, roasts, scoreHistory, streak, currentStrea
     const today = new Date().toISOString().split('T')[0];
     const roastDate = new Date(latest.created_at).toISOString().split('T')[0];
     return today === roastDate;
+  })();
+
+  // Check if user has any activity (roast or check-in) today, for the streak banner
+  const hasActivityToday = Boolean(latest) && (() => {
+    const today = new Date().toISOString().split('T')[0];
+    const activityDate = new Date(latest!.created_at).toISOString().split('T')[0];
+    return today === activityDate;
   })();
 
   const scoresWithValues = scoreHistory
@@ -228,6 +235,39 @@ export function DashboardView({ name, roasts, scoreHistory, streak, currentStrea
         </p>
       </header>
 
+      {/* Daily streak banner */}
+      {streak > 0 && (
+        <div
+          className={`flex items-center justify-start gap-3 rounded-xl border px-5 py-3 ${
+            hasActivityToday
+              ? "border-[#FF3D00]/40 bg-[#FF3D00]/10"
+              : "border-neutral-800 bg-[#111111]"
+          }`}
+        >
+          <span
+            aria-hidden
+            className={`text-3xl leading-none ${hasActivityToday ? "" : "opacity-50 grayscale"}`}
+          >
+            {hasActivityToday ? "🔥" : "⏳"}
+          </span>
+          <span
+            className={`text-2xl font-black tabular-nums ${
+              hasActivityToday ? "text-[#FF3D00]" : "text-neutral-300"
+            }`}
+          >
+            {streak}
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500">
+            day streak
+          </span>
+          {!hasActivityToday && (
+            <span className="text-[11px] text-neutral-600">
+              · keep it going today
+            </span>
+          )}
+        </div>
+      )}
+
       {latest && latest.life_score !== null ? (
         <>
           {/* Hero — Life Score */}
@@ -249,12 +289,12 @@ export function DashboardView({ name, roasts, scoreHistory, streak, currentStrea
           </section>
 
           {/* Streak */}
-          {currentStreak > 0 && (
+          {streak > 0 && (
             <div className="rounded-xl border border-[#FF3D00]/30 bg-[#FF3D00]/10 px-5 py-4 text-center">
               <p className="text-base font-semibold text-[#FF3D00]">
-                {getStreakMessage(currentStreak)}
+                {getStreakMessage(streak)}
               </p>
-              {longestStreak > currentStreak && (
+              {longestStreak > streak && (
                 <p className="mt-1 text-xs text-neutral-500">
                   Best: {longestStreak} days
                 </p>
