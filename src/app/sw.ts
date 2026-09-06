@@ -34,3 +34,37 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+// Real Web Push notifications (the daily "roast nudge" cron sends these).
+// Registered directly on `self` alongside Serwist's own install/activate/
+// fetch listeners — these are separate event types, so they don't conflict.
+self.addEventListener("push", (event: PushEvent) => {
+  if (!event.data) return;
+  let payload: { title?: string; body?: string; url?: string };
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: "Ember", body: event.data.text() };
+  }
+  const title = payload.title || "Ember";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: payload.body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: payload.url || "/dashboard" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event: NotificationEvent) => {
+  event.notification.close();
+  const url = (event.notification.data as { url?: string } | undefined)?.url || "/dashboard";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window" }).then((clientsArr) => {
+      const existing = clientsArr.find((c) => "focus" in c && c.url.includes(url));
+      if (existing && "focus" in existing) return existing.focus();
+      return self.clients.openWindow(url);
+    }),
+  );
+});
