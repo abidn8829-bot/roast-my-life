@@ -63,18 +63,21 @@ export function buildPushNudge(input: PushNudgeInput): PushNudge {
         ? "Your running joke is still waiting for a punchline. That's you."
         : "Silence isn't a personality trait. Check in.",
     ];
-    return { title: "Ember", body: pick(lines, seed) };
+    return { title: "🔥 Ember", body: pick(lines, seed) };
   }
 
   // Missed today with a real streak on the line — loss aversion, specific numbers.
   if (daysSinceLastActivity === 1 && streak >= 3) {
     return {
-      title: "Ember",
+      title: "🔥 Ember",
       body: `${streak}-day streak. About to become a ${streak}-day memory. Check in before midnight.`,
     };
   }
   if (daysSinceLastActivity === 1 && streak >= 1) {
-    return { title: "Ember", body: `Day ${streak} was easy. Day ${streak + 1} is right there.` };
+    return {
+      title: "🔥 Ember",
+      body: `Day ${streak} was easy. Day ${streak + 1} is right there — don't go soft on me now.`,
+    };
   }
 
   // No streak to protect — call out their weakest category instead.
@@ -84,8 +87,8 @@ export function buildPushNudge(input: PushNudgeInput): PushNudge {
       `Still curious how your ${worstLabel} looks today, or scared to check?`,
       `One check-in. That's it. Your ${worstLabel} isn't going to grade itself.`,
     ];
-    return { title: "Ember", body: pick(lines, seed) };
+    return { title: "🔥 Ember", body: pick(lines, seed) };
   }
 
-  return { title: "Ember", body: "One roast a day keeps the delusion away. Your turn." };
+  return { title: "🔥 Ember", body: "One roast a day keeps the delusion away. Your turn." };
 }
