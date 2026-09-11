@@ -26,17 +26,31 @@ export function PushPermissionPrompt() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
-    if (Notification.permission !== "default") return;
-    try {
-      if (localStorage.getItem("ember_push_prompt_dismissed") === "1") return;
-    } catch {
-      // localStorage unavailable (private mode etc.) — just show the prompt.
+    if (Notification.permission === "denied") return;
+
+    if (Notification.permission === "default") {
+      try {
+        if (localStorage.getItem("ember_push_prompt_dismissed") === "1") return;
+      } catch {
+        // localStorage unavailable (private mode etc.) — just show the prompt.
+      }
+      // Browser feature/permission detection is only knowable client-side
+      // after mount (window/Notification don't exist during SSR), so this
+      // genuinely has to happen inside the effect rather than as initial state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVisible(true);
+      return;
     }
-    // Browser feature/permission detection is only knowable client-side
-    // after mount (window/Notification don't exist during SSR), so this
-    // genuinely has to happen inside the effect rather than as initial state.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setVisible(true);
+
+    // Permission is already "granted" (e.g. toggled directly in OS settings,
+    // or an earlier subscription went stale and was cleaned up server-side)
+    // but this device may not actually have a live PushSubscription yet —
+    // in that case still offer the button so the user has a way back in.
+    void (async () => {
+      const registration = await navigator.serviceWorker.ready;
+      const existing = await registration.pushManager.getSubscription();
+      if (!existing) setVisible(true);
+    })();
   }, []);
 
   async function enable() {
