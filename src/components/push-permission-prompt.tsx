@@ -44,12 +44,13 @@ export function PushPermissionPrompt() {
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
+        alert(`[push debug] Permission not granted: ${permission}`);
         setVisible(false);
         return;
       }
       const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!publicKey) {
-        console.error("[push] Missing NEXT_PUBLIC_VAPID_PUBLIC_KEY");
+        alert("[push debug] Missing NEXT_PUBLIC_VAPID_PUBLIC_KEY");
         setVisible(false);
         return;
       }
@@ -61,13 +62,15 @@ export function PushPermissionPrompt() {
         // as Uint8Array<ArrayBufferLike>. It's a real Uint8Array either way.
         applicationServerKey: urlBase64ToUint8Array(publicKey) as unknown as BufferSource,
       });
-      await fetch("/api/push/subscribe", {
+      const res = await fetch("/api/push/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(subscription.toJSON()),
       });
+      const text = await res.text();
+      alert(`[push debug] subscribe POST -> ${res.status}: ${text}`);
     } catch (error) {
-      console.error("[push] Failed to subscribe:", error);
+      alert(`[push debug] Failed to subscribe: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setBusy(false);
       setVisible(false);
