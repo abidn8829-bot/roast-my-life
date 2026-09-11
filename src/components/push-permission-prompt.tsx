@@ -58,13 +58,12 @@ export function PushPermissionPrompt() {
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
-        alert(`[push debug] Permission not granted: ${permission}`);
         setVisible(false);
         return;
       }
       const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!publicKey) {
-        alert("[push debug] Missing NEXT_PUBLIC_VAPID_PUBLIC_KEY");
+        console.error("[push] Missing NEXT_PUBLIC_VAPID_PUBLIC_KEY");
         setVisible(false);
         return;
       }
@@ -81,10 +80,11 @@ export function PushPermissionPrompt() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(subscription.toJSON()),
       });
-      const text = await res.text();
-      alert(`[push debug] subscribe POST -> ${res.status}: ${text}`);
+      if (!res.ok) {
+        console.error("[push] subscribe request failed:", res.status, await res.text());
+      }
     } catch (error) {
-      alert(`[push debug] Failed to subscribe: ${error instanceof Error ? error.message : String(error)}`);
+      console.error("[push] Failed to subscribe:", error);
     } finally {
       setBusy(false);
       setVisible(false);
