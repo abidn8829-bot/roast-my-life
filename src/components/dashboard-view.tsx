@@ -7,6 +7,7 @@ import { ACHIEVEMENTS, type UserAchievements } from "@/lib/achievements";
 import { formatWeekLabel, snippet } from "@/lib/format-week";
 import type { CategoryScores } from "@/lib/roast-types";
 import { ProWaitlistModal } from "@/components/pro-waitlist-modal";
+import { playUnlockSound } from "@/lib/unlock-sound";
 
 export type DashboardRoast = {
   id: string;
@@ -180,15 +181,70 @@ function ScoreTrend({ scores }: { scores: number[] }) {
   );
 }
 
+function AchievementCelebration({
+  achievementId,
+  onDismiss,
+}: {
+  achievementId: string;
+  onDismiss: () => void;
+}) {
+  const achievement = ACHIEVEMENTS.find((a) => a.id === achievementId);
+
+  useEffect(() => {
+    playUnlockSound();
+    const timer = setTimeout(onDismiss, 3500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [achievementId]);
+
+  if (!achievement) return null;
+
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-6 z-50 flex justify-center px-4">
+      <div
+        role="status"
+        onClick={onDismiss}
+        className="animate-achievement-pop-in pointer-events-auto flex max-w-sm cursor-pointer items-center gap-4 rounded-2xl border border-[#FF3D00]/50 bg-[#141414] px-6 py-5 shadow-[0_0_60px_rgba(255,61,0,0.4)]"
+      >
+        <span className="text-5xl leading-none" aria-hidden>
+          {achievement.emoji}
+        </span>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-[#FF3D00]">
+            Achievement unlocked
+          </p>
+          <p className="mt-1 text-base font-bold text-[#FAFAFA]">{achievement.title}</p>
+          <p className="mt-0.5 text-xs text-neutral-400">{achievement.description}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function DashboardView({ name, roasts, scoreHistory, streak, longestStreak, achievements, newlyUnlockedAchievements, isPro }: Props) {
   const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
+  const [celebrationQueue, setCelebrationQueue] = useState<string[]>([]);
+  const [activeCelebration, setActiveCelebration] = useState<string | null>(null);
   const latest = roasts[0] ?? null;
 
   useEffect(() => {
     for (const achievementId of newlyUnlockedAchievements) {
       posthog.capture("achievement_unlocked", { achievement_id: achievementId });
     }
+    if (newlyUnlockedAchievements.length > 0) {
+      setCelebrationQueue(newlyUnlockedAchievements);
+      // This render already consumed the pending-achievement cookie (if any) — clear it
+      // so refreshing /dashboard doesn't replay the celebration.
+      fetch("/api/clear-pending-achievement", { method: "POST", keepalive: true }).catch(() => {});
+    }
   }, [newlyUnlockedAchievements]);
+
+  useEffect(() => {
+    if (activeCelebration || celebrationQueue.length === 0) return;
+    const [next, ...rest] = celebrationQueue;
+    setActiveCelebration(next ?? null);
+    setCelebrationQueue(rest);
+  }, [celebrationQueue, activeCelebration]);
 
   // Check if user has already roasted today (for free users)
   const hasRoastedToday = !isPro && latest && (() => {
@@ -226,6 +282,13 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6 pb-12">
+      {activeCelebration && (
+        <AchievementCelebration
+          achievementId={activeCelebration}
+          onDismiss={() => setActiveCelebration(null)}
+        />
+      )}
+
       <header>
         <h1 className="text-2xl font-bold text-[#FAFAFA]">
           Hey {name} <span aria-hidden>👋</span>
@@ -487,6 +550,7 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
             const progress = state?.progress ?? 0;
             const target = achievement.target;
             const progressPct = target ? Math.min(100, Math.round((progress / target) * 100)) : 0;
+            const justUnlocked = newlyUnlockedAchievements.includes(achievement.id);
             return (
               <div
                 key={achievement.id}
@@ -494,7 +558,7 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
                   unlocked
                     ? "border-[#FF3D00] bg-[#FF3D00]/10 shadow-[0_0_12px_rgba(255,61,0,0.4)] hover:scale-105"
                     : "border-[#1A1A1A] bg-[#0A0A0A] opacity-60"
-                }`}
+                } ${justUnlocked ? "animate-achievement-glow" : ""}`}
                 title={achievement.description}
               >
                 <p className="text-[60px] leading-none">{unlocked ? achievement.emoji : "🔒"}</p>

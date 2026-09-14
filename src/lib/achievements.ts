@@ -88,32 +88,84 @@ function isComplete(id: AchievementId, progress: Progress): boolean {
   return progress[id] >= target;
 }
 
+const MAX_UNLOCK_ATTEMPTS = 5;
+
+function achievementsEqual(a: UserAchievements, b: UserAchievements): boolean {
+  // Perf-only short-circuit to skip a redundant write when nothing changed —
+  // NOT the correctness mechanism. The DB-level compare-and-swap below is
+  // what actually prevents lost updates; an imperfect equality check here
+  // can only cost one extra write, never cause a wrong result.
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export async function unlockAchievements(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<{ achievements: UserAchievements; newlyUnlocked: AchievementId[] }> {
-  const [{ data: userRow }, { data: roasts }] = await Promise.all([
-    supabase.from("users").select("achievements").eq("id", userId).single(),
-    supabase.from("roasts").select("created_at, continuity_memory").eq("user_id", userId).order("created_at", { ascending: false }),
-  ]);
-  const current = parseAchievements(userRow?.achievements);
-  const progress = getProgress((roasts ?? []) as RoastHistoryRow[]);
-  const updated: UserAchievements = { ...current };
-  const newlyUnlocked: AchievementId[] = [];
   const now = new Date().toISOString();
+  let lastKnown: UserAchievements = {};
 
-  for (const achievement of ACHIEVEMENTS) {
-    const currentState = updated[achievement.id] ?? {};
-    const state: AchievementState = { ...currentState, progress: progress[achievement.id] };
-    if (!state.unlocked_at && isComplete(achievement.id, progress)) {
-      state.unlocked_at = now;
-      newlyUnlocked.push(achievement.id);
+  for (let attempt = 1; attempt <= MAX_UNLOCK_ATTEMPTS; attempt++) {
+    const [{ data: userRow, error: userError }, { data: roasts }] = await Promise.all([
+      supabase.from("users").select("achievements").eq("id", userId).single(),
+      supabase.from("roasts").select("created_at, continuity_memory").eq("user_id", userId).order("created_at", { ascending: false }),
+    ]);
+
+    if (userError || !userRow) {
+      if (userError) console.error("[achievements] failed to read user row:", userError.message);
+      return { achievements: lastKnown, newlyUnlocked: [] };
     }
-    updated[achievement.id] = state;
+
+    const previousRaw = userRow.achievements as Record<string, unknown> | null;
+    const current = parseAchievements(previousRaw);
+    lastKnown = current;
+
+    const progress = getProgress((roasts ?? []) as RoastHistoryRow[]);
+    const updated: UserAchievements = { ...current };
+    const newlyUnlocked: AchievementId[] = [];
+
+    for (const achievement of ACHIEVEMENTS) {
+      const currentState = updated[achievement.id] ?? {};
+      const state: AchievementState = { ...currentState, progress: progress[achievement.id] };
+      if (!state.unlocked_at && isComplete(achievement.id, progress)) {
+        state.unlocked_at = now;
+        newlyUnlocked.push(achievement.id);
+      }
+      updated[achievement.id] = state;
+    }
+
+    if (achievementsEqual(updated, current)) {
+      return { achievements: current, newlyUnlocked: [] };
+    }
+
+    // Compare-and-swap: only write if `achievements` still matches what we just
+    // read, so a concurrent unlockAchievements() call (e.g. dashboard/page.tsx
+    // racing api/roast or api/check-in) can't silently overwrite the other's
+    // newly-unlocked achievement with a full-column write from a stale snapshot.
+    let query = supabase.from("users").update({ achievements: updated }).eq("id", userId);
+    query = previousRaw === null
+      ? query.is("achievements", null)
+      : query.eq("achievements", JSON.stringify(previousRaw));
+
+    const { data: writtenRows, error } = await query.select("id");
+
+    if (error) {
+      console.error("[achievements] failed to update:", error.message);
+      return { achievements: current, newlyUnlocked: [] };
+    }
+
+    if (writtenRows && writtenRows.length > 0) {
+      return { achievements: updated, newlyUnlocked };
+    }
+
+    // 0 rows matched: another call wrote `achievements` between our read and
+    // our write. Re-read fresh state and retry.
+    if (attempt < MAX_UNLOCK_ATTEMPTS) {
+      console.warn(`[achievements] CAS conflict on attempt ${attempt}/${MAX_UNLOCK_ATTEMPTS} for user ${userId}; retrying`);
+      await new Promise((resolve) => setTimeout(resolve, attempt * 25 + Math.random() * 25));
+    }
   }
 
-  console.log("[achievements][diagnostic] about to write:", JSON.stringify(updated));
-  const { error } = await supabase.from("users").update({ achievements: updated }).eq("id", userId).select();
-  if (error) console.error("[achievements] failed to update:", error.message);
-  return { achievements: updated, newlyUnlocked };
+  console.error(`[achievements] exhausted ${MAX_UNLOCK_ATTEMPTS} attempts for user ${userId}; giving up without persisting this call's changes`);
+  return { achievements: lastKnown, newlyUnlocked: [] };
 }

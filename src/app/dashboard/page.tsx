@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { DashboardView, type DashboardRoast, type ScoreHistoryEntry } from "@/components/dashboard-view";
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -7,6 +8,7 @@ import { UpgradeBanner } from "@/components/upgrade-banner";
 import { parseAchievements, unlockAchievements } from "@/lib/achievements";
 import { getDisplayName } from "@/lib/display-name";
 import { parseCategoryScores } from "@/lib/parse-category-scores";
+import { PENDING_ACHIEVEMENT_COOKIE, decodePendingAchievements } from "@/lib/pending-achievement-cookie";
 import { calculateStreak } from "@/lib/streak";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -44,6 +46,15 @@ export default async function DashboardPage() {
     newlyUnlockedAchievements = (await unlockAchievements(supabase, user.id)).newlyUnlocked;
   } catch (error) {
     console.error("[dashboard] achievement evaluation failed:", error);
+  }
+
+  // Achievements unlocked during the roast/check-in that redirected here were already
+  // consumed by that API call, so unlockAchievements() above won't report them again —
+  // pick them up from the handoff cookie instead (cleared in middleware after this read).
+  const cookieStore = await cookies();
+  const pendingAchievements = decodePendingAchievements(cookieStore.get(PENDING_ACHIEVEMENT_COOKIE)?.value);
+  if (pendingAchievements.length > 0) {
+    newlyUnlockedAchievements = Array.from(new Set([...newlyUnlockedAchievements, ...pendingAchievements]));
   }
 
   const { data: userData, error: userDataError } = await supabase

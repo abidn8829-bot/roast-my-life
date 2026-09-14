@@ -1,8 +1,10 @@
 import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
-import { unlockAchievements } from "@/lib/achievements";
+import { sendAchievementPush } from "@/lib/achievement-push";
+import { unlockAchievements, type AchievementId } from "@/lib/achievements";
 import { buildReportCard, calculateCategoryScores, calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
+import { PENDING_ACHIEVEMENT_COOKIE, encodePendingAchievements } from "@/lib/pending-achievement-cookie";
 import type { OnboardingAnswers, RoastTone, RoastMode, RoastPersona } from "@/lib/roast-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
@@ -605,33 +607,40 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     const currentStreak = userData?.current_streak ?? 0;
     const longestStreak = userData?.longest_streak ?? 0;
 
-    // Get the last roast date
+    // Get the last roast date, excluding the one just inserted above.
     const { data: lastRoast } = await supabase
       .from("roasts")
       .select("created_at")
       .eq("user_id", user.id)
+      .neq("id", data?.id ?? "")
       .order("created_at", { ascending: false })
-      .limit(2)
+      .limit(1)
       .maybeSingle();
 
     let newStreak = 1;
     let streakReset = false;
 
     if (lastRoast && lastRoast.created_at) {
-      const lastDate = new Date(lastRoast.created_at);
-      const today = new Date();
-      const diffDays = Math.floor((today.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+      // Calendar-date-key comparison, matching lib/streak.ts's calculateStreak() exactly
+      // (toDateKey/previousDay), so the write path here and the display path agree —
+      // a raw hours-elapsed diff would disagree with it across a midnight boundary.
+      const toDateKey = (iso: string) => new Date(iso).toISOString().split("T")[0]!;
+      const lastDateKey = toDateKey(lastRoast.created_at);
+      const todayKey = toDateKey(new Date().toISOString());
+      const yesterday = new Date(`${todayKey}T12:00:00`);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayKey = yesterday.toISOString().split("T")[0]!;
 
-      if (diffDays === 1) {
-        // Consecutive day
+      if (lastDateKey === todayKey) {
+        // Same calendar day, don't increment
+        newStreak = currentStreak;
+      } else if (lastDateKey === yesterdayKey) {
+        // Consecutive calendar day
         newStreak = currentStreak + 1;
-      } else if (diffDays > 1) {
-        // Streak reset
+      } else {
+        // Gap of 2+ calendar days
         newStreak = 1;
         streakReset = true;
-      } else {
-        // Same day, don't increment
-        newStreak = currentStreak;
       }
     }
 
@@ -650,12 +659,17 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     console.error("[api/roast] Failed to update streak:", err);
   }
 
-  let newlyUnlockedAchievements: string[] = [];
+  let newlyUnlockedAchievements: AchievementId[] = [];
   try {
     const achievementResult = await unlockAchievements(supabase, user.id);
     newlyUnlockedAchievements = achievementResult.newlyUnlocked;
   } catch (err) {
     console.error("[api/roast] Failed to unlock achievements:", err);
+  }
+  try {
+    await sendAchievementPush(supabase, user.id, newlyUnlockedAchievements);
+  } catch (err) {
+    console.error("[api/roast] Failed to send achievement push:", err);
   }
 
   const roastId = data?.id ? String(data.id) : "";
@@ -667,5 +681,14 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     );
   }
 
-  return NextResponse.json({ id: roastId, shareSlug: share_slug, newlyUnlockedAchievements });
+  const response = NextResponse.json({ id: roastId, shareSlug: share_slug, newlyUnlockedAchievements });
+  if (newlyUnlockedAchievements.length > 0) {
+    response.cookies.set(PENDING_ACHIEVEMENT_COOKIE, encodePendingAchievements(newlyUnlockedAchievements), {
+      path: "/",
+      maxAge: 60 * 10,
+      httpOnly: true,
+      sameSite: "lax",
+    });
+  }
+  return response;
 }

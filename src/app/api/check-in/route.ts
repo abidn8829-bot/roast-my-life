@@ -1,8 +1,10 @@
 import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
-import { unlockAchievements } from "@/lib/achievements";
+import { sendAchievementPush } from "@/lib/achievement-push";
+import { unlockAchievements, type AchievementId } from "@/lib/achievements";
 import { calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
+import { PENDING_ACHIEVEMENT_COOKIE, encodePendingAchievements } from "@/lib/pending-achievement-cookie";
 import type { CategoryScores, Grade, OnboardingAnswers, RoastMode, RoastPersona, RoastTone } from "@/lib/roast-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
@@ -224,11 +226,25 @@ export async function POST(request: Request) {
   if (roastError || !created) return NextResponse.json({ error: "Failed to save check-in roast" }, { status: 500 });
   const { error: historyError } = await supabase.from("score_history").insert({ user_id: user.id, roast_id: created.id, life_score: lifeScore, category_grades: updatedCategoryScores });
   if (historyError) { console.error("[api/check-in] score history insert failed:", historyError.message); return NextResponse.json({ error: "Check-in saved, but score history could not be updated" }, { status: 500 }); }
-  let newlyUnlockedAchievements: string[] = [];
+  let newlyUnlockedAchievements: AchievementId[] = [];
   try {
     newlyUnlockedAchievements = (await unlockAchievements(supabase, user.id)).newlyUnlocked;
   } catch (error) {
     console.error("[api/check-in] achievement unlock failed:", error);
   }
-  return NextResponse.json({ id: created.id, direction: result.direction, newlyUnlockedAchievements });
+  try {
+    await sendAchievementPush(supabase, user.id, newlyUnlockedAchievements);
+  } catch (error) {
+    console.error("[api/check-in] achievement push failed:", error);
+  }
+  const response = NextResponse.json({ id: created.id, direction: result.direction, newlyUnlockedAchievements });
+  if (newlyUnlockedAchievements.length > 0) {
+    response.cookies.set(PENDING_ACHIEVEMENT_COOKIE, encodePendingAchievements(newlyUnlockedAchievements), {
+      path: "/",
+      maxAge: 60 * 10,
+      httpOnly: true,
+      sameSite: "lax",
+    });
+  }
+  return response;
 }
