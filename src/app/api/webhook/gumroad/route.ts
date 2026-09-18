@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 // Gumroad's Ping notifications are NOT signed — there is no HMAC/signature header
 // like Stripe or GitHub webhooks send. Gumroad also posts as
@@ -52,18 +52,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No email in payload" }, { status: 400 });
     }
 
-    const supabase = await createSupabaseServerClient();
+    // Service-role client: Gumroad's POST arrives with no cookies/session, so
+    // the old cookie-bound anon client ran this update as an unauthenticated
+    // request. RLS silently matched zero rows (no error), which is why past
+    // webhook calls logged 200 in Vercel while subscription_tier never
+    // actually changed in Supabase. This bypasses RLS for this one trusted,
+    // already-token-verified job, matching how the cron routes use it.
+    const supabase = createSupabaseServiceClient();
 
-    // Update user's subscription tier to pro
-    const { error } = await supabase
+    // Update user's subscription tier to pro. Match case-insensitively since
+    // Gumroad's checkout email and the signup email can differ only in case.
+    // .select() forces back the matched rows so a zero-row match (wrong/
+    // mismatched email) is caught here instead of failing silently.
+    const { data: updated, error } = await supabase
       .from("users")
       .update({ subscription_tier: "pro" })
-      .eq("email", email);
+      .ilike("email", email)
+      .select("id, email");
 
     if (error) {
       console.error("[gumroad webhook] Failed to update user:", error);
       return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
     }
+
+    if (!updated || updated.length === 0) {
+      console.error(
+        "[gumroad webhook] No user matched this email, tier NOT updated:",
+        email,
+      );
+      return NextResponse.json(
+        { error: "No matching user for this email" },
+        { status: 404 },
+      );
+    }
+
+    console.log("[gumroad webhook] Upgraded to pro:", updated[0].id, updated[0].email);
 
     return NextResponse.json({ success: true });
   } catch (error) {
