@@ -123,7 +123,7 @@ export default async function DashboardPage() {
   const name = getDisplayName(user);
 
   return (
-    <main className="min-h-screen bg-[#0A0A0A] px-4 py-10 text-[#FAFAFA]">
+    <main className="min-h-screen bg-bg px-4 py-10 text-text">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
         <DashboardHeader isPro={subscriptionTier === "pro"} name={name} />
         <PushPermissionPrompt />

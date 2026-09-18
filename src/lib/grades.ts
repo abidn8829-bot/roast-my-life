@@ -53,39 +53,86 @@ export function buildReportCard(answers: OnboardingAnswers): ReportCard {
 export function gradeColor(grade: Grade): string {
   switch (grade) {
     case "A":
+      return "border-grade-a/40 bg-grade-a/10 text-grade-a";
     case "B":
-      return "border-emerald-600/70 bg-emerald-950/60 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.15)]";
+      return "border-grade-b/40 bg-grade-b/10 text-grade-b";
     case "C":
-      return "border-amber-600/70 bg-amber-950/60 text-amber-300 shadow-[0_0_20px_rgba(245,158,11,0.12)]";
+      return "border-grade-c/40 bg-grade-c/10 text-grade-c";
     case "D":
-      return "border-orange-600/70 bg-orange-950/60 text-orange-300 shadow-[0_0_20px_rgba(249,115,22,0.12)]";
+      return "border-grade-d/40 bg-grade-d/10 text-grade-d";
     case "F":
-      return "border-red-600/70 bg-red-950/60 text-red-300 shadow-[0_0_24px_rgba(239,68,68,0.2)]";
+      return "border-grade-f/40 bg-grade-f/10 text-grade-f";
   }
 }
 
 export function gradeOgColor(grade: Grade | undefined): string {
   switch (grade) {
     case "A":
+      return "#3ddc84";
     case "B":
-      return "#34d399";
+      return "#8bd450";
     case "C":
-      return "#fbbf24";
+      return "#f2c94c";
     case "D":
-      return "#fb923c";
+      return "#f2994a";
     case "F":
-      return "#f87171";
+      return "#eb5757";
     default:
-      return "#f87171";
+      return "#eb5757";
   }
 }
 
-function scoreToGrade(score: number): Grade {
+export function scoreToGrade(score: number): Grade {
   if (score >= 90) return "A";
   if (score >= 75) return "B";
   if (score >= 60) return "C";
   if (score >= 40) return "D";
   return "F";
+}
+
+export function scoreTextColor(score: number): string {
+  switch (scoreToGrade(score)) {
+    case "A":
+      return "text-grade-a";
+    case "B":
+      return "text-grade-b";
+    case "C":
+      return "text-grade-c";
+    case "D":
+      return "text-grade-d";
+    case "F":
+      return "text-grade-f";
+  }
+}
+
+export function scoreGlowBg(score: number): string {
+  switch (scoreToGrade(score)) {
+    case "A":
+      return "bg-grade-a/20";
+    case "B":
+      return "bg-grade-b/20";
+    case "C":
+      return "bg-grade-c/20";
+    case "D":
+      return "bg-grade-d/20";
+    case "F":
+      return "bg-grade-f/20";
+  }
+}
+
+export function scoreGlow(score: number): string {
+  switch (scoreToGrade(score)) {
+    case "A":
+      return "shadow-[0_0_50px_rgba(61,220,132,0.18)]";
+    case "B":
+      return "shadow-[0_0_50px_rgba(139,212,80,0.18)]";
+    case "C":
+      return "shadow-[0_0_50px_rgba(242,201,76,0.18)]";
+    case "D":
+      return "shadow-[0_0_50px_rgba(242,153,74,0.18)]";
+    case "F":
+      return "shadow-[0_0_50px_rgba(235,87,87,0.2)]";
+  }
 }
 
 export function calculateLifeScore(answers: OnboardingAnswers): number;

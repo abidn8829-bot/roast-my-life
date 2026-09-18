@@ -103,16 +103,16 @@ export function PushPermissionPrompt() {
   if (!visible) return null;
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-neutral-800 bg-[#141414] px-4 py-3">
-      <p className="text-sm text-neutral-200">Want Ember to roast you when you forget to check in?</p>
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+      <p className="text-sm text-text-muted">Want Ember to roast you when you forget to check in?</p>
       <div className="flex shrink-0 gap-2">
-        <button onClick={dismiss} className="rounded-md px-3 py-1.5 text-sm text-neutral-400 hover:text-neutral-200">
+        <button onClick={dismiss} className="rounded-xl px-3 py-1.5 text-sm text-text-faint hover:text-text-muted">
           No
         </button>
         <button
           onClick={() => void enable()}
           disabled={busy}
-          className="rounded-md bg-[#FF3D00] px-3 py-1.5 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-50"
+          className="rounded-xl bg-ember px-3 py-1.5 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-50"
         >
           {busy ? "..." : "Turn on"}
         </button>

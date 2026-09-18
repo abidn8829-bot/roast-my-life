@@ -1,21 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #fafafa;
+  --bg: #0a0a0b;
+  --surface: #141416;
+  --surface-2: #1c1c1f;
+  --surface-3: #232326;
+  --ember: #ff5a36;
+  --ember-soft: rgba(255, 90, 54, 0.14);
+  --text: #f5f3f0;
+  --text-muted: #98979c;
+  --text-faint: #5f5f66;
+  --border: #28282c;
+  --grade-a: #3ddc84;
+  --grade-b: #8bd450;
+  --grade-c: #f2c94c;
+  --grade-d: #f2994a;
+  --grade-f: #eb5757;
+
+  /* legacy aliases kept for anything not yet migrated */
+  --background: var(--bg);
+  --foreground: var(--text);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ember: var(--ember);
+  --color-ember-soft: var(--ember-soft);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+  --color-border: var(--border);
+  --color-grade-a: var(--grade-a);
+  --color-grade-b: var(--grade-b);
+  --color-grade-c: var(--grade-c);
+  --color-grade-d: var(--grade-d);
+  --color-grade-f: var(--grade-f);
+  --font-sans: var(--font-poppins);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-poppins), Arial, Helvetica, sans-serif;
 }
 
 @keyframes achievement-pop-in {
@@ -41,10 +73,10 @@ body {
 @keyframes achievement-glow-pulse {
   0%,
   100% {
-    box-shadow: 0 0 12px rgba(255, 61, 0, 0.4);
+    box-shadow: 0 0 10px rgba(255, 90, 54, 0.3);
   }
   50% {
-    box-shadow: 0 0 34px rgba(255, 61, 0, 0.95);
+    box-shadow: 0 0 26px rgba(255, 90, 54, 0.7);
   }
 }
 

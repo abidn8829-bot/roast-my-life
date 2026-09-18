@@ -44,14 +44,14 @@ export function ProWaitlistModal({ isOpen, onClose }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-neutral-800 bg-[#141414] p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6">
         <div className="mb-6 text-center">
           <span className="text-5xl">🔥</span>
-          <h2 className="mt-4 text-2xl font-bold text-[#FAFAFA]">
+          <h2 className="mt-4 text-2xl font-bold text-text">
             Join Pro Waitlist
           </h2>
-          <p className="mt-2 text-sm text-neutral-400">
+          <p className="mt-2 text-sm text-text-muted">
             Be the first to know when Pro launches with unlimited roasts, custom personas, and more!
           </p>
         </div>
@@ -65,21 +65,21 @@ export function ProWaitlistModal({ isOpen, onClose }: Props) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
                 required
-                className="w-full rounded-lg border border-neutral-700 bg-[#0A0A0A] px-4 py-3 text-sm text-[#FAFAFA] placeholder:text-neutral-500 focus:border-[#FF3D00] focus:outline-none"
+                className="w-full rounded-xl border border-border bg-bg px-4 py-3 text-sm text-text placeholder:text-text-faint focus:border-ember focus:outline-none"
               />
             </div>
             <div className="flex gap-3">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 rounded-lg border border-neutral-700 px-4 py-3 text-sm font-medium text-neutral-300 transition hover:border-neutral-500"
+                className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-medium text-text-muted transition hover:border-text-faint"
               >
                 Maybe Later
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 rounded-lg bg-[#FF3D00] px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
+                className="flex-1 rounded-xl bg-ember px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
               >
                 {loading ? "Joining..." : "Join Waitlist 🔥"}
               </button>
@@ -87,10 +87,10 @@ export function ProWaitlistModal({ isOpen, onClose }: Props) {
           </form>
         ) : (
           <div className="text-center">
-            <p className="text-sm font-medium text-[#34d399]">{message}</p>
+            <p className="text-sm font-medium text-grade-a">{message}</p>
             <button
               onClick={onClose}
-              className="mt-4 rounded-lg border border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-300 transition hover:border-neutral-500"
+              className="mt-4 rounded-xl border border-border px-4 py-2 text-sm font-medium text-text-muted transition hover:border-text-faint"
             >
               Close
             </button>

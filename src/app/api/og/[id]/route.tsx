@@ -6,23 +6,26 @@ export const runtime = "nodejs";
 function getGradeColor(grade: string): string {
   switch (grade) {
     case "A":
+      return "#3ddc84";
     case "B":
-      return "#34d399";
+      return "#8bd450";
     case "C":
-      return "#fbbf24";
+      return "#f2c94c";
     case "D":
-      return "#fb923c";
+      return "#f2994a";
     case "F":
-      return "#f87171";
+      return "#eb5757";
     default:
-      return "#f87171";
+      return "#eb5757";
   }
 }
 
 function getScoreColor(score: number): string {
-  if (score <= 40) return "#ef4444";
-  if (score <= 70) return "#f59e0b";
-  return "#10b981";
+  if (score >= 90) return "#3ddc84";
+  if (score >= 75) return "#8bd450";
+  if (score >= 60) return "#f2c94c";
+  if (score >= 40) return "#f2994a";
+  return "#eb5757";
 }
 
 export async function GET(
@@ -105,7 +108,7 @@ export async function GET(
             height: "100%",
             display: "flex",
             flexDirection: "column",
-            background: "#0A0A0A",
+            background: "#0a0a0b",
             padding: 60,
             fontFamily: "system-ui, sans-serif",
           }}
@@ -124,7 +127,7 @@ export async function GET(
                 fontSize: 32,
                 fontWeight: 600,
                 letterSpacing: 4,
-                color: "#666",
+                color: "#5f5f66",
                 marginBottom: 10,
               }}
             >
@@ -140,7 +143,7 @@ export async function GET(
               }}
             >
               {lifeScore}
-              <span style={{ fontSize: 80, color: "#666" }}>/100</span>
+              <span style={{ fontSize: 80, color: "#5f5f66" }}>/100</span>
             </span>
           </div>
 
@@ -156,7 +159,7 @@ export async function GET(
               style={{
                 fontSize: 48,
                 fontWeight: 700,
-                color: "#FAFAFA",
+                color: "#f5f3f0",
                 textAlign: "center",
               }}
             >
@@ -180,18 +183,18 @@ export async function GET(
                 alignItems: "center",
                 padding: 30,
                 borderRadius: 20,
-                background: "#141414",
-                border: "2px solid #262626",
+                background: "#141416",
+                border: "2px solid #28282c",
               }}
             >
-              <span style={{ fontSize: 20, color: "#666", marginBottom: 10 }}>
+              <span style={{ fontSize: 20, color: "#5f5f66", marginBottom: 10 }}>
                 WORST
               </span>
               <span
                 style={{
                   fontSize: 36,
                   fontWeight: 700,
-                  color: "#FAFAFA",
+                  color: "#f5f3f0",
                   marginBottom: 10,
                 }}
               >
@@ -216,18 +219,18 @@ export async function GET(
                 alignItems: "center",
                 padding: 30,
                 borderRadius: 20,
-                background: "#141414",
-                border: "2px solid #262626",
+                background: "#141416",
+                border: "2px solid #28282c",
               }}
             >
-              <span style={{ fontSize: 20, color: "#666", marginBottom: 10 }}>
+              <span style={{ fontSize: 20, color: "#5f5f66", marginBottom: 10 }}>
                 BEST
               </span>
               <span
                 style={{
                   fontSize: 36,
                   fontWeight: 700,
-                  color: "#FAFAFA",
+                  color: "#f5f3f0",
                   marginBottom: 10,
                 }}
               >
@@ -252,8 +255,8 @@ export async function GET(
               justifyContent: "center",
               padding: 30,
               borderRadius: 20,
-              background: "#141414",
-              border: "2px solid #FF3D00",
+              background: "#141416",
+              border: "2px solid #ff5a36",
               marginBottom: 50,
             }}
           >
@@ -261,7 +264,7 @@ export async function GET(
               style={{
                 fontSize: 32,
                 fontWeight: 600,
-                color: "#FAFAFA",
+                color: "#f5f3f0",
                 lineHeight: 1.4,
               }}
             >
@@ -282,7 +285,7 @@ export async function GET(
                 fontSize: 36,
                 fontWeight: 800,
                 letterSpacing: 4,
-                color: "#FF3D00",
+                color: "#ff5a36",
               }}
             >
               EMBER

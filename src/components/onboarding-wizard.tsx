@@ -81,10 +81,10 @@ const PRO_QUESTIONS = [
 type Step = number | "tone" | "loading" | "followup" | "checkin";
 
 const inputClass =
-  "w-full rounded-xl border-2 border-neutral-800 bg-[#141414] px-5 py-4 text-xl text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2 transition-all";
+  "w-full rounded-xl border-2 border-border bg-surface px-5 py-4 text-xl text-text outline-none ring-ember focus:ring-2 transition-all";
 
 const labelClass =
-  "text-2xl sm:text-3xl font-bold leading-relaxed text-[#FAFAFA] break-words whitespace-normal text-center";
+  "text-2xl sm:text-3xl font-bold leading-relaxed text-text break-words whitespace-normal text-center";
 
 export function OnboardingWizard() {
   const router = useRouter();
@@ -361,8 +361,8 @@ export function OnboardingWizard() {
   if (isCheckingReturning) {
     return (
       <div className="w-full max-w-md text-center">
-        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[#FF3D00] border-t-transparent" />
-        <p className="text-lg text-[#FAFAFA] animate-pulse">
+        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-ember border-t-transparent" />
+        <p className="text-lg text-text animate-pulse">
           Checking your profile...
         </p>
       </div>
@@ -374,19 +374,19 @@ export function OnboardingWizard() {
       <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-2xl text-center">
           <div className="text-9xl mb-8">🔥</div>
-          <h2 className="text-3xl sm:text-4xl font-bold text-[#FAFAFA] mb-4">
+          <h2 className="text-3xl sm:text-4xl font-bold text-text mb-4">
             Today&apos;s Check-in
           </h2>
           {isGeneratingFollowUp ? (
             <div className="w-full max-w-md text-center">
-              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[#FF3D00] border-t-transparent" />
-              <p className="text-lg text-[#FAFAFA] animate-pulse">
+              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-ember border-t-transparent" />
+              <p className="text-lg text-text animate-pulse">
                 Loading your question...
               </p>
             </div>
           ) : (
             <>
-              <p className="text-xl text-neutral-300 mb-8">
+              <p className="text-xl text-text-muted mb-8">
                 {followUpQuestion || "How did your habits go yesterday?"}
               </p>
               <div className="mb-5 grid gap-3">
@@ -399,7 +399,7 @@ export function OnboardingWizard() {
                     key={label}
                     type="button"
                     onClick={() => { setFollowUpAnswer(label); setIsCustomCheckIn(false); }}
-                    className={`rounded-xl border px-5 py-4 text-left text-lg transition ${followUpAnswer === label && !isCustomCheckIn ? "border-[#FF3D00] bg-[#FF3D00]/10 text-[#FAFAFA]" : "border-neutral-800 bg-[#141414] text-neutral-300 hover:border-neutral-600"}`}
+                    className={`rounded-xl border px-5 py-4 text-left text-lg transition ${followUpAnswer === label && !isCustomCheckIn ? "border-ember bg-ember-soft text-text" : "border-border bg-surface text-text-muted hover:border-text-faint"}`}
                   >
                     <span className="mr-3">{emoji}</span>{label}
                   </button>
@@ -407,7 +407,7 @@ export function OnboardingWizard() {
                 <button
                   type="button"
                   onClick={() => { setIsCustomCheckIn(true); setFollowUpAnswer(""); }}
-                  className={`rounded-xl border px-5 py-4 text-left text-lg transition ${isCustomCheckIn ? "border-[#FF3D00] bg-[#FF3D00]/10 text-[#FAFAFA]" : "border-neutral-800 bg-[#141414] text-neutral-300 hover:border-neutral-600"}`}
+                  className={`rounded-xl border px-5 py-4 text-left text-lg transition ${isCustomCheckIn ? "border-ember bg-ember-soft text-text" : "border-border bg-surface text-text-muted hover:border-text-faint"}`}
                 >
                   <span className="mr-3">✍️</span>Custom answer
                 </button>
@@ -430,11 +430,11 @@ export function OnboardingWizard() {
               <button
                 onClick={() => void onCheckInSubmit()}
                 disabled={!followUpAnswer.trim() || isGenerating}
-                className="w-full rounded-xl bg-[#FF3D00] px-8 py-4 text-xl font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Continue →
               </button>
-              {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
+              {error ? <p className="mt-4 text-sm text-grade-f">{error}</p> : null}
             </>
           )}
         </div>
@@ -447,10 +447,10 @@ export function OnboardingWizard() {
       <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-2xl text-center">
           <div className="text-9xl mb-8">🔥</div>
-          <h2 className="text-3xl sm:text-4xl font-bold text-[#FAFAFA] mb-6">
+          <h2 className="text-3xl sm:text-4xl font-bold text-text mb-6">
             One more thing...
           </h2>
-          <p className="text-xl text-neutral-300 mb-8">
+          <p className="text-xl text-text-muted mb-8">
             {followUpQuestion}
           </p>
           <textarea
@@ -469,7 +469,7 @@ export function OnboardingWizard() {
           <button
             onClick={onFollowUpSubmit}
             disabled={!followUpAnswer.trim()}
-            className="w-full rounded-xl bg-[#FF3D00] px-8 py-4 text-xl font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Get Roasted →
           </button>
@@ -481,11 +481,11 @@ export function OnboardingWizard() {
   if (step === "loading") {
     return (
       <div className="w-full max-w-md text-center">
-        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[#FF3D00] border-t-transparent" />
-        <p className="text-lg text-[#FAFAFA] animate-pulse">
+        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-ember border-t-transparent" />
+        <p className="text-lg text-text animate-pulse">
           {LOADING_MESSAGES[loadingMsgIndex]}
         </p>
-        {error ? <p className="mt-4 text-sm text-red-300">{error}</p> : null}
+        {error ? <p className="mt-4 text-sm text-grade-f">{error}</p> : null}
       </div>
     );
   }
@@ -518,7 +518,7 @@ export function OnboardingWizard() {
             <span
               key={i}
               className={`h-2 w-8 rounded-full transition-all ${
-                i === slideIndex ? "bg-[#FF3D00] scale-110" : i < slideIndex ? "bg-[#FF3D00]/50" : "bg-neutral-800"
+                i === slideIndex ? "bg-ember scale-110" : i < slideIndex ? "bg-ember/50" : "bg-surface-3"
               }`}
             />
           ))}
@@ -564,7 +564,7 @@ export function OnboardingWizard() {
           </label>
         </div>
 
-        {error ? <p className="mt-4 text-center text-sm text-red-300">{error}</p> : null}
+        {error ? <p className="mt-4 text-center text-sm text-grade-f">{error}</p> : null}
 
         {/* Navigation buttons */}
         <div className="mt-12 flex justify-center gap-4">
@@ -572,7 +572,7 @@ export function OnboardingWizard() {
             <button
               type="button"
               onClick={onBack}
-              className="rounded-xl border border-neutral-700 px-8 py-4 text-lg font-medium text-neutral-300 transition hover:border-neutral-500 hover:bg-neutral-900"
+              className="rounded-xl border border-border px-8 py-4 text-lg font-medium text-text-muted transition hover:border-text-faint hover:bg-surface"
             >
               ← Back
             </button>
@@ -582,7 +582,7 @@ export function OnboardingWizard() {
           <button
             type="button"
             onClick={onNext}
-            className="rounded-xl bg-[#FF3D00] px-8 py-4 text-lg font-medium text-white transition hover:brightness-110 hover:scale-105"
+            className="rounded-xl bg-ember px-8 py-4 text-lg font-medium text-white transition hover:brightness-110 hover:scale-105"
           >
             {slideIndex === allQuestions.length - 1 ? "Choose Tone →" : "Next →"}
           </button>

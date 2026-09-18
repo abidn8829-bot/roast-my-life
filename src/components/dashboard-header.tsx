@@ -17,18 +17,18 @@ export function DashboardHeader({ isPro, name }: Props) {
     <>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/" className="text-sm font-semibold text-[#FF3D00]">
+          <Link href="/" className="text-sm font-bold text-ember">
             Ember
           </Link>
           <div className="flex items-center gap-2">
             {isPro ? (
-              <span className="flex items-center gap-1 rounded-full bg-[#FF3D00]/20 px-3 py-1 text-xs font-bold text-[#FF3D00]">
+              <span className="flex items-center gap-1 rounded-full bg-ember-soft px-3 py-1 text-xs font-bold text-ember">
                 🔥 PRO
               </span>
             ) : (
               <button
                 onClick={() => setShowProWaitlistModal(true)}
-                className="text-xs text-neutral-500 hover:text-[#FF3D00] transition"
+                className="text-xs text-text-muted hover:text-ember transition"
               >
                 Free Plan — Join Pro Waitlist 🔥
               </button>
@@ -36,7 +36,7 @@ export function DashboardHeader({ isPro, name }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <Link href="/pricing" className="text-sm text-neutral-400 hover:text-[#FAFAFA] transition">
+          <Link href="/pricing" className="text-sm text-text-muted hover:text-text transition">
             Pricing
           </Link>
           <LogoutButton />

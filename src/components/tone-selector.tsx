@@ -47,10 +47,10 @@ export function ToneSelector({ onSelect, isPro, onUpgradeRequest }: Props) {
 
   return (
     <div className="w-full max-w-md">
-      <h2 className="mb-2 text-xl font-bold text-[#FAFAFA]">Choose your roast intensity</h2>
-      <p className="mb-6 text-sm text-neutral-400">
-        {isPro 
-          ? "Select how brutal you want your roast to be" 
+      <h2 className="mb-2 text-xl font-bold text-text">Choose your roast intensity</h2>
+      <p className="mb-6 text-sm text-text-muted">
+        {isPro
+          ? "Select how brutal you want your roast to be"
           : "Normal tone is available for free users. Upgrade to Pro for more intensity!"}
       </p>
 
@@ -63,26 +63,26 @@ export function ToneSelector({ onSelect, isPro, onUpgradeRequest }: Props) {
             disabled={!isPro && tone.proOnly}
             className={`relative rounded-2xl border-2 p-6 text-left transition-all ${
               selected === tone.key
-                ? "border-[#FF3D00] bg-[#FF3D00]/10"
-                : "border-neutral-800 bg-[#141414] hover:border-neutral-700"
+                ? "border-ember bg-ember-soft"
+                : "border-border bg-surface hover:border-text-faint"
             } ${!isPro && tone.proOnly ? "opacity-60" : ""}`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <span className="text-4xl">{tone.emoji}</span>
                 <div>
-                  <p className="text-lg font-bold text-[#FAFAFA]">{tone.label}</p>
-                  <p className="text-sm text-neutral-400">{tone.description}</p>
+                  <p className="text-lg font-bold text-text">{tone.label}</p>
+                  <p className="text-sm text-text-muted">{tone.description}</p>
                 </div>
               </div>
               {tone.proOnly && !isPro && (
                 <div className="flex flex-col items-center gap-1">
                   <span className="text-2xl">🔒</span>
-                  <span className="text-xs font-semibold text-[#FF3D00]">Pro only</span>
+                  <span className="text-xs font-semibold text-ember">Pro only</span>
                 </div>
               )}
               {selected === tone.key && (
-                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-2xl text-[#FF3D00]">
+                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-2xl text-ember">
                   ✓
                 </span>
               )}
@@ -92,7 +92,7 @@ export function ToneSelector({ onSelect, isPro, onUpgradeRequest }: Props) {
       </div>
 
       {!isPro && (
-        <p className="mt-6 text-center text-sm text-neutral-500">
+        <p className="mt-6 text-center text-sm text-text-faint">
           Upgrade to Pro to unlock No Mercy and Destroy Me tones 🔥
         </p>
       )}

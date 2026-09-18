@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ShareButtons } from "@/components/share-buttons";
-import { gradeColor } from "@/lib/grades";
+import { gradeColor, scoreGlowBg, scoreTextColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
 import type { CategoryScores, Grade, OnboardingAnswers, ReportCard, RoastMode, RoastPersona } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -74,19 +74,6 @@ export function RoastView({
       cancelled = true;
     };
   }, [roastId]);
-
-  // Get color based on life score
-  const getScoreColor = (score: number) => {
-    if (score <= 40) return "text-red-500";
-    if (score <= 70) return "text-amber-500";
-    return "text-emerald-500";
-  };
-
-  const getScoreBgColor = (score: number) => {
-    if (score <= 40) return "from-red-500/20 to-red-500/5";
-    if (score <= 70) return "from-amber-500/20 to-amber-500/5";
-    return "from-emerald-500/20 to-emerald-500/5";
-  };
 
   async function onReaction(emoji: ReactionEmoji) {
     if (!canReact || savingReaction) return;
@@ -177,25 +164,23 @@ export function RoastView({
     <div className="flex w-full max-w-2xl flex-col gap-8 pb-12">
       {/* Life Score Section */}
       <div className="relative flex flex-col items-center gap-4 text-center">
-        <div
-          className={`absolute inset-0 -z-10 rounded-full blur-3xl opacity-30 bg-gradient-to-b ${getScoreBgColor(lifeScore)}`}
-        />
-        <p className="text-xs font-semibold tracking-[0.35em] text-neutral-500 uppercase">
+        <div className={`absolute inset-0 -z-10 rounded-full opacity-70 blur-3xl ${scoreGlowBg(lifeScore)}`} />
+        <p className="text-xs font-semibold tracking-[0.35em] text-text-faint uppercase">
           Your Life Score
         </p>
-        <div className={`text-8xl font-black tracking-tighter ${getScoreColor(lifeScore)}`}>
+        <div className={`text-8xl font-black tabular-nums tracking-tighter ${scoreTextColor(lifeScore)}`}>
           {lifeScore}
-          <span className="text-4xl text-neutral-500">/100</span>
+          <span className="text-4xl text-text-faint">/100</span>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight text-[#FAFAFA] sm:text-4xl">
+        <h1 className="text-3xl font-bold tracking-tight text-text sm:text-4xl">
           {funnyTitle}
         </h1>
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-text-faint">
           Week {weekCount} of facing reality
         </p>
         {currentStreak > 0 && (
-          <div className="mt-2 rounded-full border border-[#FF3D00] bg-[#FF3D00]/10 px-4 py-2">
-            <p className="text-sm font-semibold text-[#FF3D00]">
+          <div className="mt-2 rounded-full border border-ember/50 bg-ember-soft px-4 py-2">
+            <p className="text-sm font-semibold text-ember">
               {getStreakMessage(currentStreak)}
             </p>
           </div>
@@ -204,11 +189,11 @@ export function RoastView({
 
       {/* Full Roast */}
       <section className="flex flex-col gap-4">
-        <p className="text-center text-sm font-semibold uppercase tracking-widest text-neutral-500">
+        <p className="text-center text-sm font-semibold uppercase tracking-widest text-text-faint">
           The Full {mode === "coach" ? "Coach Report" : "Roast"}
         </p>
-        <div className="rounded-xl border border-[#FF3D00]/40 bg-[#111111] p-6 shadow-[0_0_40px_rgba(255,61,0,0.08)]">
-          <p className="whitespace-pre-wrap text-base leading-relaxed text-[#FAFAFA]">
+        <div className="rounded-xl border border-border bg-surface-2 p-6">
+          <p className="whitespace-pre-wrap text-base leading-relaxed text-text">
             {roastText}
           </p>
         </div>
@@ -220,15 +205,15 @@ export function RoastView({
           {Object.entries(categoryScores).map(([key, data]) => (
             <div
               key={key}
-              className={`rounded-xl border border-neutral-800 bg-[#111111] p-5 transition-transform hover:scale-[1.02] ${gradeColor(data.grade)}`}
+              className={`rounded-xl border p-5 transition-transform hover:scale-[1.02] ${gradeColor(data.grade)}`}
             >
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-semibold uppercase tracking-wide text-neutral-400">
+                <span className="text-sm font-semibold uppercase tracking-wide text-text-muted">
                   {key}
                 </span>
                 <span className="text-2xl font-black">{data.grade}</span>
               </div>
-              <div className="mb-2 text-3xl font-bold text-[#FAFAFA]">
+              <div className="mb-2 text-3xl font-bold tabular-nums text-text">
                 {Math.round(data.score / 10)}/10
               </div>
             </div>
@@ -239,16 +224,16 @@ export function RoastView({
       {/* Top 5 Roasts */}
       {top5Roasts.length > 0 && (
         <section className="flex flex-col gap-4">
-          <p className="text-center text-sm font-semibold uppercase tracking-widest text-neutral-500">
+          <p className="text-center text-sm font-semibold uppercase tracking-widest text-text-faint">
             Top 5 Roasts
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {top5Roasts.map((roast, index) => (
               <div
                 key={index}
-                className="group relative rounded-xl border border-neutral-800 bg-[#111111] p-4 transition-all hover:border-[#FF3D00]/50 hover:bg-[#1a1a1a]"
+                className="group relative rounded-xl border border-border bg-surface-2 p-4 transition-all hover:border-ember/40 hover:bg-surface-3"
               >
-                <p className="text-sm text-[#FAFAFA]">{roast}</p>
+                <p className="text-sm text-text">{roast}</p>
                 <button
                   type="button"
                   onClick={() => copyToClipboard(roast, index)}
@@ -256,11 +241,11 @@ export function RoastView({
                   aria-label="Copy roast"
                 >
                   {copiedIndex === index ? (
-                    <svg className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4 text-grade-a" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : (
-                    <svg className="h-4 w-4 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4 text-text-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   )}
@@ -274,11 +259,11 @@ export function RoastView({
       {/* Improvement Suggestion */}
       {suggestionLine && suggestionLine.trim() && (
         <section className="flex flex-col gap-4">
-          <p className="text-center text-sm font-semibold uppercase tracking-widest text-neutral-500">
+          <p className="text-center text-sm font-semibold uppercase tracking-widest text-text-faint">
             Improvement Suggestion
           </p>
-          <div className="rounded-xl border border-neutral-800 bg-[#111111] p-4">
-            <p className="text-sm text-[#FAFAFA]">{suggestionLine}</p>
+          <div className="rounded-xl border border-ember/30 bg-ember-soft p-4">
+            <p className="text-sm text-text">{suggestionLine}</p>
           </div>
         </section>
       )}
@@ -286,22 +271,22 @@ export function RoastView({
       {/* Your Plan */}
       {plan && (
         <section className="flex flex-col gap-4">
-          <p className="text-center text-sm font-semibold uppercase tracking-widest text-neutral-500">
+          <p className="text-center text-sm font-semibold uppercase tracking-widest text-text-faint">
             Your Plan
           </p>
-          <div className="rounded-xl border border-neutral-800 bg-[#111111] p-5">
-            <p className="mb-4 text-base font-semibold text-[#FAFAFA]">
+          <div className="rounded-xl border border-border bg-surface-2 p-5">
+            <p className="mb-4 text-base font-semibold text-text">
               {plan.challenge}
             </p>
             <ol className="flex flex-col gap-4">
               {plan.steps.map((s, index) => (
                 <li key={index} className="flex gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#FF3D00] text-xs font-bold text-[#FF3D00]">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-ember text-xs font-bold text-ember">
                     {index + 1}
                   </span>
                   <div className="flex flex-col gap-1">
-                    <p className="text-base text-[#FAFAFA]">{s.step}</p>
-                    <p className="text-sm text-neutral-500">{s.why}</p>
+                    <p className="text-base text-text">{s.step}</p>
+                    <p className="text-sm text-text-faint">{s.why}</p>
                   </div>
                 </li>
               ))}
@@ -318,7 +303,7 @@ export function RoastView({
         <button
           type="button"
           onClick={() => copyToClipboard(top5Roasts[0], -1)}
-          className="w-full rounded-lg border border-neutral-800 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50 hover:bg-[#111111]"
+          className="w-full rounded-xl border border-border px-4 py-3 text-center text-sm font-medium text-text transition hover:border-ember/40 hover:bg-surface"
         >
           {copiedIndex === -1 ? "✓ Copied!" : `📋 Copy: "${top5Roasts[0]}"`}
         </button>
@@ -327,7 +312,7 @@ export function RoastView({
       {/* Reactions */}
       {canReact && (
         <section className="flex flex-col items-center gap-3">
-          <p className="text-sm text-neutral-400">How did that feel?</p>
+          <p className="text-sm text-text-muted">How did that feel?</p>
           <div className="flex gap-2">
             {REACTION_EMOJIS.map((emoji) => (
               <button
@@ -337,8 +322,8 @@ export function RoastView({
                 onClick={() => void onReaction(emoji)}
                 className={`flex h-12 w-12 items-center justify-center rounded-full border text-2xl transition ${
                   reaction === emoji
-                    ? "border-[#FF3D00] bg-[#FF3D00]/20 scale-110"
-                    : "border-neutral-700 bg-[#141414] hover:border-[#FF3D00]/60 hover:bg-[#1a1a1a]"
+                    ? "border-ember bg-ember-soft scale-110"
+                    : "border-border bg-surface hover:border-ember/50 hover:bg-surface-2"
                 }`}
                 aria-label={`React ${emoji}`}
               >
@@ -354,7 +339,7 @@ export function RoastView({
         type="button"
         disabled={checkingLimit}
         onClick={() => void handleRoastAgain()}
-        className="w-full rounded-lg border border-neutral-700 px-4 py-3 text-center text-sm font-medium text-[#FAFAFA] transition hover:border-[#FF3D00]/50 disabled:opacity-50"
+        className="w-full rounded-xl border border-border px-4 py-3 text-center text-sm font-medium text-text transition hover:border-ember/40 disabled:opacity-50"
       >
         {checkingLimit ? "Checking..." : "Roast me again"}
       </button>

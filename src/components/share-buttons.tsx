@@ -74,11 +74,11 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
   }
 
   const btnBase =
-    "flex h-12 w-12 items-center justify-center rounded-full border border-neutral-800 bg-[#141414] transition hover:scale-105 disabled:opacity-50";
+    "flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface transition hover:scale-105 disabled:opacity-50";
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <p className="text-xs font-medium uppercase tracking-widest text-neutral-500">
+      <p className="text-xs font-medium uppercase tracking-widest text-text-faint">
         Share the damage
       </p>
       <div className="flex flex-wrap justify-center gap-3">
@@ -97,7 +97,7 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => posthog.capture('roast_shared')}
-          className={`${btnBase} hover:border-neutral-400 hover:bg-neutral-900`}
+          className={`${btnBase} hover:border-text-faint hover:bg-surface-2`}
           aria-label="Share on X"
         >
           <XIcon />
@@ -115,13 +115,13 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           type="button"
           disabled={loading}
           onClick={() => void downloadImage()}
-          className={`${btnBase} hover:border-[#FF3D00] hover:bg-[#FF3D00]/10`}
+          className={`${btnBase} hover:border-ember hover:bg-ember-soft`}
           aria-label="Download report card"
         >
           <DownloadIcon />
         </button>
       </div>
-      {status ? <p className="text-sm text-neutral-400">{status}</p> : null}
+      {status ? <p className="text-sm text-text-muted">{status}</p> : null}
     </div>
   );
 }
@@ -137,7 +137,7 @@ function WhatsAppIcon() {
 
 function XIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="#FAFAFA" aria-hidden>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="#f5f3f0" aria-hidden>
       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
     </svg>
   );
@@ -168,7 +168,7 @@ function DownloadIcon() {
       height="22"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="#FF3D00"
+      stroke="#ff5a36"
       strokeWidth="2"
       aria-hidden
     >

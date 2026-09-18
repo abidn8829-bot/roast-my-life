@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Poppins } from "next/font/google";
 import "./globals.css";
 import { PostHogProvider } from "@/components/PostHogProvider";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const poppins = Poppins({
+  variable: "--font-poppins",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 const geistMono = Geist_Mono({
@@ -26,9 +27,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased overflow-x-hidden`}
+      className={`${poppins.variable} ${geistMono.variable} h-full antialiased overflow-x-hidden`}
     >
-      <body className="flex min-h-full flex-col bg-[#0A0A0A] text-[#FAFAFA] overflow-x-hidden">
+      <body className="flex min-h-full flex-col bg-bg text-text font-sans overflow-x-hidden">
         <PostHogProvider>{children}</PostHogProvider>
       </body>
     </html>

@@ -8,6 +8,7 @@ import { formatWeekLabel, snippet } from "@/lib/format-week";
 import type { CategoryScores } from "@/lib/roast-types";
 import { ProWaitlistModal } from "@/components/pro-waitlist-modal";
 import { playUnlockSound } from "@/lib/unlock-sound";
+import { scoreGlow, scoreTextColor } from "@/lib/grades";
 
 export type DashboardRoast = {
   id: string;
@@ -53,18 +54,6 @@ const CATEGORY_LABELS: { key: keyof CategoryScores; label: string }[] = [
   { key: "spending", label: "Spending" },
 ];
 
-function getScoreColor(score: number): string {
-  if (score <= 40) return "text-red-400";
-  if (score <= 70) return "text-amber-400";
-  return "text-emerald-400";
-}
-
-function getScoreGlow(score: number): string {
-  if (score <= 40) return "shadow-[0_0_60px_rgba(239,68,68,0.25)]";
-  if (score <= 70) return "shadow-[0_0_60px_rgba(245,158,11,0.2)]";
-  return "shadow-[0_0_60px_rgba(16,185,129,0.2)]";
-}
-
 function formatUnlockedDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
@@ -94,7 +83,7 @@ function computeCategoryDeltas(
 function ScoreTrend({ scores }: { scores: number[] }) {
   if (scores.length < 2) {
     return (
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-text-faint">
         Need at least 2 roasts to see a trend
       </p>
     );
@@ -129,10 +118,10 @@ function ScoreTrend({ scores }: { scores: number[] }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500">
+        <span className="text-xs font-semibold uppercase tracking-widest text-text-faint">
           Score trend
         </span>
-        <span className="text-xs text-neutral-400">
+        <span className="text-xs text-text-muted">
           {trend === "up" && "📈 Trending up"}
           {trend === "down" && "📉 Trending down"}
           {trend === "flat" && "➡️ Holding steady"}
@@ -145,8 +134,8 @@ function ScoreTrend({ scores }: { scores: number[] }) {
       >
         <defs>
           <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#FF3D00" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#FF3D00" stopOpacity="0" />
+            <stop offset="0%" stopColor="#ff5a36" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="#ff5a36" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path
@@ -156,19 +145,19 @@ function ScoreTrend({ scores }: { scores: number[] }) {
         <path
           d={pathD}
           fill="none"
-          stroke="#FF3D00"
+          stroke="#ff5a36"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
         {points.map((p, i) => (
           <g key={i}>
-            <circle cx={p.x} cy={p.y} r="5" fill="#0A0A0A" stroke="#FF3D00" strokeWidth="2" />
+            <circle cx={p.x} cy={p.y} r="5" fill="#1c1c1f" stroke="#ff5a36" strokeWidth="2" />
             <text
               x={p.x}
               y={p.y - 10}
               textAnchor="middle"
-              fill="#a3a3a3"
+              fill="#98979c"
               fontSize="10"
               fontWeight="600"
             >
@@ -204,17 +193,17 @@ function AchievementCelebration({
       <div
         role="status"
         onClick={onDismiss}
-        className="animate-achievement-pop-in pointer-events-auto flex max-w-sm cursor-pointer items-center gap-4 rounded-2xl border border-[#FF3D00]/50 bg-[#141414] px-6 py-5 shadow-[0_0_60px_rgba(255,61,0,0.4)]"
+        className="animate-achievement-pop-in pointer-events-auto flex max-w-sm cursor-pointer items-center gap-4 rounded-2xl border border-ember/40 bg-surface px-6 py-5 shadow-[0_0_40px_rgba(255,90,54,0.25)]"
       >
         <span className="text-5xl leading-none" aria-hidden>
           {achievement.emoji}
         </span>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-[#FF3D00]">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-ember">
             Achievement unlocked
           </p>
-          <p className="mt-1 text-base font-bold text-[#FAFAFA]">{achievement.title}</p>
-          <p className="mt-0.5 text-xs text-neutral-400">{achievement.description}</p>
+          <p className="mt-1 text-base font-bold text-text">{achievement.title}</p>
+          <p className="mt-0.5 text-xs text-text-muted">{achievement.description}</p>
         </div>
       </div>
     </div>
@@ -290,10 +279,10 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
       )}
 
       <header>
-        <h1 className="text-2xl font-bold text-[#FAFAFA]">
+        <h1 className="text-2xl font-bold text-text">
           Hey {name} <span aria-hidden>👋</span>
         </h1>
-        <p className="mt-1 text-sm text-neutral-400">
+        <p className="mt-1 text-sm text-text-muted">
           Your damage report, updated weekly
         </p>
       </header>
@@ -302,9 +291,7 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
       {streak > 0 && (
         <div
           className={`flex items-center justify-start gap-3 rounded-xl border px-5 py-3 ${
-            hasActivityToday
-              ? "border-[#FF3D00]/40 bg-[#FF3D00]/10"
-              : "border-neutral-800 bg-[#111111]"
+            hasActivityToday ? "border-ember/40 bg-ember-soft" : "border-border bg-surface"
           }`}
         >
           <span
@@ -315,16 +302,16 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
           </span>
           <span
             className={`text-2xl font-black tabular-nums ${
-              hasActivityToday ? "text-[#FF3D00]" : "text-neutral-300"
+              hasActivityToday ? "text-ember" : "text-text-muted"
             }`}
           >
             {streak}
           </span>
-          <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500">
+          <span className="text-xs font-semibold uppercase tracking-widest text-text-faint">
             day streak
           </span>
           {!hasActivityToday && (
-            <span className="text-[11px] text-neutral-600">
+            <span className="text-[11px] text-text-faint">
               · keep it going today
             </span>
           )}
@@ -335,30 +322,30 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
         <>
           {/* Hero — Life Score */}
           <section
-            className={`relative overflow-hidden rounded-2xl border border-neutral-800 bg-gradient-to-b from-[#141414] to-[#0A0A0A] p-8 text-center ${getScoreGlow(latest.life_score)}`}
+            className={`relative overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-surface-2 to-surface p-8 text-center ${scoreGlow(latest.life_score)}`}
           >
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#FF3D00]">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ember">
               Life Score
             </p>
             <p
-              className={`mt-2 text-7xl font-black tabular-nums ${getScoreColor(latest.life_score)}`}
+              className={`mt-2 text-7xl font-black tabular-nums ${scoreTextColor(latest.life_score)}`}
             >
               {latest.life_score}
             </p>
-            <p className="mt-3 text-lg font-semibold text-neutral-200">
+            <p className="mt-3 text-lg font-semibold text-text">
               {latest.funny_title ?? "Certified Disaster"}
             </p>
-            <p className="mt-1 text-xs text-neutral-500">out of 100</p>
+            <p className="mt-1 text-xs text-text-faint">out of 100</p>
           </section>
 
           {/* Streak */}
           {streak > 0 && (
-            <div className="rounded-xl border border-[#FF3D00]/30 bg-[#FF3D00]/10 px-5 py-4 text-center">
-              <p className="text-base font-semibold text-[#FF3D00]">
+            <div className="rounded-xl border border-ember/30 bg-ember-soft px-5 py-4 text-center">
+              <p className="text-base font-semibold text-ember">
                 {getStreakMessage(streak)}
               </p>
               {longestStreak > streak && (
-                <p className="mt-1 text-xs text-neutral-500">
+                <p className="mt-1 text-xs text-text-faint">
                   Best: {longestStreak} days
                 </p>
               )}
@@ -368,19 +355,19 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
           {/* Best / Worst */}
           {allScores.length > 1 && bestScore !== null && worstScore !== null && (
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-emerald-800/50 bg-emerald-950/30 p-4 text-center">
-                <p className="text-xs uppercase tracking-widest text-emerald-500">
+              <div className="rounded-xl border border-grade-a/40 bg-grade-a/10 p-4 text-center">
+                <p className="text-xs uppercase tracking-widest text-grade-a/80">
                   Best ever
                 </p>
-                <p className="mt-1 text-3xl font-black text-emerald-400">
+                <p className="mt-1 text-3xl font-black tabular-nums text-grade-a">
                   {bestScore}
                 </p>
               </div>
-              <div className="rounded-xl border border-red-800/50 bg-red-950/30 p-4 text-center">
-                <p className="text-xs uppercase tracking-widest text-red-500">
+              <div className="rounded-xl border border-grade-f/40 bg-grade-f/10 p-4 text-center">
+                <p className="text-xs uppercase tracking-widest text-grade-f/80">
                   Worst ever
                 </p>
-                <p className="mt-1 text-3xl font-black text-red-400">
+                <p className="mt-1 text-3xl font-black tabular-nums text-grade-f">
                   {worstScore}
                 </p>
               </div>
@@ -389,29 +376,29 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
 
           {/* Score trend */}
           {scoresWithValues.length >= 2 && (
-            <section className="rounded-xl border border-neutral-800 bg-[#111111] p-5">
+            <section className="rounded-xl border border-border bg-surface-2 p-5">
               <ScoreTrend scores={scoresWithValues} />
             </section>
           )}
 
           {/* Category breakdown */}
           {categoryDeltas.length > 0 && (
-            <section className="rounded-xl border border-neutral-800 bg-[#111111] p-5">
-              <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">
+            <section className="rounded-xl border border-border bg-surface-2 p-5">
+              <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-text-faint">
                 Category breakdown
               </h2>
               {scoreHistory.length > 1 ? (
                 <div className="space-y-4">
                   {improved.length > 0 && (
                     <div>
-                      <p className="mb-2 text-xs font-medium text-emerald-400">
+                      <p className="mb-2 text-xs font-medium text-grade-a">
                         Improved vs last time
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {improved.map((c) => (
                           <span
                             key={c.key}
-                            className="rounded-lg border border-emerald-800/50 bg-emerald-950/40 px-3 py-1.5 text-sm text-emerald-300"
+                            className="rounded-xl border border-grade-a/40 bg-grade-a/10 px-3 py-1.5 text-sm text-grade-a"
                           >
                             {c.label} ↑ +{c.delta}
                           </span>
@@ -421,14 +408,14 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
                   )}
                   {worsened.length > 0 && (
                     <div>
-                      <p className="mb-2 text-xs font-medium text-red-400">
+                      <p className="mb-2 text-xs font-medium text-grade-f">
                         Got worse vs last time
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {worsened.map((c) => (
                           <span
                             key={c.key}
-                            className="rounded-lg border border-red-800/50 bg-red-950/40 px-3 py-1.5 text-sm text-red-300"
+                            className="rounded-xl border border-grade-f/40 bg-grade-f/10 px-3 py-1.5 text-sm text-grade-f"
                           >
                             {c.label} ↓ {c.delta}
                           </span>
@@ -437,7 +424,7 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
                     </div>
                   )}
                   {improved.length === 0 && worsened.length === 0 && (
-                    <p className="text-sm text-neutral-400">
+                    <p className="text-sm text-text-muted">
                       No changes since last roast — consistency is… something
                     </p>
                   )}
@@ -447,10 +434,10 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
                   {categoryDeltas.map((c) => (
                     <div
                       key={c.key}
-                      className="rounded-lg border border-neutral-800 bg-[#141414] px-3 py-2 text-center"
+                      className="rounded-xl border border-border bg-surface-3 px-3 py-2 text-center"
                     >
-                      <p className="text-xs text-neutral-500">{c.label}</p>
-                      <p className="text-lg font-bold text-[#FAFAFA]">
+                      <p className="text-xs text-text-faint">{c.label}</p>
+                      <p className="text-lg font-bold tabular-nums text-text">
                         {Math.round(c.current / 10)}/10
                       </p>
                     </div>
@@ -461,14 +448,14 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
           )}
         </>
       ) : (
-        <div className="rounded-2xl border border-dashed border-neutral-700 bg-[#111111] p-10 text-center">
+        <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center">
           <p className="text-5xl" aria-hidden>
             🔥
           </p>
-          <p className="mt-4 text-lg font-semibold text-neutral-200">
+          <p className="mt-4 text-lg font-semibold text-text">
             No Life Score yet
           </p>
-          <p className="mt-2 text-sm text-neutral-400">
+          <p className="mt-2 text-sm text-text-muted">
             Get roasted once to unlock your dashboard
           </p>
         </div>
@@ -479,14 +466,14 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
         <button
           type="button"
           onClick={() => setShowProWaitlistModal(true)}
-          className="block w-full rounded-xl bg-[#FF3D00] px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110"
+          className="block w-full rounded-xl bg-ember px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
         >
           Join Pro Waitlist 🔥
         </button>
       ) : (
         <Link
           href="/onboarding"
-          className="block w-full rounded-xl bg-[#FF3D00] px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110"
+          className="block w-full rounded-xl bg-ember px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
         >
           Get Roasted This Week
         </Link>
@@ -500,7 +487,7 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
       {/* Last 3 roast reports */}
       {recentRoasts.length > 0 && (
         <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-500">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-text-faint">
             Recent roasts
           </h2>
           <div className="flex flex-col gap-3">
@@ -508,25 +495,25 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
               <Link
                 key={r.id}
                 href={`/roast/${r.id}`}
-                className="group block rounded-xl border border-neutral-800 bg-[#141414] p-4 transition hover:border-[#FF3D00]/40 hover:bg-[#1a1a1a]"
+                className="group block rounded-xl border border-border bg-surface-2 p-4 transition hover:border-ember/40 hover:bg-surface-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs text-neutral-500">
+                    <p className="text-xs text-text-faint">
                       Week of {formatWeekLabel(r.week_start_date)}
                     </p>
-                    <p className="mt-1 text-sm leading-relaxed text-neutral-300 group-hover:text-neutral-200">
+                    <p className="mt-1 text-sm leading-relaxed text-text-muted group-hover:text-text">
                       {snippet(r.roast_text, 120)}
                     </p>
                     {r.funny_title && (
-                      <p className="mt-2 text-xs font-medium text-[#FF3D00]">
+                      <p className="mt-2 text-xs font-medium text-ember">
                         {r.funny_title}
                       </p>
                     )}
                   </div>
                   {r.life_score !== null && (
                     <span
-                      className={`shrink-0 rounded-lg border border-neutral-700 bg-[#0A0A0A] px-3 py-2 text-xl font-black tabular-nums ${getScoreColor(r.life_score)}`}
+                      className={`shrink-0 rounded-xl border border-border bg-surface-3 px-3 py-2 text-xl font-black tabular-nums ${scoreTextColor(r.life_score)}`}
                     >
                       {r.life_score}
                     </span>
@@ -539,8 +526,8 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
       )}
 
       {/* Achievement badges */}
-      <section className="rounded-xl border border-neutral-800 bg-[#111111] p-5">
-        <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-500">
+      <section className="rounded-xl border border-border bg-surface-2 p-5">
+        <h2 className="mb-4 text-xs font-semibold uppercase tracking-widest text-text-faint">
           Achievements
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -556,41 +543,41 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
                 key={achievement.id}
                 className={`relative rounded-xl border p-4 text-center transition-all duration-200 [transition-timing-function:ease] ${
                   unlocked
-                    ? "border-[#FF3D00] bg-[#FF3D00]/10 shadow-[0_0_12px_rgba(255,61,0,0.4)] hover:scale-105"
-                    : "border-[#1A1A1A] bg-[#0A0A0A] opacity-60"
+                    ? "border-ember/60 bg-ember-soft hover:scale-105"
+                    : "border-border bg-surface-3 opacity-60"
                 } ${justUnlocked ? "animate-achievement-glow" : ""}`}
                 title={achievement.description}
               >
                 <p className="text-[60px] leading-none">{unlocked ? achievement.emoji : "🔒"}</p>
                 <p
-                  className={`mt-2 text-xs font-bold ${unlocked ? "text-[#FAFAFA]" : "text-neutral-400"}`}
+                  className={`mt-2 text-xs font-bold ${unlocked ? "text-text" : "text-text-muted"}`}
                 >
                   {achievement.title}
                 </p>
-                <p className={`mt-1 text-[10px] leading-tight ${unlocked ? "text-neutral-300" : "text-neutral-500"}`}>
+                <p className={`mt-1 text-[10px] leading-tight ${unlocked ? "text-text-muted" : "text-text-faint"}`}>
                   {achievement.description}
                 </p>
                 {target ? (
                   <div className="mt-2">
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-800">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
                       <div
-                        className={`h-full rounded-full transition-all duration-200 [transition-timing-function:ease] ${unlocked ? "bg-[#FF3D00]" : "bg-emerald-500"}`}
+                        className={`h-full rounded-full tabular-nums transition-all duration-200 [transition-timing-function:ease] ${unlocked ? "bg-ember" : "bg-grade-a"}`}
                         style={{ width: `${unlocked ? 100 : progressPct}%` }}
                       />
                     </div>
-                    <p className="mt-1 text-[10px] font-medium text-neutral-400">
+                    <p className="mt-1 text-[10px] font-medium tabular-nums text-text-muted">
                       {unlocked ? target : progress}/{target}
                     </p>
                   </div>
                 ) : unlocked ? (
-                  <p className="mt-2 text-[10px] font-semibold text-[#FF3D00]">✓ Unlocked</p>
+                  <p className="mt-2 text-[10px] font-semibold text-ember">✓ Unlocked</p>
                 ) : null}
                 {unlocked ? (
-                  <p className="mt-1 text-[10px] text-[#FF3D00]">
+                  <p className="mt-1 text-[10px] text-ember">
                     Unlocked {formatUnlockedDate(state!.unlocked_at!)}
                   </p>
                 ) : (
-                  <p className="mt-2 text-[10px] italic leading-tight text-neutral-600">
+                  <p className="mt-2 text-[10px] italic leading-tight text-text-faint">
                     Unlock by: {achievement.hint}
                   </p>
                 )}

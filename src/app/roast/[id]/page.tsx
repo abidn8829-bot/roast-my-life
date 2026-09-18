@@ -52,7 +52,7 @@ export default async function RoastDetailPage({
       .single();
 
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-[#0A0A0A] px-4 py-12 text-[#FAFAFA]">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 py-12 text-text">
         <RoastView
           roastId={roast.id}
           roastText={roast.roast_text}
@@ -147,7 +147,7 @@ export default async function RoastDetailPage({
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[#0A0A0A] px-4 py-12 text-[#FAFAFA]">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 py-12 text-text">
       <RoastView
         roastId={row.id}
         roastText={row.roast_text}
