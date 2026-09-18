@@ -6,6 +6,7 @@ import posthog from "posthog-js";
 import { ACHIEVEMENTS, type UserAchievements } from "@/lib/achievements";
 import { formatWeekLabel, snippet } from "@/lib/format-week";
 import type { CategoryScores } from "@/lib/roast-types";
+import { ArcSection } from "@/components/arc-section";
 import { ProWaitlistModal } from "@/components/pro-waitlist-modal";
 import { playUnlockSound } from "@/lib/unlock-sound";
 import { scoreGlow, scoreTextColor } from "@/lib/grades";
@@ -446,6 +447,8 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
               )}
             </section>
           )}
+
+          <ArcSection variant="compact" />
         </>
       ) : (
         <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center">

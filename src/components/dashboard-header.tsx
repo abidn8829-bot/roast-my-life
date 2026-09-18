@@ -36,6 +36,9 @@ export function DashboardHeader({ isPro, name }: Props) {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          <Link href="/arc" className="text-sm text-text-muted hover:text-text transition">
+            Your Arc
+          </Link>
           <Link href="/pricing" className="text-sm text-text-muted hover:text-text transition">
             Pricing
           </Link>
