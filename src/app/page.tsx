@@ -93,7 +93,7 @@ export default function Home() {
         <div className="flex items-center gap-2">
           <EmberMark className="h-6 w-6" />
           <span className="font-display text-2xl tracking-wide">
-            Ember<span className="text-[#FF3D00]">.ai</span>
+            Ember<span className="text-[#FF3D00]">ai</span>
           </span>
         </div>
         <div className="flex gap-3">
@@ -119,7 +119,7 @@ export default function Home() {
             AI ACCOUNTABILITY COACH
           </div>
           <h1 className="font-display text-6xl md:text-7xl leading-[0.95] mb-6">
-            Ember<span className="text-[#FF3D00]">.ai</span>
+            Ember<span className="text-[#FF3D00]">ai</span>
           </h1>
           <p className="text-2xl md:text-3xl font-semibold leading-tight mb-6 max-w-xl">
             The AI accountability coach that{" "}
@@ -217,7 +217,7 @@ export default function Home() {
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-2">
             <EmberMark className="h-4 w-4" />
-            <span>Ember.ai</span>
+            <span>Emberai</span>
           </div>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:text-[#FAFAFA] transition">
