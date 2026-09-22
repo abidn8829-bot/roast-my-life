@@ -285,7 +285,7 @@ export function OnboardingWizard() {
     for (const achievementId of data.newlyUnlockedAchievements ?? []) {
       posthog.capture("achievement_unlocked", { achievement_id: achievementId });
     }
-    router.push(`/roast/${encodeURIComponent(roastId)}`);
+    router.push(`/roast/${encodeURIComponent(roastId)}?share=1`);
     router.refresh();
   }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, selectedTone, isPro, router, allQuestions]);
 
@@ -349,7 +349,7 @@ export function OnboardingWizard() {
       for (const achievementId of data.newlyUnlockedAchievements ?? []) {
         posthog.capture("achievement_unlocked", { achievement_id: achievementId });
       }
-      router.push(`/roast/${encodeURIComponent(data.id)}`);
+      router.push(`/roast/${encodeURIComponent(data.id)}?share=1`);
       router.refresh();
     } catch {
       setError("Couldn't save your check-in. Try again.");

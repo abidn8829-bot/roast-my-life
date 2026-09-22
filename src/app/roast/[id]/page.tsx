@@ -1,19 +1,21 @@
 import { notFound, redirect } from "next/navigation";
 import { RoastView } from "@/components/roast-view";
+import { backfillCardPunchline } from "@/lib/card-punchline";
 import { fetchOwnRoastById } from "@/lib/fetch-own-roast";
 import { isUuid } from "@/lib/is-uuid";
-import { parseReportCard } from "@/lib/parse-report-card";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { OnboardingAnswers } from "@/lib/roast-types";
 
 export const dynamic = "force-dynamic";
 
 export default async function RoastDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ share?: string }>;
 }) {
   const { id: param } = await params;
+  const { share } = await searchParams;
   const roastId = decodeURIComponent(param).trim();
 
   if (!roastId) {
@@ -35,6 +37,9 @@ export default async function RoastDetailPage({
       notFound();
     }
 
+    // Make sure the share card has a real punchline before the share sheet asks for the image.
+    await backfillCardPunchline(supabase, roast);
+
     // Fetch week count
     const { data: weekData } = await supabase
       .from("roasts")
@@ -47,7 +52,7 @@ export default async function RoastDetailPage({
     // Fetch user streak data
     const { data: userData } = await supabase
       .from("users")
-      .select("current_streak, longest_streak")
+      .select("current_streak, longest_streak, subscription_tier")
       .eq("id", user.id)
       .single();
 
@@ -64,109 +69,19 @@ export default async function RoastDetailPage({
           weekCount={weekCount}
           lifeScore={roast.life_score}
           funnyTitle={roast.funny_title}
-          top5Roasts={roast.top_5_roasts}
+          subscriptionTier={userData?.subscription_tier ?? "free"}
           categoryScores={roast.category_scores}
           currentStreak={userData?.current_streak}
           longestStreak={userData?.longest_streak}
           mode={roast.mode}
           persona={roast.persona}
           suggestionLine={roast.suggestion_line}
+          showShareSheet={share === "1"}
         />
       </main>
     );
   }
 
-  const { data, error } = await supabase.rpc("get_roast_by_share_slug", {
-    p_slug: roastId,
-  });
-
-  if (error || !data?.length) {
-    console.error("[roast page] share slug lookup failed:", error?.message);
-    notFound();
-  }
-
-  const row = data[0] as {
-    id: string;
-    roast_text: string;
-    report_card: unknown;
-    share_slug: string;
-  };
-
-  const reportCard = parseReportCard(row.report_card);
-  if (!reportCard) {
-    notFound();
-  }
-
-  let initialReaction: string | null = null;
-  let canReact = false;
-  let answers: OnboardingAnswers | undefined = undefined;
-  let weekCount = 1;
-  let lifeScore: number | undefined = undefined;
-  let funnyTitle: string | undefined = undefined;
-  let top5Roasts: string[] | undefined = undefined;
-  let categoryScores: import("@/lib/roast-types").CategoryScores | undefined = undefined;
-  let currentStreak: number | undefined = undefined;
-  let longestStreak: number | undefined = undefined;
-  let mode: import("@/lib/roast-types").RoastMode | undefined = undefined;
-  let persona: import("@/lib/roast-types").RoastPersona | undefined = undefined;
-  let suggestionLine: string | undefined = undefined;
-
-  if (user) {
-    const owned = await fetchOwnRoastById(supabase, row.id, user.id);
-    if (owned) {
-      canReact = true;
-      initialReaction = owned.reaction;
-      answers = owned.answers;
-      lifeScore = owned.life_score;
-      funnyTitle = owned.funny_title;
-      top5Roasts = owned.top_5_roasts;
-      categoryScores = owned.category_scores;
-      mode = owned.mode;
-      persona = owned.persona;
-      suggestionLine = owned.suggestion_line;
-    }
-
-    // Fetch week count
-    const { data: weekData } = await supabase
-      .from("roasts")
-      .select("week_start_date")
-      .eq("user_id", user.id);
-
-    const uniqueWeeks = new Set(weekData?.map(r => r.week_start_date) || []);
-    weekCount = uniqueWeeks.size;
-
-    // Fetch user streak data
-    const { data: userData } = await supabase
-      .from("users")
-      .select("current_streak, longest_streak")
-      .eq("id", user.id)
-      .single();
-
-    currentStreak = userData?.current_streak;
-    longestStreak = userData?.longest_streak;
-  }
-
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 py-12 text-text">
-      <RoastView
-        roastId={row.id}
-        roastText={row.roast_text}
-        reportCard={reportCard}
-        shareSlug={row.share_slug}
-        initialReaction={initialReaction}
-        canReact={canReact}
-        answers={answers}
-        weekCount={weekCount}
-        lifeScore={lifeScore}
-        funnyTitle={funnyTitle}
-        top5Roasts={top5Roasts}
-        categoryScores={categoryScores}
-        currentStreak={currentStreak}
-        longestStreak={longestStreak}
-        mode={mode}
-        persona={persona}
-        suggestionLine={suggestionLine}
-      />
-    </main>
-  );
+  // Public links live at /share/[slug]; keep old /roast/[slug] links working.
+  redirect(`/share/${encodeURIComponent(roastId)}`);
 }

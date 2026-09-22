@@ -1,3 +1,4 @@
+import { generateCardPunchline, insertRoastRow } from "@/lib/card-punchline";
 import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
 import { sendAchievementPush } from "@/lib/achievement-push";
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
   try { body = await request.json() as Record<string, unknown>; } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
   const { data: previous, error: previousError } = await supabase.from("roasts")
-    .select("id, roast_text, report_card, answers, category_scores, tone, mode, persona, continuity_memory, top_5_roasts")
+    .select("id, roast_text, report_card, answers, category_scores, tone, mode, persona, continuity_memory")
     .eq("user_id", user.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (previousError || !previous) return NextResponse.json({ error: "No previous roast found" }, { status: 404 });
   const categoryScores = previous.category_scores as CategoryScores | null;
@@ -218,11 +219,21 @@ export async function POST(request: Request) {
     newRoastText = generatedRoast;
   } catch (error) { logGroqError(error); return NextResponse.json({ error: "Failed to generate check-in roast" }, { status: 502 }); }
 
-  const { data: created, error: roastError } = await supabase.from("roasts").insert({
+  // Fresh punchline for this check-in (previously the first-roast's top-5 lines were copied forward verbatim).
+  const cardPunchline = await generateCardPunchline(groq, MODEL, {
+    answers: previous.answers as OnboardingAnswers,
+    categoryScores: updatedCategoryScores,
+    lifeScore,
+    roastText: newRoastText,
+    mode: (previous.mode ?? "roast") as RoastMode,
+    checkIn: { category, answer, direction: result.direction },
+  });
+
+  const { data: created, error: roastError } = await insertRoastRow(supabase, {
     user_id: user.id, roast_text: newRoastText, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),
-    answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: previous.top_5_roasts ?? [], category_scores: updatedCategoryScores, suggestion_line: suggestionLine,
+    answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: [], card_punchline: cardPunchline, category_scores: updatedCategoryScores, suggestion_line: suggestionLine,
     tone: (previous.tone ?? "normal") as RoastTone, mode: (previous.mode ?? "roast") as RoastMode, persona: (previous.persona ?? "default") as RoastPersona, continuity_memory: nextMemory, plan_steps: plan,
-  }).select("id").single();
+  });
   if (roastError || !created) return NextResponse.json({ error: "Failed to save check-in roast" }, { status: 500 });
   const { error: historyError } = await supabase.from("score_history").insert({ user_id: user.id, roast_id: created.id, life_score: lifeScore, category_grades: updatedCategoryScores });
   if (historyError) { console.error("[api/check-in] score history insert failed:", historyError.message); return NextResponse.json({ error: "Check-in saved, but score history could not be updated" }, { status: 500 }); }
