@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { OnboardingAnswers, RoastTone, RoastMode, RoastPersona } from "@/lib/roast-types";
 import posthog from "posthog-js";
 import { ToneSelector } from "@/components/tone-selector";
+import { PersonaSelector } from "@/components/persona-selector";
 import { ProWaitlistModal } from "@/components/pro-waitlist-modal";
 
 const LOADING_MESSAGES = [
@@ -78,7 +79,7 @@ const PRO_QUESTIONS = [
   },
 ];
 
-type Step = number | "tone" | "loading" | "followup" | "checkin";
+type Step = number | "persona" | "tone" | "loading" | "followup" | "checkin-persona" | "checkin";
 
 const inputClass =
   "w-full rounded-xl border-2 border-border bg-surface px-5 py-4 text-xl text-text outline-none ring-ember focus:ring-2 transition-all";
@@ -93,6 +94,7 @@ export function OnboardingWizard() {
   const [error, setError] = useState<string | null>(null);
   const [isPro, setIsPro] = useState(false);
   const [selectedTone, setSelectedTone] = useState<RoastTone>("normal");
+  const [selectedPersona, setSelectedPersona] = useState<RoastPersona>("default");
   const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
@@ -139,16 +141,21 @@ export function OnboardingWizard() {
       fetch('/api/user/previous-answers').then(res => res.json()),
     ])
       .then(([tierData, answersData]) => {
-        setIsPro(tierData.tier === 'pro');
+        const userIsPro = tierData.tier === 'pro';
+        setIsPro(userIsPro);
         setHasUsedTodayRoast(answersData.hasUsedTodayRoast);
         if (answersData.isReturning) {
           setIsReturningUser(true);
           setPreviousAnswers(answersData.answers);
           setContinuityMemory(answersData.continuityMemory);
           setPreviousRoastText(answersData.previousRoastText);
+          if (answersData.tone) setSelectedTone(answersData.tone);
+          if (answersData.persona) setSelectedPersona(answersData.persona);
           // Only show check-in if they haven't used today's roast
           if (!answersData.hasUsedTodayRoast) {
-            setStep("checkin");
+            // Pro users get to pick today's roaster before the check-in question;
+            // free users stay locked to Default and skip straight to the question.
+            setStep(userIsPro ? "checkin-persona" : "checkin");
             // Generate follow-up question
             generateFollowUpQuestion();
           } else {
@@ -247,7 +254,7 @@ export function OnboardingWizard() {
         ...buildAnswers(),
         tone: selectedTone,
         mode: "roast",
-        persona: "default",
+        persona: selectedPersona,
         followUpAnswer: followUpAnswer || undefined,
       }),
     });
@@ -285,9 +292,9 @@ export function OnboardingWizard() {
     for (const achievementId of data.newlyUnlockedAchievements ?? []) {
       posthog.capture("achievement_unlocked", { achievement_id: achievementId });
     }
-    router.push(`/roast/${encodeURIComponent(roastId)}`);
+    router.push(`/roast/${encodeURIComponent(roastId)}?share=1`);
     router.refresh();
-  }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, selectedTone, isPro, router, allQuestions]);
+  }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, selectedTone, selectedPersona, isPro, router, allQuestions]);
 
   useEffect(() => {
     if (step !== "loading") return;
@@ -307,7 +314,7 @@ export function OnboardingWizard() {
     if (step < allQuestions.length - 1) {
       setStep(step + 1);
     } else {
-      setStep("tone");
+      setStep("persona");
     }
   }
 
@@ -315,6 +322,16 @@ export function OnboardingWizard() {
     if (typeof step !== "number" || step === 0) return;
     setError(null);
     setStep(step - 1);
+  }
+
+  function onPersonaSelect(persona: RoastPersona) {
+    setSelectedPersona(persona);
+    setStep("tone");
+  }
+
+  function onCheckInPersonaSelect(persona: RoastPersona) {
+    setSelectedPersona(persona);
+    setStep("checkin");
   }
 
   function onToneSelect(tone: RoastTone) {
@@ -339,7 +356,7 @@ export function OnboardingWizard() {
       const res = await fetch("/api/check-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "submit", category: checkInCategory, answer: followUpAnswer.trim(), activeTheme: checkInTheme, question: followUpQuestion }),
+        body: JSON.stringify({ action: "submit", category: checkInCategory, answer: followUpAnswer.trim(), activeTheme: checkInTheme, question: followUpQuestion, tone: selectedTone, persona: selectedPersona }),
       });
       const data = await res.json() as { id?: string; error?: string; newlyUnlockedAchievements?: string[] };
       if (!res.ok || !data.id) {
@@ -349,7 +366,7 @@ export function OnboardingWizard() {
       for (const achievementId of data.newlyUnlockedAchievements ?? []) {
         posthog.capture("achievement_unlocked", { achievement_id: achievementId });
       }
-      router.push(`/roast/${encodeURIComponent(data.id)}`);
+      router.push(`/roast/${encodeURIComponent(data.id)}?share=1`);
       router.refresh();
     } catch {
       setError("Couldn't save your check-in. Try again.");
@@ -366,6 +383,22 @@ export function OnboardingWizard() {
           Checking your profile...
         </p>
       </div>
+    );
+  }
+
+  if (step === "checkin-persona") {
+    return (
+      <>
+        <PersonaSelector
+          onSelect={onCheckInPersonaSelect}
+          isPro={isPro}
+          onUpgradeRequest={() => setShowProWaitlistModal(true)}
+        />
+        <ProWaitlistModal
+          isOpen={showProWaitlistModal}
+          onClose={() => setShowProWaitlistModal(false)}
+        />
+      </>
     );
   }
 
@@ -490,6 +523,22 @@ export function OnboardingWizard() {
     );
   }
 
+  if (step === "persona") {
+    return (
+      <>
+        <PersonaSelector
+          onSelect={onPersonaSelect}
+          isPro={isPro}
+          onUpgradeRequest={() => setShowProWaitlistModal(true)}
+        />
+        <ProWaitlistModal
+          isOpen={showProWaitlistModal}
+          onClose={() => setShowProWaitlistModal(false)}
+        />
+      </>
+    );
+  }
+
   if (step === "tone") {
     return (
       <>
@@ -584,7 +633,7 @@ export function OnboardingWizard() {
             onClick={onNext}
             className="rounded-xl bg-ember px-8 py-4 text-lg font-medium text-white transition hover:brightness-110 hover:scale-105"
           >
-            {slideIndex === allQuestions.length - 1 ? "Choose Tone →" : "Next →"}
+            {slideIndex === allQuestions.length - 1 ? "Choose Your Roaster →" : "Next →"}
           </button>
         </div>
       </div>

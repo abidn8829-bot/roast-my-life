@@ -1,12 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { ShareButtons } from "@/components/share-buttons";
+import { ShareSheet } from "@/components/share-sheet";
 import { gradeColor, scoreGlowBg, scoreTextColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
 import type { CategoryScores, Grade, OnboardingAnswers, ReportCard, RoastMode, RoastPersona } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+
+const DISMISS_EVENT = "share-sheet-dismissed";
+function subscribeToDismissals(onChange: () => void) {
+  window.addEventListener(DISMISS_EVENT, onChange);
+  return () => window.removeEventListener(DISMISS_EVENT, onChange);
+}
 
 type PlanStep = { step: string; why: string };
 type ChallengePlan = { challenge: string; steps: PlanStep[] };
@@ -22,13 +29,14 @@ type Props = {
   weekCount?: number;
   lifeScore?: number;
   funnyTitle?: string;
-  top5Roasts?: string[];
+  subscriptionTier?: string;
   categoryScores?: CategoryScores;
   currentStreak?: number;
   longestStreak?: number;
   mode?: RoastMode;
   persona?: RoastPersona;
   suggestionLine?: string;
+  showShareSheet?: boolean;
 };
 
 export function RoastView({
@@ -41,20 +49,48 @@ export function RoastView({
   weekCount = 1,
   lifeScore = 50,
   funnyTitle = "Your Life",
-  top5Roasts = [],
+  subscriptionTier,
   categoryScores,
   currentStreak = 0,
   longestStreak = 0,
   mode = "roast",
   persona = "default",
   suggestionLine,
+  showShareSheet = false,
 }: Props) {
   const router = useRouter();
   const [reaction, setReaction] = useState<string | null>(initialReaction);
   const [savingReaction, setSavingReaction] = useState(false);
   const [checkingLimit, setCheckingLimit] = useState(false);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [plan, setPlan] = useState<ChallengePlan | null>(null);
+  const [closedLocally, setClosedLocally] = useState(false);
+
+  // ?share=1 opens the sheet. We deliberately leave the URL alone (editing it re-keys the
+  // page in Next's router and can remount this component mid-navigation); instead the
+  // sheet stays until dismissed, and "dismissed" is remembered per roast for the session.
+  const dismissedKey = `share-sheet-dismissed:${roastId}`;
+  const dismissedInSession = useSyncExternalStore(
+    subscribeToDismissals,
+    () => {
+      try {
+        return window.sessionStorage.getItem(dismissedKey) === "1";
+      } catch {
+        return false; // storage blocked: closedLocally still handles this page view
+      }
+    },
+    () => false,
+  );
+  const shareSheetOpen = showShareSheet && !dismissedInSession && !closedLocally;
+
+  function closeShareSheet() {
+    try {
+      window.sessionStorage.setItem(dismissedKey, "1");
+      window.dispatchEvent(new Event(DISMISS_EVENT));
+    } catch {
+      // ignore
+    }
+    setClosedLocally(true);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -145,12 +181,6 @@ export function RoastView({
     }
   }
 
-  function copyToClipboard(text: string, index: number) {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  }
-
   function getStreakMessage(streak: number): string {
     if (streak === 1) return "Day 1 of facing reality 👀";
     if (streak === 3) return "3 days of self inflicted damage 🔥";
@@ -221,38 +251,22 @@ export function RoastView({
         </section>
       )}
 
-      {/* Top 5 Roasts */}
-      {top5Roasts.length > 0 && (
-        <section className="flex flex-col gap-4">
-          <p className="text-center text-sm font-semibold uppercase tracking-widest text-text-faint">
-            Top 5 Roasts
+      {/* Upgrade CTA (free plan only) */}
+      {subscriptionTier !== "pro" && (
+        <section className="flex flex-col items-center gap-2 rounded-xl border border-ember/30 bg-ember-soft p-5 text-center">
+          <p className="text-lg font-bold text-text">Ember has more to say.</p>
+          <p className="text-sm text-text-muted">
+            I found some patterns in your answers that aren&apos;t visible in your roast yet.
           </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {top5Roasts.map((roast, index) => (
-              <div
-                key={index}
-                className="group relative rounded-xl border border-border bg-surface-2 p-4 transition-all hover:border-ember/40 hover:bg-surface-3"
-              >
-                <p className="text-sm text-text">{roast}</p>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(roast, index)}
-                  className="absolute right-3 top-3 opacity-0 transition-opacity group-hover:opacity-100"
-                  aria-label="Copy roast"
-                >
-                  {copiedIndex === index ? (
-                    <svg className="h-4 w-4 text-grade-a" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="h-4 w-4 text-text-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            ))}
-          </div>
+          <a
+            href={process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL || "/pricing"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-block rounded-lg bg-ember px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
+          >
+            Unlock My Full Read →
+          </a>
+          <span className="text-xs font-semibold uppercase tracking-widest text-ember">Pro</span>
         </section>
       )}
 
@@ -298,17 +312,6 @@ export function RoastView({
       {/* Share Buttons */}
       <ShareButtons roastId={roastId} shareSlug={shareSlug} />
 
-      {/* Copy Roast Button */}
-      {top5Roasts.length > 0 && (
-        <button
-          type="button"
-          onClick={() => copyToClipboard(top5Roasts[0], -1)}
-          className="w-full rounded-xl border border-border px-4 py-3 text-center text-sm font-medium text-text transition hover:border-ember/40 hover:bg-surface"
-        >
-          {copiedIndex === -1 ? "✓ Copied!" : `📋 Copy: "${top5Roasts[0]}"`}
-        </button>
-      )}
-
       {/* Reactions */}
       {canReact && (
         <section className="flex flex-col items-center gap-3">
@@ -343,6 +346,14 @@ export function RoastView({
       >
         {checkingLimit ? "Checking..." : "Roast me again"}
       </button>
+
+      {shareSheetOpen && (
+        <ShareSheet
+          roastId={roastId}
+          shareSlug={shareSlug}
+          onClose={closeShareSheet}
+        />
+      )}
     </div>
   );
 }

@@ -1,7 +1,19 @@
 import { ImageResponse } from "next/og";
-import { createClient } from "@supabase/supabase-js";
+import { getShareCardData } from "@/lib/get-share-card";
+import type { CategoryScores } from "@/lib/roast-types";
 
 export const runtime = "nodejs";
+
+const EMBER_ORANGE = "#FF3D00";
+
+// Fixed order, real keys from CategoryScores.
+const CATEGORY_ROWS: { key: keyof CategoryScores; label: string }[] = [
+  { key: "sleep", label: "Sleep" },
+  { key: "fitness", label: "Fitness" },
+  { key: "discipline", label: "Discipline" },
+  { key: "focus", label: "Focus" },
+  { key: "spending", label: "Spending" },
+];
 
 function getGradeColor(grade: string): string {
   switch (grade) {
@@ -28,77 +40,39 @@ function getScoreColor(score: number): string {
   return "#eb5757";
 }
 
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
-    console.log("[api/og] Generating OG image for roastId:", id);
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
-
-    // Use the RLS-bypassing function to get roast data
-    const { data: roast, error } = await supabase
-      .rpc("get_roast_for_og", { p_id: id });
-
-    if (error) {
-      console.error("[api/og] Supabase error:", error);
-      return new Response(`Database error: ${error.message}`, { status: 500 });
-    }
-
-    if (!roast || roast.length === 0) {
-      console.error("[api/og] Roast not found for id:", id);
-      return new Response("Roast not found", { status: 404 });
-    }
-
-    const roastData = roast[0];
-    console.log("[api/og] Roast data found:", { life_score: roastData.life_score, funny_title: roastData.funny_title, top_5_roasts: roastData.top_5_roasts, category_scores: roastData.category_scores });
-
-    const lifeScore = roastData.life_score ?? 50;
-    const funnyTitle = roastData.funny_title ?? "Your Life";
-    const topRoasts = Array.isArray(roastData.top_5_roasts) && roastData.top_5_roasts.length > 0 ? roastData.top_5_roasts : ["You need to do better."];
-    const categoryScores = roastData.category_scores;
-
-    console.log("[api/og] Category scores raw:", categoryScores);
-
-    // Find worst and best categories
-    let worstCategory = { name: "Unknown", grade: "F", score: Infinity };
-    let bestCategory = { name: "Unknown", grade: "A", score: -Infinity };
-
-    if (categoryScores && typeof categoryScores === "object" && Object.keys(categoryScores).length > 0) {
-      const entries = Object.entries(categoryScores);
-      console.log("[api/og] Category entries:", entries);
-      for (const [name, data] of entries) {
-        const categoryData = data as { score: number; grade: string };
-        console.log("[api/og] Processing category:", name, categoryData);
-        // Use default values if category data is empty
-        const score = categoryData.score ?? 50;
-        const grade = categoryData.grade ?? "C";
-        const displayName = name.charAt(0).toUpperCase() + name.slice(1);
-        if (score < worstCategory.score) {
-          worstCategory = { name: displayName, grade, score };
-        }
-        if (score > bestCategory.score) {
-          bestCategory = { name: displayName, grade, score };
-        }
+    const result = await getShareCardData(id);
+    if ("error" in result) {
+      if (result.error === "not_found") {
+        return new Response("Roast not found", { status: 404 });
       }
+      console.error("[api/og] Supabase error:", result.message);
+      return new Response(`Database error: ${result.message}`, { status: 500 });
     }
 
-    // If no categories were found (all scores were default/empty), use defaults
-    if (worstCategory.score === Infinity) {
-      worstCategory = { name: "Unknown", grade: "F", score: 0 };
-    }
-    if (bestCategory.score === -Infinity) {
-      bestCategory = { name: "Unknown", grade: "A", score: 100 };
-    }
+    const { lifeScore, funnyTitle, punchline, categoryScores } = result.card;
 
-    console.log("[api/og] Final categories:", { worst: worstCategory, best: bestCategory });
-
-    const bestRoast = topRoasts[0] ?? "You need to do better.";
+    const rows = categoryScores
+      ? CATEGORY_ROWS.map(({ key, label }) => {
+          const { score, grade } = categoryScores[key];
+          return {
+            key,
+            label,
+            grade,
+            fill: Math.max(0, Math.min(100, score)),
+          };
+        })
+      : [];
 
     return new ImageResponse(
       (
@@ -108,8 +82,9 @@ export async function GET(
             height: "100%",
             display: "flex",
             flexDirection: "column",
+            justifyContent: "center",
             background: "#0a0a0b",
-            padding: 60,
+            padding: 80,
             fontFamily: "system-ui, sans-serif",
           }}
         >
@@ -167,86 +142,79 @@ export async function GET(
             </span>
           </div>
 
-          {/* Worst and Best Categories */}
-          <div
-            style={{
-              display: "flex",
-              gap: 30,
-              marginBottom: 50,
-            }}
-          >
+          {/* Category breakdown */}
+          {rows.length > 0 && (
             <div
               style={{
-                flex: 1,
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "center",
-                padding: 30,
-                borderRadius: 20,
-                background: "#141416",
-                border: "2px solid #28282c",
+                marginBottom: 50,
               }}
             >
-              <span style={{ fontSize: 20, color: "#5f5f66", marginBottom: 10 }}>
-                WORST
-              </span>
-              <span
-                style={{
-                  fontSize: 36,
-                  fontWeight: 700,
-                  color: "#f5f3f0",
-                  marginBottom: 10,
-                }}
-              >
-                {worstCategory.name?.toUpperCase() ?? "UNKNOWN"}
-              </span>
-              <span
-                style={{
-                  fontSize: 80,
-                  fontWeight: 900,
-                  color: getGradeColor(worstCategory.grade),
-                }}
-              >
-                {worstCategory.grade}
-              </span>
+              {rows.map((row, i) => {
+                const color = getGradeColor(row.grade);
+                return (
+                  <div
+                    key={row.key}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "26px 34px",
+                      marginTop: i === 0 ? 0 : 20,
+                      background: "#111111",
+                      border: `2px solid ${color}55`,
+                      borderRadius: 18,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 220,
+                        fontSize: 34,
+                        fontWeight: 700,
+                        color: "#f5f3f0",
+                      }}
+                    >
+                      {row.label}
+                    </span>
+                    <div
+                      style={{
+                        display: "flex",
+                        flex: 1,
+                        height: 22,
+                        marginLeft: 20,
+                        marginRight: 30,
+                        borderRadius: 11,
+                        background: "#262626",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          width: `${row.fill}%`,
+                          height: "100%",
+                          borderRadius: 11,
+                          background: color,
+                        }}
+                      />
+                    </div>
+                    <span
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        width: 56,
+                        fontSize: 56,
+                        fontWeight: 900,
+                        color,
+                      }}
+                    >
+                      {row.grade}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                padding: 30,
-                borderRadius: 20,
-                background: "#141416",
-                border: "2px solid #28282c",
-              }}
-            >
-              <span style={{ fontSize: 20, color: "#5f5f66", marginBottom: 10 }}>
-                BEST
-              </span>
-              <span
-                style={{
-                  fontSize: 36,
-                  fontWeight: 700,
-                  color: "#f5f3f0",
-                  marginBottom: 10,
-                }}
-              >
-                {bestCategory.name?.toUpperCase() ?? "UNKNOWN"}
-              </span>
-              <span
-                style={{
-                  fontSize: 80,
-                  fontWeight: 900,
-                  color: getGradeColor(bestCategory.grade),
-                }}
-              >
-                {bestCategory.grade}
-              </span>
-            </div>
-          </div>
+          )}
 
           {/* Best Roast One-Liner */}
           <div
@@ -255,9 +223,9 @@ export async function GET(
               justifyContent: "center",
               padding: 30,
               borderRadius: 20,
-              background: "#141416",
-              border: "2px solid #ff5a36",
-              marginBottom: 50,
+              background: "#111111",
+              border: `2px solid ${EMBER_ORANGE}`,
+              marginBottom: 60,
             }}
           >
             <span
@@ -266,29 +234,33 @@ export async function GET(
                 fontWeight: 600,
                 color: "#f5f3f0",
                 lineHeight: 1.4,
+                textAlign: "center",
               }}
             >
-              "{bestRoast}"
+              &quot;{truncate(punchline, 180)}&quot;
             </span>
           </div>
 
-          {/* App Name */}
+          {/* Wordmark */}
           <div
             style={{
               display: "flex",
-              justifyContent: "center",
-              marginTop: "auto",
+              flexDirection: "column",
+              alignItems: "center",
             }}
           >
             <span
               style={{
-                fontSize: 36,
+                fontSize: 40,
                 fontWeight: 800,
-                letterSpacing: 4,
-                color: "#ff5a36",
+                letterSpacing: 6,
+                color: EMBER_ORANGE,
               }}
             >
-              EMBER
+              EMBERAI
+            </span>
+            <span style={{ marginTop: 10, fontSize: 26, color: "#98979c" }}>
+              Get roasted at emberai.site
             </span>
           </div>
         </div>
@@ -296,10 +268,19 @@ export async function GET(
       {
         width: 1080,
         height: 1920,
+        // next/og defaults to a 1-year immutable cache, which would pin stale
+        // (or old-design) cards in browsers/CDNs and social scrapers.
+        headers: {
+          "Cache-Control":
+            "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400",
+        },
       },
     );
   } catch (error) {
     console.error("[api/og] Unhandled error in OG generation:", error);
-    return new Response(`Internal server error: ${error instanceof Error ? error.message : "Unknown error"}`, { status: 500 });
+    return new Response(
+      `Internal server error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      { status: 500 },
+    );
   }
 }

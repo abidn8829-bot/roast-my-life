@@ -1,3 +1,4 @@
+import { generateCardPunchline, insertRoastRow } from "@/lib/card-punchline";
 import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
 import { sendAchievementPush } from "@/lib/achievement-push";
@@ -41,11 +42,10 @@ const SYSTEM_PROMPTS: Record<RoastTone, string> = {
 
 IMPORTANT: You must respond with valid JSON in this exact format:
 {
-  "roast_text": "your full roast paragraph here",
-  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+  "roast_text": "your full roast paragraph here"
 }
 
-Each one-liner must be under 15 words and brutally funny. No markdown, no extra text, just the JSON.
+No markdown, no extra text, just the JSON.
 
 CONTINUITY INSTRUCTIONS:
 - Reference previous sessions naturally using the continuity memory
@@ -59,11 +59,10 @@ CONTINUITY INSTRUCTIONS:
 
 IMPORTANT: You must respond with valid JSON in this exact format:
 {
-  "roast_text": "your full roast paragraph here",
-  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+  "roast_text": "your full roast paragraph here"
 }
 
-Each one-liner must be under 15 words and brutally savage. No markdown, no extra text, just the JSON.
+No markdown, no extra text, just the JSON.
 
 CONTINUITY INSTRUCTIONS:
 - Reference previous sessions naturally using the continuity memory
@@ -76,11 +75,10 @@ CONTINUITY INSTRUCTIONS:
 
 IMPORTANT: You must respond with valid JSON in this exact format:
 {
-  "roast_text": "your full roast paragraph here",
-  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+  "roast_text": "your full roast paragraph here"
 }
 
-Each one-liner must be under 15 words and absolutely devastating. No markdown, no extra text, just the JSON.
+No markdown, no extra text, just the JSON.
 
 CONTINUITY INSTRUCTIONS:
 - Reference previous sessions naturally using the continuity memory
@@ -95,22 +93,20 @@ const COACH_SYSTEM_PROMPT = `You are a supportive life coach who gives construct
 
 IMPORTANT: You must respond with valid JSON in this exact format:
 {
-  "roast_text": "your full coach report paragraph here",
-  "top_5_roasts": ["actionable tip 1", "actionable tip 2", "actionable tip 3", "actionable tip 4", "actionable tip 5"]
+  "roast_text": "your full coach report paragraph here"
 }
 
-Each tip must be under 15 words and practical. No markdown, no extra text, just the JSON.`;
+No markdown, no extra text, just the JSON.`;
 
 const PERSONA_PROMPTS: Record<RoastPersona, string> = {
   default: `You are a savage roast comedian with zero filter who remembers everything. Use their exact numbers to destroy them. Connect every bad habit to real consequences. Heavy Gen Z slang. No softening, no "I'm not judging", no encouragement. Just brutal facts. End with a devastating one liner. 150-200 words.
 
 IMPORTANT: You must respond with valid JSON in this exact format:
 {
-  "roast_text": "your full roast paragraph here",
-  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+  "roast_text": "your full roast paragraph here"
 }
 
-Each one-liner must be under 15 words and brutally funny. No markdown, no extra text, just the JSON.
+No markdown, no extra text, just the JSON.
 
 CONTINUITY INSTRUCTIONS:
 - Reference previous sessions naturally using the continuity memory
@@ -123,11 +119,10 @@ CONTINUITY INSTRUCTIONS:
 
 IMPORTANT: You must respond with valid JSON in this exact format:
 {
-  "roast_text": "your full roast paragraph here",
-  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+  "roast_text": "your full roast paragraph here"
 }
 
-Each one-liner must be under 15 words and food-themed. No markdown, no extra text, just the JSON.
+No markdown, no extra text, just the JSON.
 
 CONTINUITY INSTRUCTIONS:
 - Reference previous sessions naturally using the continuity memory
@@ -140,11 +135,10 @@ CONTINUITY INSTRUCTIONS:
 
 IMPORTANT: You must respond with valid JSON in this exact format:
 {
-  "roast_text": "your full roast paragraph here",
-  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+  "roast_text": "your full roast paragraph here"
 }
 
-Each one-liner must be under 15 words and military-themed. No markdown, no extra text, just the JSON.
+No markdown, no extra text, just the JSON.
 
 CONTINUITY INSTRUCTIONS:
 - Reference previous sessions naturally using the continuity memory
@@ -157,11 +151,10 @@ CONTINUITY INSTRUCTIONS:
 
 IMPORTANT: You must respond with valid JSON in this exact format:
 {
-  "roast_text": "your full roast paragraph here",
-  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+  "roast_text": "your full roast paragraph here"
 }
 
-Each one-liner must be under 15 words and Gen Z slang. No markdown, no extra text, just the JSON.
+No markdown, no extra text, just the JSON.
 
 CONTINUITY INSTRUCTIONS:
 - Reference previous sessions naturally using the continuity memory
@@ -174,11 +167,10 @@ CONTINUITY INSTRUCTIONS:
 
 IMPORTANT: You must respond with valid JSON in this exact format:
 {
-  "roast_text": "your full roast paragraph here",
-  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+  "roast_text": "your full roast paragraph here"
 }
 
-Each one-liner must be under 15 words and corporate-themed. No markdown, no extra text, just the JSON.
+No markdown, no extra text, just the JSON.
 
 CONTINUITY INSTRUCTIONS:
 - Reference previous sessions naturally using the continuity memory
@@ -191,11 +183,10 @@ CONTINUITY INSTRUCTIONS:
 
 IMPORTANT: You must respond with valid JSON in this exact format:
 {
-  "roast_text": "your full roast paragraph here",
-  "top_5_roasts": ["short one-liner 1", "short one-liner 2", "short one-liner 3", "short one-liner 4", "short one-liner 5"]
+  "roast_text": "your full roast paragraph here"
 }
 
-Each one-liner must be under 15 words and grandmother-themed. No markdown, no extra text, just the JSON.
+No markdown, no extra text, just the JSON.
 
 CONTINUITY INSTRUCTIONS:
 - Reference previous sessions naturally using the continuity memory
@@ -362,6 +353,15 @@ export async function POST(request: Request) {
   const { answers, tone, mode, persona, followUpAnswer } = parsed;
   console.log("[api/roast] Parsed answers:", { answers, tone, mode, persona, followUpAnswer });
 
+  // Free tier only gets the default persona and normal tone — everything else is Pro-gated.
+  // (Client UI already disables these for free users; this is the server-side enforcement.)
+  if (subscriptionTier === "free" && (tone !== "normal" || persona !== "default")) {
+    return NextResponse.json(
+      { error: "Custom personas and roast tones are Pro features. Upgrade to Pro to unlock them 🔥" },
+      { status: 403 },
+    );
+  }
+
   // Check if this is a returning user (has previous roasts)
   const { data: previousRoasts } = await supabase
     .from("roasts")
@@ -418,7 +418,6 @@ Continuity memory: ${JSON.stringify(continuityMemory)}`;
   }
 
   let roastText: string;
-  let top5Roasts: string[] = [];
   try {
     let systemPrompt: string;
     if (mode === "coach") {
@@ -465,12 +464,10 @@ Continuity memory: ${JSON.stringify(continuityMemory)}`;
     try {
       const parsed = JSON.parse(content);
       roastText = parsed.roast_text || content;
-      top5Roasts = parsed.top_5_roasts || [];
-      console.log("[api/roast] Parsed AI response:", { roastText: roastText.substring(0, 100), top5Roasts });
+      console.log("[api/roast] Parsed AI response:", { roastText: roastText.substring(0, 100) });
     } catch (parseError) {
       console.error("[api/roast] Failed to parse JSON response, using raw content:", parseError);
       roastText = content;
-      top5Roasts = [];
     }
   } catch (err) {
     logGroqError(err);
@@ -486,6 +483,15 @@ Continuity memory: ${JSON.stringify(continuityMemory)}`;
   const life_score = calculateLifeScore(answers);
   const funny_title = getFunnyTitle(life_score);
   const category_scores = calculateCategoryScores(answers);
+
+  // Card punchline runs alongside the continuity-memory call (both only need roastText).
+  const punchlinePromise = generateCardPunchline(groq, MODEL, {
+    answers,
+    categoryScores: category_scores,
+    lifeScore: life_score,
+    roastText,
+    mode,
+  });
 
   // Generate continuity memory
   let newContinuityMemory = continuityMemory || { activeTheme: "", followUpQuestion: "", lastResponse: "", callbackCount: 0, resolved: false, challenge: "", updatedAt: "" };
@@ -528,6 +534,8 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     newContinuityMemory.updatedAt = new Date().toISOString();
   }
 
+  const cardPunchline = await punchlinePromise;
+
   const baseRow = {
     user_id: user.id,
     roast_text: roastText,
@@ -538,7 +546,8 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     answers,
     life_score,
     funny_title,
-    top_5_roasts: top5Roasts,
+    top_5_roasts: [],
+    card_punchline: cardPunchline,
     category_scores,
     tone,
     mode,
@@ -557,9 +566,7 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     life_score_type: typeof baseRow.life_score,
     funny_title: baseRow.funny_title,
     funny_title_type: typeof baseRow.funny_title,
-    top_5_roasts: baseRow.top_5_roasts,
-    top_5_roasts_type: typeof baseRow.top_5_roasts,
-    top_5_roasts_length: baseRow.top_5_roasts?.length,
+    card_punchline: baseRow.card_punchline,
     category_scores: baseRow.category_scores,
     category_scores_type: typeof baseRow.category_scores,
     tone: baseRow.tone,
@@ -573,11 +580,7 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
   console.log("[api/roast] Full insert object keys:", Object.keys(baseRow));
   console.log("[api/roast] Full insert object:", JSON.stringify(baseRow, null, 2));
 
-  let { data, error } = await supabase
-    .from("roasts")
-    .insert(baseRow)
-    .select("id")
-    .single();
+  const { data, error } = await insertRoastRow(supabase, baseRow);
 
   if (error) {
     console.error("[api/roast] Full Supabase error object:", JSON.stringify(error, null, 2));

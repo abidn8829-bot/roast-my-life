@@ -7,6 +7,7 @@ type Props = {
   onSelect: (tone: RoastTone) => void;
   isPro: boolean;
   onUpgradeRequest?: () => void;
+  defaultTone?: RoastTone;
 };
 
 const TONES: { key: RoastTone; label: string; emoji: string; description: string; proOnly: boolean }[] = [
@@ -33,8 +34,8 @@ const TONES: { key: RoastTone; label: string; emoji: string; description: string
   },
 ];
 
-export function ToneSelector({ onSelect, isPro, onUpgradeRequest }: Props) {
-  const [selected, setSelected] = useState<RoastTone>("normal");
+export function ToneSelector({ onSelect, isPro, onUpgradeRequest, defaultTone }: Props) {
+  const [selected, setSelected] = useState<RoastTone>(defaultTone ?? "normal");
 
   function handleSelect(tone: RoastTone) {
     if (!isPro && tone !== "normal") {
@@ -80,11 +81,6 @@ export function ToneSelector({ onSelect, isPro, onUpgradeRequest }: Props) {
                   <span className="text-2xl">🔒</span>
                   <span className="text-xs font-semibold text-ember">Pro only</span>
                 </div>
-              )}
-              {selected === tone.key && (
-                <span className="absolute right-6 top-1/2 -translate-y-1/2 text-2xl text-ember">
-                  ✓
-                </span>
               )}
             </div>
           </button>

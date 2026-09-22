@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   // Get the most recent roast
   const { data: previousRoast } = await supabase
     .from("roasts")
-    .select("answers, continuity_memory, roast_text, created_at")
+    .select("answers, continuity_memory, roast_text, created_at, tone, persona")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -55,5 +55,7 @@ export async function GET(request: Request) {
     continuityMemory: previousRoast.continuity_memory,
     previousRoastText: previousRoast.roast_text,
     lastRoastDate: previousRoast.created_at,
+    tone: previousRoast.tone ?? "normal",
+    persona: previousRoast.persona ?? "default",
   });
 }
