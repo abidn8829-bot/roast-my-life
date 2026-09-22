@@ -16,9 +16,22 @@ const CATEGORIES = ["sleep", "fitness", "discipline", "focus", "spending"] as co
 type Category = typeof CATEGORIES[number];
 const GRADES = ["A", "B", "C", "D", "F"] as const;
 const GRADE_SCORES: Record<Grade, number> = { A: 100, B: 75, C: 60, D: 40, F: 0 };
+const PERSONAS = ["default", "gordon_ramsay", "drill_sergeant", "toxic_friend", "corporate_manager", "savage_grandma"] as const;
 
 function isCategory(value: unknown): value is Category { return typeof value === "string" && CATEGORIES.includes(value as Category); }
 function isGrade(value: unknown): value is Grade { return typeof value === "string" && GRADES.includes(value as Grade); }
+
+// Check-in roast voice per tone. `normal` is the existing, unchanged prompt.
+// TODO: no_mercy / destroy_me are placeholders (identical to normal) until these
+// get their own tailored copy — intentionally not writing that content here.
+// NOTE: `resolvedPersona` below is captured and persisted (so it's ready to use),
+// but this generation prompt doesn't vary by persona yet either — same reasoning.
+const CHECKIN_SYSTEM_PROMPT_NORMAL = "You are a gen z brutally honest roast comedian with zero filter. You roast people based on their exact habits and numbers. Rules: use their specific numbers, name the exact apps they mentioned, connect their bad habits to real life consequences, no sugarcoating, no encouragement. End with one devastatingly accurate one-liner. 100 words max. If the overall check-in shows improvement, stay funny but noticeably lighter and less brutal; if nothing improved or something got worse, keep it at full brutal intensity. Only cite a specific category's numeric score if it appears in \"Categories graded this check-in\" below, always as its exact was-to-now change — never invent, approximate, or reference a score for a category not listed there. The life score is a separate overall 0-100 average across all 5 categories — never present it as if it were a single category's score.";
+const CHECKIN_SYSTEM_PROMPTS: Record<RoastTone, string> = {
+  normal: CHECKIN_SYSTEM_PROMPT_NORMAL,
+  no_mercy: CHECKIN_SYSTEM_PROMPT_NORMAL,
+  destroy_me: CHECKIN_SYSTEM_PROMPT_NORMAL,
+};
 
 function getAvailableCategories(coveredCategories: Category[], lastAskedCategory: unknown): { available: Category[]; resetCovered: Category[] } {
   let available = CATEGORIES.filter((c) => !coveredCategories.includes(c) && c !== lastAskedCategory);
@@ -58,6 +71,27 @@ export async function POST(request: Request) {
   if (previousError || !previous) return NextResponse.json({ error: "No previous roast found" }, { status: 404 });
   const categoryScores = previous.category_scores as CategoryScores | null;
   if (!categoryScores) return NextResponse.json({ error: "Previous category grades are unavailable" }, { status: 409 });
+
+  // Free tier stays locked to whatever tone they already have (always "normal" in
+  // practice, since /api/roast never lets a free user set anything else). Pro users
+  // can pick a different tone per check-in via the tone selector.
+  const { data: userRow } = await supabase.from("users").select("subscription_tier").eq("id", user.id).single();
+  const subscriptionTier = userRow?.subscription_tier || "free";
+  const requestedTone = typeof body.tone === "string" && ["normal", "no_mercy", "destroy_me"].includes(body.tone)
+    ? (body.tone as RoastTone)
+    : undefined;
+  const resolvedTone: RoastTone = subscriptionTier === "pro" && requestedTone
+    ? requestedTone
+    : ((previous.tone as RoastTone) ?? "normal");
+
+  // Same gating for persona: free tier keeps whatever they already have (always
+  // "default" in practice), Pro users can pick a different roaster per check-in.
+  const requestedPersona = typeof body.persona === "string" && PERSONAS.includes(body.persona as RoastPersona)
+    ? (body.persona as RoastPersona)
+    : undefined;
+  const resolvedPersona: RoastPersona = subscriptionTier === "pro" && requestedPersona
+    ? requestedPersona
+    : ((previous.persona as RoastPersona) ?? "default");
 
   const groq = new Groq({ apiKey });
   if (body.action === "question") {
@@ -210,7 +244,7 @@ export async function POST(request: Request) {
     const roastCompletion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 350, reasoning_effort: "low",
       messages: [
-        { role: "system", content: "You are a gen z brutally honest roast comedian with zero filter. You roast people based on their exact habits and numbers. Rules: use their specific numbers, name the exact apps they mentioned, connect their bad habits to real life consequences, no sugarcoating, no encouragement. End with one devastatingly accurate one-liner. 100 words max. If the overall check-in shows improvement, stay funny but noticeably lighter and less brutal; if nothing improved or something got worse, keep it at full brutal intensity. Only cite a specific category's numeric score if it appears in \"Categories graded this check-in\" below, always as its exact was-to-now change — never invent, approximate, or reference a score for a category not listed there. The life score is a separate overall 0-100 average across all 5 categories — never present it as if it were a single category's score." },
+        { role: "system", content: CHECKIN_SYSTEM_PROMPTS[resolvedTone] },
         { role: "user", content: `Categories graded this check-in (score is 0-100 for that category only, separate from life score): ${JSON.stringify(changedCategoryScores)}\nCategory directions this check-in, all 5 (qualitative only, no numbers): ${JSON.stringify(categoryDirections)}\nOverall life score (0-100 average across all categories): was ${previousLifeScore}, now ${lifeScore} (${overallDirection})\nCheck-in answer: ${answer}\nContinuity memory: ${JSON.stringify(nextMemory)}` },
       ],
     });
@@ -232,7 +266,7 @@ export async function POST(request: Request) {
   const { data: created, error: roastError } = await insertRoastRow(supabase, {
     user_id: user.id, roast_text: newRoastText, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),
     answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: [], card_punchline: cardPunchline, category_scores: updatedCategoryScores, suggestion_line: suggestionLine,
-    tone: (previous.tone ?? "normal") as RoastTone, mode: (previous.mode ?? "roast") as RoastMode, persona: (previous.persona ?? "default") as RoastPersona, continuity_memory: nextMemory, plan_steps: plan,
+    tone: resolvedTone, mode: (previous.mode ?? "roast") as RoastMode, persona: resolvedPersona, continuity_memory: nextMemory, plan_steps: plan,
   });
   if (roastError || !created) return NextResponse.json({ error: "Failed to save check-in roast" }, { status: 500 });
   const { error: historyError } = await supabase.from("score_history").insert({ user_id: user.id, roast_id: created.id, life_score: lifeScore, category_grades: updatedCategoryScores });

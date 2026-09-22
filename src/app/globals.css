@@ -96,3 +96,22 @@ body {
     animation: none;
   }
 }
+
+@keyframes ember-float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+}
+
+.animate-ember-float {
+  animation: ember-float 4.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ember-float {
+    animation: none;
+  }
+}

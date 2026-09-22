@@ -353,6 +353,15 @@ export async function POST(request: Request) {
   const { answers, tone, mode, persona, followUpAnswer } = parsed;
   console.log("[api/roast] Parsed answers:", { answers, tone, mode, persona, followUpAnswer });
 
+  // Free tier only gets the default persona and normal tone — everything else is Pro-gated.
+  // (Client UI already disables these for free users; this is the server-side enforcement.)
+  if (subscriptionTier === "free" && (tone !== "normal" || persona !== "default")) {
+    return NextResponse.json(
+      { error: "Custom personas and roast tones are Pro features. Upgrade to Pro to unlock them 🔥" },
+      { status: 403 },
+    );
+  }
+
   // Check if this is a returning user (has previous roasts)
   const { data: previousRoasts } = await supabase
     .from("roasts")
