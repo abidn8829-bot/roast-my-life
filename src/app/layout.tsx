@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono, Poppins } from "next/font/google";
 import "./globals.css";
 import { PostHogProvider } from "@/components/PostHogProvider";
+import { SITE_URL } from "@/lib/site";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -15,6 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Ember — Get Brutally Roasted by AI",
   description: "Answer 5 questions. Get brutally roasted by AI. Share your shame.",
 };
