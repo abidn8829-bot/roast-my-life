@@ -2,33 +2,29 @@ import { NextResponse } from "next/server";
 import { computePercentile, MIN_SAMPLE_SIZE } from "@/lib/percentile";
 import { parseCategoryScores } from "@/lib/parse-category-scores";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { todayKey } from "@/lib/arc-trend";
 
+// Runs DAILY (vercel.json) despite the route name — kept at this path so the
+// existing Vercel cron wiring doesn't change. One row per Pro user per
+// category per UTC day (snapshot_date), upserted so re-runs are idempotent.
 export const dynamic = "force-dynamic";
 
 const CATEGORIES = ["sleep", "fitness", "discipline", "focus", "spending"] as const;
-
-function mondayOf(date: Date): string {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = d.getUTCDay(); // 0=Sun..6=Sat
-  const diff = (day === 0 ? -6 : 1) - day; // shift back to this week's Monday
-  d.setUTCDate(d.getUTCDate() + diff);
-  return d.toISOString().split("T")[0]!;
-}
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
   if (!authHeader || !authHeader.startsWith("Bearer ") || authHeader.slice(7) !== cronSecret) {
-    console.error("[weekly-arc-snapshot] Unauthorized request");
+    console.error("[daily-arc-snapshot] Unauthorized request");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const service = createSupabaseServiceClient();
-  const weekStart = mondayOf(new Date());
+  const snapshotDate = todayKey();
 
   const { data: distributionData, error: distributionError } = await service.rpc("get_category_averages");
   if (distributionError) {
-    console.error("[weekly-arc-snapshot] get_category_averages failed:", distributionError.message);
+    console.error("[daily-arc-snapshot] get_category_averages failed:", distributionError.message);
     return NextResponse.json({ error: "Failed to fetch category averages" }, { status: 500 });
   }
 
@@ -43,7 +39,7 @@ export async function GET(request: Request) {
     .eq("subscription_tier", "pro");
 
   if (proUsersError) {
-    console.error("[weekly-arc-snapshot] Failed to fetch pro users:", proUsersError.message);
+    console.error("[daily-arc-snapshot] Failed to fetch pro users:", proUsersError.message);
     return NextResponse.json({ error: "Failed to fetch pro users" }, { status: 500 });
   }
 
@@ -52,7 +48,7 @@ export async function GET(request: Request) {
   const rows: {
     user_id: string;
     category: string;
-    week_start: string;
+    snapshot_date: string;
     user_score: number;
     avg_score: number | null;
     percentile: number | null;
@@ -84,7 +80,7 @@ export async function GET(request: Request) {
       rows.push({
         user_id: userId,
         category,
-        week_start: weekStart,
+        snapshot_date: snapshotDate,
         user_score: userScore,
         avg_score: hasEnoughSample ? Number(distribution!.avg_score) : null,
         percentile: hasEnoughSample ? computePercentile(userScore, peerScores!) : null,
@@ -96,15 +92,15 @@ export async function GET(request: Request) {
   if (rows.length > 0) {
     const { error: upsertError } = await service
       .from("arc_percentile_snapshots")
-      .upsert(rows, { onConflict: "user_id,category,week_start" });
+      .upsert(rows, { onConflict: "user_id,category,snapshot_date" });
 
     if (upsertError) {
-      console.error("[weekly-arc-snapshot] Upsert failed:", upsertError.message);
+      console.error("[daily-arc-snapshot] Upsert failed:", upsertError.message);
       return NextResponse.json({ error: "Failed to write snapshots" }, { status: 500 });
     }
     rowsWritten = rows.length;
   }
 
-  console.log("[weekly-arc-snapshot] Run complete:", { weekStart, usersProcessed, rowsWritten });
-  return NextResponse.json({ success: true, weekStart, usersProcessed, rowsWritten });
+  console.log("[daily-arc-snapshot] Run complete:", { snapshotDate, usersProcessed, rowsWritten });
+  return NextResponse.json({ success: true, snapshotDate, usersProcessed, rowsWritten });
 }

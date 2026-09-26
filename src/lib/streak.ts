@@ -1,8 +1,8 @@
-function toDateKey(iso: string): string {
+export function toDateKey(iso: string): string {
   return new Date(iso).toISOString().split("T")[0]!;
 }
 
-function previousDay(dateKey: string): string {
+export function previousDay(dateKey: string): string {
   const d = new Date(`${dateKey}T12:00:00`);
   d.setDate(d.getDate() - 1);
   return d.toISOString().split("T")[0]!;

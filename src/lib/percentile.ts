@@ -1,4 +1,6 @@
-export const MIN_SAMPLE_SIZE = 2;
+// Below this many Ember users graded on a category, a percentile is noise —
+// callers show "not enough users yet" instead of a number.
+export const MIN_SAMPLE_SIZE = 10;
 
 // Percentile of userScore within peerScores (every user's latest score for that
 // category, including the requesting user). Ties split the difference so a

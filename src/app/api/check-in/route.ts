@@ -10,6 +10,8 @@ import type { CategoryScores, Grade, OnboardingAnswers, RoastMode, RoastPersona,
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
+import { todayKey } from "@/lib/arc-trend";
+import { applyCheckInToMission } from "@/lib/missions-server";
 
 const MODEL = "openai/gpt-oss-120b";
 const CATEGORIES = ["sleep", "fitness", "discipline", "focus", "spending"] as const;
@@ -271,6 +273,13 @@ export async function POST(request: Request) {
   if (roastError || !created) return NextResponse.json({ error: "Failed to save check-in roast" }, { status: 500 });
   const { error: historyError } = await supabase.from("score_history").insert({ user_id: user.id, roast_id: created.id, life_score: lifeScore, category_grades: updatedCategoryScores });
   if (historyError) { console.error("[api/check-in] score history insert failed:", historyError.message); return NextResponse.json({ error: "Check-in saved, but score history could not be updated" }, { status: 500 }); }
+  if (subscriptionTier === "pro") {
+    try {
+      await applyCheckInToMission(supabase, groq, user.id, answer, todayKey());
+    } catch (error) {
+      console.error("[api/check-in] mission check failed:", error);
+    }
+  }
   let newlyUnlockedAchievements: AchievementId[] = [];
   try {
     newlyUnlockedAchievements = (await unlockAchievements(supabase, user.id)).newlyUnlocked;
