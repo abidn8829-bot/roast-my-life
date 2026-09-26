@@ -18,20 +18,32 @@ create index if not exists score_history_user_recorded_idx
   on public.score_history (user_id, recorded_at desc);
 
 -- /api/check-in inserts with the user-session (anon key) client, so RLS
--- applies to it. The insert + select policies below MUST exist whenever RLS
--- is on, or the check-in insert silently fails (same bug class as 011/012).
--- Policies are created before RLS is enabled so there is no window where the
--- table is locked. Existing policies with other names are left alone —
--- permissive policies are OR'd, so they can only widen access, never block it.
-drop policy if exists "Users can view own score history" on public.score_history;
-create policy "Users can view own score history"
-  on public.score_history for select
-  using (auth.uid() = user_id);
+-- applies to it: an insert + select policy MUST exist whenever RLS is on, or
+-- the check-in insert silently fails (same bug class as 011/012).
+-- The live table already has these (created by hand as "allow insert
+-- score_history" / "allow select score_history"), so policies are only
+-- created when no policy for that command exists — never duplicated, never
+-- dropped. They're created before RLS is enabled so there's no locked window.
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'score_history' and cmd in ('SELECT', 'ALL')
+  ) then
+    create policy "Users can view own score history"
+      on public.score_history for select
+      using (auth.uid() = user_id);
+  end if;
 
-drop policy if exists "Users can insert own score history" on public.score_history;
-create policy "Users can insert own score history"
-  on public.score_history for insert
-  with check (auth.uid() = user_id);
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'score_history' and cmd in ('INSERT', 'ALL')
+  ) then
+    create policy "Users can insert own score history"
+      on public.score_history for insert
+      with check (auth.uid() = user_id);
+  end if;
+end $$;
 
 alter table public.score_history enable row level security;
 
