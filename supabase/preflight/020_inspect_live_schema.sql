@@ -32,8 +32,8 @@ where p.schemaname = 'public' and p.tablename in ('score_history', 'arc_percenti
 union all
 
 select 'constraint',
-       con.conrelid::regclass::text || '.' || con.conname,
-       con.contype || ': ' || pg_get_constraintdef(con.oid)
+       con.conrelid::regclass::text || '.' || con.conname::text,
+       con.contype::text || ': ' || pg_get_constraintdef(con.oid)
 from pg_constraint con
 where con.conrelid in ('public.score_history'::regclass, 'public.arc_percentile_snapshots'::regclass)
 
