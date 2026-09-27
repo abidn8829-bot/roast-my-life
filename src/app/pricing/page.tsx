@@ -65,7 +65,7 @@ export default function PricingPage() {
             </div>
             <div className="mb-4">
               <h2 className="text-2xl font-bold text-[#FAFAFA]">Pro</h2>
-              <p className="text-3xl font-black text-[#FF3D00]">$4.99<span className="text-lg font-normal text-neutral-400">/month</span></p>
+              <p className="text-3xl font-black text-[#FF3D00]">$6.99<span className="text-lg font-normal text-neutral-400">/month</span></p>
             </div>
             <ul className="mb-6 space-y-3 text-sm text-neutral-300">
               <li className="flex items-center gap-2">

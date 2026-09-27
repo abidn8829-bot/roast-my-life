@@ -503,7 +503,7 @@ export default function Home() {
               </span>
               <h3 className="text-xl font-bold">Pro</h3>
               <p className="mt-1 text-3xl font-black">
-                $4.99<span className="text-lg font-normal text-text-faint">/month</span>
+                $6.99<span className="text-lg font-normal text-text-faint">/month</span>
               </p>
               <ul className="mt-6 space-y-4 text-sm">
                 {PRO_FEATURES.map((f) => (
