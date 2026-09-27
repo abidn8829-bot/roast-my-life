@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { FREE_FEATURES, PRO_FEATURES, PRO_PRICE } from "@/lib/plans";
 import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 import { useUserEmail } from "@/lib/use-user-email";
 
@@ -182,32 +183,6 @@ const FAQS = [
   {
     q: "Can I cancel anytime?",
     a: "Yes — no contracts, no guilt trips (well, maybe one, this is Ember after all).",
-  },
-];
-
-const FREE_FEATURES = [
-  "1 roast per day",
-  "Daily check-in",
-  "5 categories graded",
-  "Your Life Report Card",
-];
-
-const PRO_FEATURES = [
-  {
-    title: "Unlimited roasts",
-    desc: "Every day, any time — no waiting for tomorrow.",
-  },
-  {
-    title: "All 6 personas + every tone",
-    desc: "Gordon Ramsay, Drill Sergeant, Destroy Me mode — the full arsenal.",
-  },
-  {
-    title: "Your Arc",
-    desc: "See how you stack up against everyone else brave enough to do this — and get a plan for closing the gap. We're not explaining the rest. You'll see.",
-  },
-  {
-    title: "More categories, unlocking soon",
-    desc: "We're not done grading you yet.",
   },
 ];
 
@@ -503,7 +478,7 @@ export default function Home() {
               </span>
               <h3 className="text-xl font-bold">Pro</h3>
               <p className="mt-1 text-3xl font-black">
-                $6.99<span className="text-lg font-normal text-text-faint">/month</span>
+                {PRO_PRICE}<span className="text-lg font-normal text-text-faint">/month</span>
               </p>
               <ul className="mt-6 space-y-4 text-sm">
                 {PRO_FEATURES.map((f) => (

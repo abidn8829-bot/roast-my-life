@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { EliteWaitlistModal } from "@/components/elite-waitlist-modal";
+import { FREE_FEATURES, PRO_FEATURES, PRO_PRICE } from "@/lib/plans";
 import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 import { useUserEmail } from "@/lib/use-user-email";
 
@@ -37,18 +38,12 @@ export default function PricingPage() {
               <p className="text-3xl font-black text-[#FF3D00]">$0</p>
             </div>
             <ul className="mb-6 space-y-3 text-sm text-neutral-300">
-              <li className="flex items-center gap-2">
-                <span className="text-[#FF3D00]">✓</span>
-                1 roast per day
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-[#FF3D00]">✓</span>
-                3 categories graded
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-[#FF3D00]">✓</span>
-                Basic report card
-              </li>
+              {FREE_FEATURES.map((f) => (
+                <li key={f} className="flex items-center gap-2">
+                  <span className="text-[#FF3D00]">✓</span>
+                  {f}
+                </li>
+              ))}
             </ul>
             <Link
               href="/dashboard"
@@ -65,25 +60,18 @@ export default function PricingPage() {
             </div>
             <div className="mb-4">
               <h2 className="text-2xl font-bold text-[#FAFAFA]">Pro</h2>
-              <p className="text-3xl font-black text-[#FF3D00]">$6.99<span className="text-lg font-normal text-neutral-400">/month</span></p>
+              <p className="text-3xl font-black text-[#FF3D00]">{PRO_PRICE}<span className="text-lg font-normal text-neutral-400">/month</span></p>
             </div>
-            <ul className="mb-6 space-y-3 text-sm text-neutral-300">
-              <li className="flex items-center gap-2">
-                <span className="text-[#FF3D00]">✓</span>
-                Unlimited roasts
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-[#FF3D00]">✓</span>
-                Full roast history
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-[#FF3D00]">✓</span>
-                Destroy me mode
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-[#FF3D00]">✓</span>
-                5 categories graded
-              </li>
+            <ul className="mb-6 space-y-4 text-sm">
+              {PRO_FEATURES.map((f) => (
+                <li key={f.title}>
+                  <div className="flex items-center gap-2 font-semibold text-[#FAFAFA]">
+                    <span className="text-[#FF3D00]">✓</span>
+                    {f.title}
+                  </div>
+                  <p className="mt-1 pl-6 text-xs leading-relaxed text-neutral-400">{f.desc}</p>
+                </li>
+              ))}
             </ul>
             <a
               href={getUpgradeUrl(userEmail)}
@@ -105,24 +93,9 @@ export default function PricingPage() {
               <h2 className="text-2xl font-bold text-[#FAFAFA]">Elite</h2>
               <p className="text-3xl font-black text-neutral-400">???</p>
             </div>
-            <ul className="mb-6 space-y-3 text-sm text-neutral-400">
-              <li className="flex items-center gap-2">
-                <span className="text-neutral-500">○</span>
-                Real progress tracking
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-neutral-500">○</span>
-                Daily check-ins
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-neutral-500">○</span>
-                Streak system
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="text-neutral-500">○</span>
-                And more...
-              </li>
-            </ul>
+            <p className="mb-6 text-sm text-neutral-400">
+              Everything in Pro, plus more we&apos;re still building. Join the waitlist to hear first.
+            </p>
             <button
               type="button"
               onClick={() => setShowEliteWaitlistModal(true)}
