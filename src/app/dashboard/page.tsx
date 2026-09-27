@@ -125,9 +125,9 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen bg-bg px-4 py-10 text-text">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-        <DashboardHeader isPro={subscriptionTier === "pro"} name={name} />
+        <DashboardHeader isPro={subscriptionTier === "pro"} name={name} userEmail={user.email ?? undefined} />
         <PushPermissionPrompt />
-        {subscriptionTier === "free" && <UpgradeBanner />}
+        {subscriptionTier === "free" && <UpgradeBanner userEmail={user.email ?? undefined} />}
         <DashboardView
           name={name}
           roasts={roasts}

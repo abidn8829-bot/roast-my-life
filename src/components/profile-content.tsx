@@ -39,7 +39,7 @@ export function ProfileContent({ email, subscriptionTier }: Props) {
           </div>
         </div>
 
-        {subscriptionTier === "free" && <UpgradeBanner />}
+        {subscriptionTier === "free" && <UpgradeBanner userEmail={email || undefined} />}
       </div>
     </div>
   );

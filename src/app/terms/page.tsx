@@ -45,7 +45,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-xl font-bold text-[#FAFAFA] mb-3">Subscription and Payments</h2>
             <p className="leading-relaxed">
-              We offer free and paid subscription tiers. Pro subscriptions will be available soon. Join our waitlist to be notified when Pro launches. Payment processing details will be available at launch.
+              We offer free and paid subscription tiers. Pro is a monthly subscription sold and processed through Gumroad; purchase, billing and cancellation are handled under Gumroad&apos;s terms. An Elite tier is planned, and you can join its waitlist to be notified when it launches.
             </p>
           </section>
 

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
+import { useUserEmail } from "@/lib/use-user-email";
 
 function useRevealOnScroll<T extends HTMLElement>() {
   const ref = useRef<T | null>(null);
@@ -213,6 +215,7 @@ export default function Home() {
   const heroCard = useRevealOnScroll<HTMLDivElement>();
   const showcaseCard = useRevealOnScroll<HTMLDivElement>();
   const sampleDialogRef = useRef<HTMLDialogElement>(null);
+  const userEmail = useUserEmail();
 
   return (
     <main className="min-h-screen bg-bg text-text">
@@ -513,12 +516,15 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/pricing"
+              <a
+                href={getUpgradeUrl(userEmail)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-8 block rounded-lg bg-ember px-4 py-3 text-center text-sm font-bold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
               >
                 Upgrade to Pro 🔥
-              </Link>
+              </a>
+              <p className="mt-2 text-center text-xs text-text-faint">{UPGRADE_EMAIL_HINT}</p>
             </div>
           </div>
         </div>

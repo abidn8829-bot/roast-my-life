@@ -26,7 +26,7 @@ export default async function ArcPage() {
   return (
     <main className="min-h-screen bg-bg px-4 py-10 text-text">
       <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
-        <DashboardHeader isPro={subscriptionTier === "pro"} name={user.email || ""} />
+        <DashboardHeader isPro={subscriptionTier === "pro"} name={user.email || ""} userEmail={user.email ?? undefined} />
         <ArcSection variant="full" userEmail={user.email ?? undefined} />
       </div>
     </main>

@@ -6,7 +6,7 @@ import type { OnboardingAnswers, RoastTone, RoastMode, RoastPersona } from "@/li
 import posthog from "posthog-js";
 import { ToneSelector } from "@/components/tone-selector";
 import { PersonaSelector } from "@/components/persona-selector";
-import { ProWaitlistModal } from "@/components/pro-waitlist-modal";
+import { UpgradeModal } from "@/components/upgrade-modal";
 
 const LOADING_MESSAGES = [
   "Analyzing your poor life choices...",
@@ -87,7 +87,7 @@ const inputClass =
 const labelClass =
   "text-2xl sm:text-3xl font-bold leading-relaxed text-text break-words whitespace-normal text-center";
 
-export function OnboardingWizard() {
+export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(0);
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
@@ -95,7 +95,7 @@ export function OnboardingWizard() {
   const [isPro, setIsPro] = useState(false);
   const [selectedTone, setSelectedTone] = useState<RoastTone>("normal");
   const [selectedPersona, setSelectedPersona] = useState<RoastPersona>("default");
-  const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<"daily_limit" | "pro_feature" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
   const [followUpAnswer, setFollowUpAnswer] = useState("");
@@ -159,8 +159,8 @@ export function OnboardingWizard() {
             // Generate follow-up question
             generateFollowUpQuestion();
           } else {
-            // Show Pro waitlist modal if they've used today's roast
-            setShowProWaitlistModal(true);
+            // Offer Pro if they've used today's roast
+            setUpgradeReason("daily_limit");
           }
         }
       })
@@ -279,7 +279,7 @@ export function OnboardingWizard() {
 
       // Check if it's a daily limit error
       if (res.status === 429 && data.error?.includes("free roast today")) {
-        setShowProWaitlistModal(true);
+        setUpgradeReason("daily_limit");
         return;
       }
 
@@ -392,11 +392,13 @@ export function OnboardingWizard() {
         <PersonaSelector
           onSelect={onCheckInPersonaSelect}
           isPro={isPro}
-          onUpgradeRequest={() => setShowProWaitlistModal(true)}
+          onUpgradeRequest={() => setUpgradeReason("pro_feature")}
         />
-        <ProWaitlistModal
-          isOpen={showProWaitlistModal}
-          onClose={() => setShowProWaitlistModal(false)}
+        <UpgradeModal
+          isOpen={upgradeReason !== null}
+          onClose={() => setUpgradeReason(null)}
+          reason={upgradeReason ?? undefined}
+          userEmail={userEmail}
         />
       </>
     );
@@ -519,6 +521,12 @@ export function OnboardingWizard() {
           {LOADING_MESSAGES[loadingMsgIndex]}
         </p>
         {error ? <p className="mt-4 text-sm text-grade-f">{error}</p> : null}
+        <UpgradeModal
+          isOpen={upgradeReason !== null}
+          onClose={() => setUpgradeReason(null)}
+          reason={upgradeReason ?? undefined}
+          userEmail={userEmail}
+        />
       </div>
     );
   }
@@ -529,11 +537,13 @@ export function OnboardingWizard() {
         <PersonaSelector
           onSelect={onPersonaSelect}
           isPro={isPro}
-          onUpgradeRequest={() => setShowProWaitlistModal(true)}
+          onUpgradeRequest={() => setUpgradeReason("pro_feature")}
         />
-        <ProWaitlistModal
-          isOpen={showProWaitlistModal}
-          onClose={() => setShowProWaitlistModal(false)}
+        <UpgradeModal
+          isOpen={upgradeReason !== null}
+          onClose={() => setUpgradeReason(null)}
+          reason={upgradeReason ?? undefined}
+          userEmail={userEmail}
         />
       </>
     );
@@ -545,11 +555,13 @@ export function OnboardingWizard() {
         <ToneSelector
           onSelect={onToneSelect}
           isPro={isPro}
-          onUpgradeRequest={() => setShowProWaitlistModal(true)}
+          onUpgradeRequest={() => setUpgradeReason("pro_feature")}
         />
-        <ProWaitlistModal
-          isOpen={showProWaitlistModal}
-          onClose={() => setShowProWaitlistModal(false)}
+        <UpgradeModal
+          isOpen={upgradeReason !== null}
+          onClose={() => setUpgradeReason(null)}
+          reason={upgradeReason ?? undefined}
+          userEmail={userEmail}
         />
       </>
     );
@@ -637,6 +649,12 @@ export function OnboardingWizard() {
           </button>
         </div>
       </div>
+      <UpgradeModal
+        isOpen={upgradeReason !== null}
+        onClose={() => setUpgradeReason(null)}
+        reason={upgradeReason ?? undefined}
+        userEmail={userEmail}
+      />
     </div>
   );
 }

@@ -20,7 +20,7 @@ export default async function OnboardingPage() {
           Answer honestly. We&apos;ll do the rest.
         </p>
       </div>
-      <OnboardingWizard />
+      <OnboardingWizard userEmail={user.email ?? undefined} />
     </main>
   );
 }

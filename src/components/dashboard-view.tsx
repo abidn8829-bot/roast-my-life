@@ -7,7 +7,7 @@ import { ACHIEVEMENTS, type UserAchievements } from "@/lib/achievements";
 import { formatWeekLabel, snippet } from "@/lib/format-week";
 import type { CategoryScores } from "@/lib/roast-types";
 import { ArcSection } from "@/components/arc-section";
-import { ProWaitlistModal } from "@/components/pro-waitlist-modal";
+import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 import { playUnlockSound } from "@/lib/unlock-sound";
 import { scoreGlow, scoreTextColor } from "@/lib/grades";
 
@@ -213,7 +213,6 @@ function AchievementCelebration({
 }
 
 export function DashboardView({ name, roasts, scoreHistory, streak, longestStreak, achievements, newlyUnlockedAchievements, isPro, userEmail }: Props) {
-  const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
   const [celebrationQueue, setCelebrationQueue] = useState<string[]>([]);
   const [activeCelebration, setActiveCelebration] = useState<string | null>(null);
   const latest = roasts[0] ?? null;
@@ -467,13 +466,17 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
 
       {/* CTA */}
       {hasRoastedToday ? (
-        <button
-          type="button"
-          onClick={() => setShowProWaitlistModal(true)}
-          className="block w-full rounded-xl bg-ember px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
-        >
-          Join Pro Waitlist 🔥
-        </button>
+        <div>
+          <a
+            href={getUpgradeUrl(userEmail)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full rounded-xl bg-ember px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
+          >
+            Upgrade to Pro 🔥
+          </a>
+          <p className="mt-2 text-center text-xs text-text-faint">{UPGRADE_EMAIL_HINT}</p>
+        </div>
       ) : (
         <Link
           href="/onboarding"
@@ -482,11 +485,6 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
           Get Roasted This Week
         </Link>
       )}
-
-      <ProWaitlistModal
-        isOpen={showProWaitlistModal}
-        onClose={() => setShowProWaitlistModal(false)}
-      />
 
       {/* Last 3 roast reports */}
       {recentRoasts.length > 0 && (

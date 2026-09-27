@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ProWaitlistModal } from "@/components/pro-waitlist-modal";
+import { EliteWaitlistModal } from "@/components/elite-waitlist-modal";
+import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
+import { useUserEmail } from "@/lib/use-user-email";
 
 export default function PricingPage() {
-  const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
+  const [showEliteWaitlistModal, setShowEliteWaitlistModal] = useState(false);
+  const userEmail = useUserEmail();
 
   return (
     <main className="min-h-screen bg-[#0A0A0A] px-4 py-10 text-[#FAFAFA]">
@@ -82,16 +85,19 @@ export default function PricingPage() {
                 5 categories graded
               </li>
             </ul>
-            <button
-              onClick={() => setShowProWaitlistModal(true)}
+            <a
+              href={getUpgradeUrl(userEmail)}
+              target="_blank"
+              rel="noopener noreferrer"
               className="block w-full rounded-lg bg-[#FF3D00] px-4 py-3 text-center text-sm font-semibold text-white shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110"
             >
-              Join Pro Waitlist 🔥
-            </button>
+              Upgrade to Pro 🔥
+            </a>
+            <p className="mt-2 text-center text-xs text-neutral-400">{UPGRADE_EMAIL_HINT}</p>
           </div>
 
           {/* Elite Tier */}
-          <div className="rounded-xl border border-neutral-800 bg-[#111111] p-6 opacity-60">
+          <div className="rounded-xl border border-neutral-800 bg-[#111111] p-6">
             <div className="mb-2 inline-block rounded-full bg-neutral-800 px-3 py-1 text-xs font-semibold text-neutral-400">
               COMING SOON
             </div>
@@ -118,19 +124,19 @@ export default function PricingPage() {
               </li>
             </ul>
             <button
-              disabled
-              className="block w-full rounded-lg border border-neutral-700 px-4 py-3 text-center text-sm font-semibold text-neutral-500 cursor-not-allowed"
+              type="button"
+              onClick={() => setShowEliteWaitlistModal(true)}
+              className="block w-full rounded-lg border border-neutral-700 px-4 py-3 text-center text-sm font-semibold text-[#FAFAFA] transition hover:border-neutral-500"
             >
-              Coming Soon
+              Join Elite Waitlist 👑
             </button>
           </div>
         </div>
       </div>
 
-      <ProWaitlistModal
-        isOpen={showProWaitlistModal}
-        onClose={() => setShowProWaitlistModal(false)}
-      />
+      {showEliteWaitlistModal && (
+        <EliteWaitlistModal isOpen onClose={() => setShowEliteWaitlistModal(false)} defaultEmail={userEmail} />
+      )}
     </main>
   );
 }
