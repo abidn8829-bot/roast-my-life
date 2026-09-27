@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { escapeLikePattern, gumroadAction, gumroadBuyerEmail } from "@/lib/gumroad";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 // Gumroad's Ping notifications are NOT signed — there is no HMAC/signature header
@@ -11,6 +12,13 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 // Advanced Settings, e.g.:
 //   https://your-app.com/api/webhook/gumroad?token=YOUR_GUMROAD_WEBHOOK_SECRET
 // (reusing the existing GUMROAD_WEBHOOK_SECRET env var as that token's value)
+//
+// The same URL also receives refund / dispute / subscription_ended /
+// subscription_restarted events once registered via Gumroad's
+// resource_subscriptions API; see gumroadAction() for what each one does.
+//
+// Only pings for GUMROAD_PRODUCT_ID (the Ember Pro product) change a tier, so a
+// sale of any other product on the same Gumroad account can't grant Pro.
 
 export async function POST(request: Request) {
   try {
@@ -18,8 +26,9 @@ export async function POST(request: Request) {
     const token = url.searchParams.get("token");
 
     const webhookSecret = process.env.GUMROAD_WEBHOOK_SECRET;
-    if (!webhookSecret) {
-      console.error("[gumroad webhook] Missing GUMROAD_WEBHOOK_SECRET");
+    const productId = process.env.GUMROAD_PRODUCT_ID;
+    if (!webhookSecret || !productId) {
+      console.error("[gumroad webhook] Missing GUMROAD_WEBHOOK_SECRET or GUMROAD_PRODUCT_ID");
       return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
     }
 
@@ -37,18 +46,23 @@ export async function POST(request: Request) {
     console.log("[gumroad webhook] Received ping:", {
       ...data,
       email: data.email ? "[present]" : undefined,
+      user_email: data.user_email ? "[present]" : undefined,
     });
 
-    // If registered via the resource_subscriptions API (rather than the simple
-    // per-account Ping URL), Gumroad includes resource_name. The plain Ping URL
-    // only ever fires for sales, so this check is a no-op in that case.
-    if (data.resource_name && data.resource_name !== "sale") {
-      return NextResponse.json({ success: true });
+    if (data.product_id !== productId) {
+      console.warn("[gumroad webhook] Ignoring ping for another product:", data.product_id);
+      return NextResponse.json({ success: true, ignored: "other product" });
     }
 
-    const email = data.email;
+    const action = gumroadAction(data);
+    if (action === "ignore") {
+      console.log("[gumroad webhook] No tier change for event:", data.resource_name);
+      return NextResponse.json({ success: true, ignored: data.resource_name });
+    }
+
+    const email = gumroadBuyerEmail(data);
     if (!email) {
-      console.error("[gumroad webhook] No email in ping payload:", data);
+      console.error("[gumroad webhook] No email in ping payload:", data.resource_name ?? "sale");
       return NextResponse.json({ error: "No email in payload" }, { status: 400 });
     }
 
@@ -60,14 +74,15 @@ export async function POST(request: Request) {
     // already-token-verified job, matching how the cron routes use it.
     const supabase = createSupabaseServiceClient();
 
-    // Update user's subscription tier to pro. Match case-insensitively since
-    // Gumroad's checkout email and the signup email can differ only in case.
-    // .select() forces back the matched rows so a zero-row match (wrong/
-    // mismatched email) is caught here instead of failing silently.
+    // Match case-insensitively since Gumroad's checkout email and the signup
+    // email can differ only in case, but escape LIKE wildcards so this stays an
+    // exact match. .select() forces back the matched rows so a zero-row match
+    // (wrong/mismatched email) is caught here instead of failing silently.
+    const tier = action === "upgrade" ? "pro" : "free";
     const { data: updated, error } = await supabase
       .from("users")
-      .update({ subscription_tier: "pro" })
-      .ilike("email", email)
+      .update({ subscription_tier: tier })
+      .ilike("email", escapeLikePattern(email))
       .select("id, email");
 
     if (error) {
@@ -77,7 +92,7 @@ export async function POST(request: Request) {
 
     if (!updated || updated.length === 0) {
       console.error(
-        "[gumroad webhook] No user matched this email, tier NOT updated:",
+        `[gumroad webhook] No user matched this email, tier NOT set to ${tier}:`,
         email,
       );
       return NextResponse.json(
@@ -86,9 +101,9 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log("[gumroad webhook] Upgraded to pro:", updated[0].id, updated[0].email);
+    console.log(`[gumroad webhook] Set tier to ${tier}:`, updated[0].id, updated[0].email);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, tier });
   } catch (error) {
     console.error("[gumroad webhook] Error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
