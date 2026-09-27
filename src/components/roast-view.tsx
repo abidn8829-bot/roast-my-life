@@ -8,6 +8,7 @@ import { gradeColor, scoreGlowBg, scoreTextColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
 import type { CategoryScores, Grade, OnboardingAnswers, ReportCard, RoastMode, RoastPersona } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 
 const DISMISS_EVENT = "share-sheet-dismissed";
 function subscribeToDismissals(onChange: () => void) {
@@ -37,6 +38,7 @@ type Props = {
   persona?: RoastPersona;
   suggestionLine?: string;
   showShareSheet?: boolean;
+  userEmail?: string;
 };
 
 export function RoastView({
@@ -57,6 +59,7 @@ export function RoastView({
   persona = "default",
   suggestionLine,
   showShareSheet = false,
+  userEmail,
 }: Props) {
   const router = useRouter();
   const [reaction, setReaction] = useState<string | null>(initialReaction);
@@ -259,7 +262,7 @@ export function RoastView({
             I found some patterns in your answers that aren&apos;t visible in your roast yet.
           </p>
           <a
-            href={process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL || "/pricing"}
+            href={getUpgradeUrl(userEmail)}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-2 inline-block rounded-lg bg-ember px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
@@ -267,6 +270,7 @@ export function RoastView({
             Unlock My Full Read →
           </a>
           <span className="text-xs font-semibold uppercase tracking-widest text-ember">Pro</span>
+          <p className="text-xs text-text-faint">{UPGRADE_EMAIL_HINT}</p>
         </section>
       )}
 

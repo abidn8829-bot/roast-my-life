@@ -1,22 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   reason?: "daily_limit" | "pro_feature";
+  userEmail?: string;
 };
 
-export function UpgradeModal({ isOpen, onClose, reason = "daily_limit" }: Props) {
+export function UpgradeModal({ isOpen, onClose, reason = "daily_limit", userEmail }: Props) {
   const [loading, setLoading] = useState(false);
 
   function handleUpgrade() {
     setLoading(true);
-    const gumroadUrl = process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL;
-    if (gumroadUrl) {
-      window.open(gumroadUrl, "_blank");
-    }
+    window.open(getUpgradeUrl(userEmail), "_blank");
     setLoading(false);
     onClose();
   }
@@ -85,6 +84,7 @@ export function UpgradeModal({ isOpen, onClose, reason = "daily_limit" }: Props)
             {loading ? "Loading..." : "Upgrade to Pro"}
           </button>
         </div>
+        <p className="mt-3 text-center text-xs text-neutral-400">{UPGRADE_EMAIL_HINT}</p>
       </div>
     </div>
   );

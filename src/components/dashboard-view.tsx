@@ -45,6 +45,7 @@ type Props = {
   achievements: UserAchievements;
   newlyUnlockedAchievements: string[];
   isPro: boolean;
+  userEmail?: string;
 };
 
 const CATEGORY_LABELS: { key: keyof CategoryScores; label: string }[] = [
@@ -211,7 +212,7 @@ function AchievementCelebration({
   );
 }
 
-export function DashboardView({ name, roasts, scoreHistory, streak, longestStreak, achievements, newlyUnlockedAchievements, isPro }: Props) {
+export function DashboardView({ name, roasts, scoreHistory, streak, longestStreak, achievements, newlyUnlockedAchievements, isPro, userEmail }: Props) {
   const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
   const [celebrationQueue, setCelebrationQueue] = useState<string[]>([]);
   const [activeCelebration, setActiveCelebration] = useState<string | null>(null);
@@ -448,7 +449,7 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
             </section>
           )}
 
-          <ArcSection variant="compact" />
+          <ArcSection variant="compact" userEmail={userEmail} />
         </>
       ) : (
         <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center">

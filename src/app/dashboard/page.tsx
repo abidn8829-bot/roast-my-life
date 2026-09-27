@@ -138,6 +138,7 @@ export default async function DashboardPage() {
           achievements={achievements}
           newlyUnlockedAchievements={newlyUnlockedAchievements}
           isPro={subscriptionTier === "pro"}
+          userEmail={user.email ?? undefined}
         />
       </div>
     </main>
