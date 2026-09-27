@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { FREE_FEATURES, PRO_FEATURES, PRO_PRICE } from "@/lib/plans";
+import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
+import { useUserEmail } from "@/lib/use-user-email";
 
 function useRevealOnScroll<T extends HTMLElement>() {
   const ref = useRef<T | null>(null);
@@ -183,36 +186,11 @@ const FAQS = [
   },
 ];
 
-const FREE_FEATURES = [
-  "1 roast per day",
-  "Daily check-in",
-  "5 categories graded",
-  "Your Life Report Card",
-];
-
-const PRO_FEATURES = [
-  {
-    title: "Unlimited roasts",
-    desc: "Every day, any time — no waiting for tomorrow.",
-  },
-  {
-    title: "All 6 personas + every tone",
-    desc: "Gordon Ramsay, Drill Sergeant, Destroy Me mode — the full arsenal.",
-  },
-  {
-    title: "Your Arc",
-    desc: "See how you stack up against everyone else brave enough to do this — and get a plan for closing the gap. We're not explaining the rest. You'll see.",
-  },
-  {
-    title: "More categories, unlocking soon",
-    desc: "We're not done grading you yet.",
-  },
-];
-
 export default function Home() {
   const heroCard = useRevealOnScroll<HTMLDivElement>();
   const showcaseCard = useRevealOnScroll<HTMLDivElement>();
   const sampleDialogRef = useRef<HTMLDialogElement>(null);
+  const userEmail = useUserEmail();
 
   return (
     <main className="min-h-screen bg-bg text-text">
@@ -500,7 +478,7 @@ export default function Home() {
               </span>
               <h3 className="text-xl font-bold">Pro</h3>
               <p className="mt-1 text-3xl font-black">
-                $4.99<span className="text-lg font-normal text-text-faint">/month</span>
+                {PRO_PRICE}<span className="text-lg font-normal text-text-faint">/month</span>
               </p>
               <ul className="mt-6 space-y-4 text-sm">
                 {PRO_FEATURES.map((f) => (
@@ -513,12 +491,15 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
-              <Link
-                href="/pricing"
+              <a
+                href={getUpgradeUrl(userEmail)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-8 block rounded-lg bg-ember px-4 py-3 text-center text-sm font-bold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
               >
                 Upgrade to Pro 🔥
-              </Link>
+              </a>
+              <p className="mt-2 text-center text-xs text-text-faint">{UPGRADE_EMAIL_HINT}</p>
             </div>
           </div>
         </div>

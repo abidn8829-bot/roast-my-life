@@ -8,6 +8,7 @@ import type { ProComparison } from "@/lib/arc-comparisons";
 import type { CategoryTrend, Delta } from "@/lib/arc-trend";
 import { gradeColor, scoreTextColor, scoreToGrade } from "@/lib/grades";
 import type { Grade } from "@/lib/roast-types";
+import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 
 type Trend = {
   windowDays: number;
@@ -169,9 +170,9 @@ function SectionLabel({ children, right }: { children: React.ReactNode; right?: 
   );
 }
 
-type Props = { variant?: "compact" | "full" };
+type Props = { variant?: "compact" | "full"; userEmail?: string };
 
-export function ArcSection({ variant = "full" }: Props) {
+export function ArcSection({ variant = "full", userEmail }: Props) {
   const [data, setData] = useState<ArcResponse | null>(null);
   const [error, setError] = useState(false);
 
@@ -230,7 +231,7 @@ export function ArcSection({ variant = "full" }: Props) {
       </div>
 
       {compact ? (
-        <MissionCard isPro={isPro} variant="compact" />
+        <MissionCard isPro={isPro} variant="compact" userEmail={userEmail} />
       ) : (
         <>
           <div>
@@ -247,13 +248,14 @@ export function ArcSection({ variant = "full" }: Props) {
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-surface-2/80 p-4 text-center">
                   <p className="text-sm font-semibold text-text">See how you compare to other Ember users, updated daily</p>
                   <a
-                    href={process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL || "/pricing"}
+                    href={getUpgradeUrl(userEmail)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-1 inline-block rounded-lg bg-ember px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
                   >
                     Upgrade to Pro 🔥
                   </a>
+                  <p className="text-xs text-text-faint">{UPGRADE_EMAIL_HINT}</p>
                 </div>
               </div>
             ) : (
@@ -267,7 +269,7 @@ export function ArcSection({ variant = "full" }: Props) {
 
           <div>
             <SectionLabel>Your mission</SectionLabel>
-            <MissionCard isPro={isPro} variant="full" />
+            <MissionCard isPro={isPro} variant="full" userEmail={userEmail} />
           </div>
         </>
       )}

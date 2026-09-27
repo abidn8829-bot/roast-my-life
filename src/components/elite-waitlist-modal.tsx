@@ -5,10 +5,11 @@ import { useState } from "react";
 type Props = {
   isOpen: boolean;
   onClose: () => void;
+  defaultEmail?: string;
 };
 
-export function ProWaitlistModal({ isOpen, onClose }: Props) {
-  const [email, setEmail] = useState("");
+export function EliteWaitlistModal({ isOpen, onClose, defaultEmail }: Props) {
+  const [email, setEmail] = useState(defaultEmail ?? "");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -20,7 +21,7 @@ export function ProWaitlistModal({ isOpen, onClose }: Props) {
     setMessage(null);
 
     try {
-      const response = await fetch("/api/pro-waitlist", {
+      const response = await fetch("/api/elite-waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -47,12 +48,12 @@ export function ProWaitlistModal({ isOpen, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6">
         <div className="mb-6 text-center">
-          <span className="text-5xl">🔥</span>
+          <span className="text-5xl">👑</span>
           <h2 className="mt-4 text-2xl font-bold text-text">
-            Join Pro Waitlist
+            Join the Elite Waitlist
           </h2>
           <p className="mt-2 text-sm text-text-muted">
-            Be the first to know when Pro launches with unlimited roasts, custom personas, and more!
+            Elite is coming: real progress tracking, deeper check-ins, and more. Be the first to know when it launches.
           </p>
         </div>
 
@@ -81,7 +82,7 @@ export function ProWaitlistModal({ isOpen, onClose }: Props) {
                 disabled={loading}
                 className="flex-1 rounded-xl bg-ember px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
               >
-                {loading ? "Joining..." : "Join Waitlist 🔥"}
+                {loading ? "Joining..." : "Join Waitlist 👑"}
               </button>
             </div>
           </form>

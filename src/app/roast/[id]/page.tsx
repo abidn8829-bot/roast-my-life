@@ -77,6 +77,7 @@ export default async function RoastDetailPage({
           persona={roast.persona}
           suggestionLine={roast.suggestion_line}
           showShareSheet={share === "1"}
+          userEmail={user.email ?? undefined}
         />
       </main>
     );

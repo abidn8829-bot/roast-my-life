@@ -1,18 +1,16 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { ProWaitlistModal } from "@/components/pro-waitlist-modal";
 import { LogoutButton } from "@/components/logout-button";
+import { getUpgradeUrl } from "@/lib/upgrade-url";
 
 type Props = {
   isPro: boolean;
   name: string;
+  userEmail?: string;
 };
 
-export function DashboardHeader({ isPro, name }: Props) {
-  const [showProWaitlistModal, setShowProWaitlistModal] = useState(false);
-
+export function DashboardHeader({ isPro, userEmail }: Props) {
   return (
     <>
       <div className="flex items-center justify-between">
@@ -26,12 +24,14 @@ export function DashboardHeader({ isPro, name }: Props) {
                 🔥 PRO
               </span>
             ) : (
-              <button
-                onClick={() => setShowProWaitlistModal(true)}
+              <a
+                href={getUpgradeUrl(userEmail)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-xs text-text-muted hover:text-ember transition"
               >
-                Free Plan — Join Pro Waitlist 🔥
-              </button>
+                Free Plan — Upgrade to Pro 🔥
+              </a>
             )}
           </div>
         </div>
@@ -45,10 +45,6 @@ export function DashboardHeader({ isPro, name }: Props) {
           <LogoutButton />
         </div>
       </div>
-      <ProWaitlistModal
-        isOpen={showProWaitlistModal}
-        onClose={() => setShowProWaitlistModal(false)}
-      />
     </>
   );
 }

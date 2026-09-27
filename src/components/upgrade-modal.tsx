@@ -1,22 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { PRO_FEATURES } from "@/lib/plans";
+import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   reason?: "daily_limit" | "pro_feature";
+  userEmail?: string;
 };
 
-export function UpgradeModal({ isOpen, onClose, reason = "daily_limit" }: Props) {
+export function UpgradeModal({ isOpen, onClose, reason = "daily_limit", userEmail }: Props) {
   const [loading, setLoading] = useState(false);
 
   function handleUpgrade() {
     setLoading(true);
-    const gumroadUrl = process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL;
-    if (gumroadUrl) {
-      window.open(gumroadUrl, "_blank");
-    }
+    window.open(getUpgradeUrl(userEmail), "_blank");
     setLoading(false);
     onClose();
   }
@@ -41,30 +41,12 @@ export function UpgradeModal({ isOpen, onClose, reason = "daily_limit" }: Props)
         <div className="mb-6 space-y-3 rounded-xl border border-neutral-800 bg-[#0A0A0A] p-4">
           <h3 className="text-sm font-semibold text-[#FF3D00]">Pro Features:</h3>
           <ul className="space-y-2 text-sm text-neutral-300">
-            <li className="flex items-center gap-2">
-              <span className="text-[#FF3D00]">✓</span>
-              Unlimited roasts per day
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-[#FF3D00]">✓</span>
-              5 categories (screen time, sleep, spending, social media, fitness)
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-[#FF3D00]">✓</span>
-              3 roast tones (Normal, No Mercy, Destroy Me)
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-[#FF3D00]">✓</span>
-              Share cards without watermark
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-[#FF3D00]">✓</span>
-              Full history all time
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="text-[#FF3D00]">✓</span>
-              Grade trend charts (last 8 weeks)
-            </li>
+            {PRO_FEATURES.map((f) => (
+              <li key={f.title} className="flex items-center gap-2">
+                <span className="text-[#FF3D00]">✓</span>
+                {f.title}
+              </li>
+            ))}
           </ul>
         </div>
 
@@ -85,6 +67,7 @@ export function UpgradeModal({ isOpen, onClose, reason = "daily_limit" }: Props)
             {loading ? "Loading..." : "Upgrade to Pro"}
           </button>
         </div>
+        <p className="mt-3 text-center text-xs text-neutral-400">{UPGRADE_EMAIL_HINT}</p>
       </div>
     </div>
   );

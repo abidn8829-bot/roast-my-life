@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { MissionDay, MissionView } from "@/lib/missions";
+import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 
 type MissionResponse = { mission: MissionView | null; canStart: boolean; reason?: string };
-
-const UPGRADE_URL = process.env.NEXT_PUBLIC_GUMROAD_PRODUCT_URL || "/pricing";
 
 function DayPill({ day, isToday }: { day: MissionDay | { day: number; status: "upcoming" }; isToday: boolean }) {
   const status = day.status;
@@ -60,7 +59,7 @@ function StepBlock({ title, step, why }: { title: string; step: string; why: str
   );
 }
 
-function LockedMission({ compact }: { compact: boolean }) {
+function LockedMission({ compact, userEmail }: { compact: boolean; userEmail?: string }) {
   return (
     <div className="relative">
       <div aria-hidden className="pointer-events-none space-y-3 rounded-xl border border-border bg-surface-3 p-4 blur-sm select-none">
@@ -85,21 +84,22 @@ function LockedMission({ compact }: { compact: boolean }) {
           </p>
         )}
         <a
-          href={UPGRADE_URL}
+          href={getUpgradeUrl(userEmail)}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-1 inline-block rounded-lg bg-ember px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
         >
           Upgrade to Pro 🔥
         </a>
+        <p className="text-xs text-text-faint">{UPGRADE_EMAIL_HINT}</p>
       </div>
     </div>
   );
 }
 
-type Props = { isPro: boolean; variant: "compact" | "full" };
+type Props = { isPro: boolean; variant: "compact" | "full"; userEmail?: string };
 
-export function MissionCard({ isPro, variant }: Props) {
+export function MissionCard({ isPro, variant, userEmail }: Props) {
   const [data, setData] = useState<MissionResponse | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState<null | "start" | "done" | "missed" | "abandon">(null);
@@ -145,7 +145,7 @@ export function MissionCard({ isPro, variant }: Props) {
     }
   }, []);
 
-  if (!isPro) return <LockedMission compact={variant === "compact"} />;
+  if (!isPro) return <LockedMission compact={variant === "compact"} userEmail={userEmail} />;
   if (loadError) return <p className="text-sm text-text-faint">Couldn&apos;t load your mission. Refresh to try again.</p>;
   if (!data) return <p className="text-sm text-text-faint">Loading your mission…</p>;
 
