@@ -20,12 +20,10 @@ export function GoogleAuthButton({
     
     try {
       const supabase = createSupabaseBrowserClient();
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${appUrl}/auth/callback?next=/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
         },
       });
       
