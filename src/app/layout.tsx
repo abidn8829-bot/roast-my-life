@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono, Poppins } from "next/font/google";
 import "./globals.css";
 import { PostHogProvider } from "@/components/PostHogProvider";
+import { OG_IMAGE } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
 const poppins = Poppins({
@@ -15,10 +16,26 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const TITLE = "Ember — AI Accountability App That Roasts Your Habits";
+const DESCRIPTION =
+  "Ember is an AI accountability app for self-tracking. Get honest roasts of your habits, daily check-ins, and a Life Score that shows if you're improving.";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "Ember — Get Brutally Roasted by AI",
-  description: "Answer 5 questions. Get brutally roasted by AI. Share your shame.",
+  title: { default: TITLE, template: "%s | Ember" },
+  description: DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: "Ember",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [OG_IMAGE.url],
+  },
 };
 
 export default function RootLayout({

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { RoastView } from "@/components/roast-view";
 import { backfillCardPunchline } from "@/lib/card-punchline";
@@ -6,6 +7,9 @@ import { isUuid } from "@/lib/is-uuid";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+// Private (UUID) roasts and the legacy /roast/<slug> redirect: never index, never canonicalize.
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function RoastDetailPage({
   params,
