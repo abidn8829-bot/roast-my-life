@@ -1,4 +1,11 @@
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata = pageMetadata({
+  title: "Privacy Policy",
+  description: "What data Ember collects, how it is used to generate your roasts and report cards, and how you can request deletion of your account.",
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (

@@ -1,4 +1,11 @@
 import Link from "next/link";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata = pageMetadata({
+  title: "Terms of Service",
+  description: "The terms for using Ember, the AI accountability app, including subscriptions, acceptable use and content.",
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (

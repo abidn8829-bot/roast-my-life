@@ -34,9 +34,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     metadataBase: new URL(SITE_URL),
     title,
     description: `"${punchline}" Get roasted at emberai.site`,
+    alternates: { canonical: `/share/${encodeURIComponent(slug)}` },
     // A personal result page: let link previews work, keep it out of search results.
     robots: { index: false, follow: false },
-    openGraph: { title, description: `"${punchline}"`, images: [image], type: "website" },
+    openGraph: { title, description: `"${punchline}"`, url: `/share/${encodeURIComponent(slug)}`, images: [image], type: "website" },
     twitter: { card: "summary_large_image", title, images: [image.url] },
   };
 }
