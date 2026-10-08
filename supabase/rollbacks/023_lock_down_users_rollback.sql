@@ -1,3 +1,7 @@
+-- EMERGENCY USE ONLY. Running this file reopens the security hole (users can
+-- edit their own subscription_tier and read other users' rows). Do not run it
+-- unless production is broken and you have read this file.
+--
 -- 023_lock_down_users_rollback.sql
 --
 -- Puts public.users back EXACTLY as it was before 023_lock_down_users.sql.
@@ -24,6 +28,7 @@ drop policy if exists "allow insert users" on public.users;
 create policy "allow insert users"
   on public.users
   for insert
+  to authenticated
   with check (true);
 
 -- Plain English: put back the "anyone can read every row" policy and remove
@@ -33,6 +38,7 @@ drop policy if exists "allow select users" on public.users;
 create policy "allow select users"
   on public.users
   for select
+  to authenticated
   using (true);
 
 -- Plain English: give back the right to insert and delete rows.
