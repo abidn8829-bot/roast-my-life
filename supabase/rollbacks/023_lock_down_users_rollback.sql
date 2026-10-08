@@ -14,10 +14,10 @@
 -- never runs automatically. Run it by hand in the Supabase SQL editor.
 --
 -- Assumptions (the original policies/grants were made by hand and are not in
--- the repo): the two old policies applied to all roles (no "to ..." clause)
--- and Supabase's default table grants were in place for anon and
--- authenticated. Row-level security itself is NOT switched off here; it was
--- already on before the migration.
+-- the repo): the two old policies applied only to logged-in users (the
+-- "authenticated" role) and Supabase's default table grants were in place for
+-- anon and authenticated. Row-level security itself is NOT switched off here;
+-- it was already on before the migration.
 --
 -- One transaction: if any step fails, nothing is applied.
 
