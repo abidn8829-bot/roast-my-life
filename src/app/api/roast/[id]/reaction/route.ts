@@ -32,17 +32,27 @@ export async function POST(
     return NextResponse.json({ error: "Invalid reaction" }, { status: 400 });
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("roasts")
     .update({ reaction: emoji })
     .eq("id", id)
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .select("id");
 
   if (error) {
     console.error("Reaction save error:", error);
     return NextResponse.json(
       { error: "Failed to save reaction" },
       { status: 500 },
+    );
+  }
+
+  // RLS or a wrong id can update zero rows without raising an error.
+  if (!data || data.length === 0) {
+    console.error("Reaction save updated no rows for roast:", id);
+    return NextResponse.json(
+      { error: "Reaction was not saved" },
+      { status: 404 },
     );
   }
 

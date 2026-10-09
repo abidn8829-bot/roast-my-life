@@ -54,6 +54,10 @@ export async function fetchOwnRoastById(
     .eq("user_id", userId)
     .maybeSingle();
 
+  if (reactionError) {
+    console.error("[fetchOwnRoastById] reaction query error:", reactionError.message);
+  }
+
   if (!reactionError && reactionRow) {
     reaction = reactionRow.reaction ?? null;
   }
