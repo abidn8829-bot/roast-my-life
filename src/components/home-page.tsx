@@ -563,7 +563,7 @@ export function HomePage() {
             <EmberMark className="h-4 w-4 text-ember" />
             <span>Ember AI</span>
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap justify-center gap-4">
             <Link href="/privacy" className="transition hover:text-text">
               Privacy
             </Link>
@@ -572,6 +572,9 @@ export function HomePage() {
             </Link>
             <Link href="/contact" className="transition hover:text-text">
               Contact
+            </Link>
+            <Link href="/what-is-ember-ai" className="transition hover:text-text">
+              What is Ember AI?
             </Link>
           </div>
         </div>

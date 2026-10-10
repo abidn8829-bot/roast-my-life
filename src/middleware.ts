@@ -6,7 +6,7 @@ function isPublicPath(pathname: string) {
   if (pathname === "/") return true;
   if (pathname === "/login" || pathname === "/signup") return true;
   // Marketing/legal pages must be crawlable, so they can't redirect to /login.
-  if (["/pricing", "/contact", "/privacy", "/terms"].includes(pathname)) return true;
+  if (["/pricing", "/contact", "/privacy", "/terms", "/what-is-ember-ai"].includes(pathname)) return true;
   if (pathname.startsWith("/auth")) return true;
   if (pathname.startsWith("/share")) return true;
   if (pathname.startsWith("/roast/")) {

@@ -3,10 +3,10 @@ import { LoginForm } from "@/components/login-form";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
-  title: "Log In",
+  title: "Log In to Ember AI",
   description: "Log in to Ember to see your Life Score, daily check-ins and your latest roast.",
   path: "/login",
-  noindex: true,
+  absoluteTitle: true,
 });
 
 export default function LoginPage() {
