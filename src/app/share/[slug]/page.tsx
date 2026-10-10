@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   // Public pages are keyed by share_slug only, never the private roast UUID.
   const result = isUuid(slug) ? ({ error: "not_found" } as const) : await getShareCardData(slug);
-  if ("error" in result) return { title: "Emberai", robots: { index: false, follow: false } };
+  if ("error" in result) return { title: "Ember AI", robots: { index: false, follow: false } };
 
   const { lifeScore, funnyTitle, punchline } = result.card;
   const title = `Life score: ${lifeScore}/100 — ${funnyTitle}`;
