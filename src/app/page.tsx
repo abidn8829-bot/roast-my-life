@@ -3,9 +3,9 @@ import { PRO_PRICE } from "@/lib/plans";
 import { pageMetadata } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
 
-const TITLE = "Ember — AI Accountability App That Roasts Your Habits";
+const TITLE = "Ember AI: AI Accountability App That Roasts Your Habits";
 const DESCRIPTION =
-  "Ember is an AI accountability app for self-tracking. Get honest roasts of your habits, daily check-ins, and a Life Score that shows if you're improving.";
+  "Ember AI is an AI accountability app for self-tracking. Get honest roasts of your habits, daily check-ins, and a Life Score that shows if you're improving.";
 
 export const metadata = pageMetadata({
   title: TITLE,

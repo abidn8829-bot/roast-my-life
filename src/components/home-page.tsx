@@ -198,8 +198,8 @@ export function HomePage() {
       <nav className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-bg/95 px-6 py-4 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <EmberMark className="h-6 w-6 text-ember" />
-          <span className="text-2xl font-black tracking-tight">
-            Ember<span className="text-ember">ai</span>
+          <span className="text-xl font-black tracking-tight sm:text-2xl">
+            Ember<span className="text-ember"> AI</span>
           </span>
         </div>
         <div className="hidden items-center gap-7 text-sm font-semibold text-text-muted md:flex">
@@ -229,18 +229,19 @@ export function HomePage() {
       <section className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 px-6 py-20 md:grid-cols-[1.2fr_1fr] md:py-32">
         <div>
           <div className="mb-8 inline-block rounded-full border border-ember/30 bg-ember-soft px-4 py-2 font-mono text-xs tracking-widest text-ember">
-            AI ACCOUNTABILITY COACH
+            EMBER AI · AI ACCOUNTABILITY APP
           </div>
           <h1 className="mb-6 text-5xl font-black leading-[1] tracking-tight md:text-6xl">
             Get roasted by AI. <span className="text-ember">Then actually fix your habits.</span>
           </h1>
           <p className="mb-6 max-w-xl text-2xl font-semibold leading-tight md:text-3xl">
-            The AI accountability coach that{" "}
+            The AI accountability app that{" "}
             <span className="text-ember">roasts you into taking action</span>.
           </p>
           <p className="mb-10 max-w-md text-base leading-relaxed text-text-muted md:text-lg">
-            Answer 5 quick questions. Ember roasts your habits with brutal honesty, then hands you
-            a Life Report Card — and checks in on you tomorrow.
+            Ember AI is an AI accountability app that roasts your excuses and gives you a daily
+            plan to improve. Answer 5 quick questions. Ember roasts your habits with brutal
+            honesty, then hands you a Life Report Card — and checks in on you tomorrow.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link
@@ -560,9 +561,9 @@ export function HomePage() {
         <div className="flex flex-col items-center gap-2">
           <div className="flex items-center gap-2">
             <EmberMark className="h-4 w-4 text-ember" />
-            <span>Emberai</span>
+            <span>Ember AI</span>
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap justify-center gap-4">
             <Link href="/privacy" className="transition hover:text-text">
               Privacy
             </Link>
@@ -571,6 +572,9 @@ export function HomePage() {
             </Link>
             <Link href="/contact" className="transition hover:text-text">
               Contact
+            </Link>
+            <Link href="/what-is-ember-ai" className="transition hover:text-text">
+              What is Ember AI?
             </Link>
           </div>
         </div>

@@ -16,9 +16,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const TITLE = "Ember — AI Accountability App That Roasts Your Habits";
+const TITLE = "Ember AI: AI Accountability App That Roasts Your Habits";
 const DESCRIPTION =
-  "Ember is an AI accountability app for self-tracking. Get honest roasts of your habits, daily check-ins, and a Life Score that shows if you're improving.";
+  "Ember AI is an AI accountability app for self-tracking. Get honest roasts of your habits, daily check-ins, and a Life Score that shows if you're improving.";
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: TITLE, template: "%s | Ember" },
