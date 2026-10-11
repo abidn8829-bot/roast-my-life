@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ShareCta } from "@/components/share-cta";
+import { cleanRoastText } from "@/lib/clean-roast-text";
 import { getShareCardData } from "@/lib/get-share-card";
 import { isUuid } from "@/lib/is-uuid";
 import { gradeOgColor, scoreToGrade } from "@/lib/grades";
@@ -122,7 +123,7 @@ export default async function SharePage({ params }: Params) {
               The full roast
             </p>
             <div className="rounded-xl border border-border bg-surface-2 p-5">
-              <p className="whitespace-pre-wrap text-base leading-relaxed">{roastText}</p>
+              <p className="whitespace-pre-wrap text-base leading-relaxed">{cleanRoastText(roastText)}</p>
             </div>
           </section>
         )}

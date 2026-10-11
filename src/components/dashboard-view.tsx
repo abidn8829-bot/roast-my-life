@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import posthog from "posthog-js";
 import { ACHIEVEMENTS, type UserAchievements } from "@/lib/achievements";
+import { cleanRoastText } from "@/lib/clean-roast-text";
 import { formatWeekLabel, snippet } from "@/lib/format-week";
 import type { CategoryScores } from "@/lib/roast-types";
 import { ArcSection } from "@/components/arc-section";
@@ -505,7 +506,7 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
                       Week of {formatWeekLabel(r.week_start_date)}
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-text-muted group-hover:text-text">
-                      {snippet(r.roast_text, 120)}
+                      {snippet(cleanRoastText(r.roast_text), 120)}
                     </p>
                     {r.funny_title && (
                       <p className="mt-2 text-xs font-medium text-ember">

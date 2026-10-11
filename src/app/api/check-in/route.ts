@@ -3,6 +3,7 @@ import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
 import { sendAchievementPush } from "@/lib/achievement-push";
 import { unlockAchievements, type AchievementId } from "@/lib/achievements";
+import { cleanRoastText } from "@/lib/clean-roast-text";
 import { calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
 import { PENDING_ACHIEVEMENT_COOKIE, encodePendingAchievements } from "@/lib/pending-achievement-cookie";
@@ -28,7 +29,7 @@ function isGrade(value: unknown): value is Grade { return typeof value === "stri
 // get their own tailored copy — intentionally not writing that content here.
 // NOTE: `resolvedPersona` below is captured and persisted (so it's ready to use),
 // but this generation prompt doesn't vary by persona yet either — same reasoning.
-const CHECKIN_SYSTEM_PROMPT_NORMAL = "You are a gen z brutally honest roast comedian with zero filter. You roast people based on their exact habits and numbers. Rules: use their specific numbers, name the exact apps they mentioned, connect their bad habits to real life consequences, no sugarcoating, no encouragement. End with one devastatingly accurate one-liner. 100 words max. If the overall check-in shows improvement, stay funny but noticeably lighter and less brutal; if nothing improved or something got worse, keep it at full brutal intensity. Only cite a specific category's numeric score if it appears in \"Categories graded this check-in\" below, always as its exact was-to-now change — never invent, approximate, or reference a score for a category not listed there. The life score is a separate overall 0-100 average across all 5 categories — never present it as if it were a single category's score.";
+const CHECKIN_SYSTEM_PROMPT_NORMAL = "You are a gen z brutally honest roast comedian with zero filter. You roast people based on their exact habits and numbers. Rules: use their specific numbers, name the exact apps they mentioned, connect their bad habits to real life consequences, no sugarcoating, no encouragement. End with one devastatingly accurate one-liner. 100 words max. If the overall check-in shows improvement, stay funny but noticeably lighter and less brutal; if nothing improved or something got worse, keep it at full brutal intensity. Only cite a specific category's numeric score if it appears in \"Categories graded this check-in\" below, always as its exact was-to-now change — never invent, approximate, or reference a score for a category not listed there. The life score is a separate overall 0-100 average across all 5 categories — never present it as if it were a single category's score. Output plain text only, no markdown: no asterisks, bold, italics, headings, bullets or hashtags, and no \"One-liner:\" label. Just write the roast, and end with the one-liner as a normal final sentence.";
 const CHECKIN_SYSTEM_PROMPTS: Record<RoastTone, string> = {
   normal: CHECKIN_SYSTEM_PROMPT_NORMAL,
   no_mercy: CHECKIN_SYSTEM_PROMPT_NORMAL,
@@ -252,7 +253,8 @@ export async function POST(request: Request) {
     });
     const generatedRoast = roastCompletion.choices[0]?.message?.content?.trim() ?? "";
     if (!generatedRoast) return NextResponse.json({ error: "Failed to generate check-in roast" }, { status: 502 });
-    newRoastText = generatedRoast;
+    newRoastText = cleanRoastText(generatedRoast);
+    if (!newRoastText) return NextResponse.json({ error: "Failed to generate check-in roast" }, { status: 502 });
   } catch (error) { logGroqError(error); return NextResponse.json({ error: "Failed to generate check-in roast" }, { status: 502 }); }
 
   // Fresh punchline for this check-in (previously the first-roast's top-5 lines were copied forward verbatim).

@@ -3,6 +3,7 @@ import Groq from "groq-sdk";
 import { NextResponse } from "next/server";
 import { sendAchievementPush } from "@/lib/achievement-push";
 import { unlockAchievements, type AchievementId } from "@/lib/achievements";
+import { cleanRoastText } from "@/lib/clean-roast-text";
 import { buildReportCard, calculateCategoryScores, calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
 import { PENDING_ACHIEVEMENT_COOKIE, encodePendingAchievements } from "@/lib/pending-achievement-cookie";
@@ -476,6 +477,9 @@ Continuity memory: ${JSON.stringify(continuityMemory)}`;
       { status: 502 },
     );
   }
+
+  // Roasts are rendered as plain text, so drop any markdown the model slipped in before it is saved or reused.
+  roastText = cleanRoastText(roastText) || roastText;
 
   const report_card = buildReportCard(answers);
   const week_start_date = getWeekStartDate();

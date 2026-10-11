@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { ShareButtons } from "@/components/share-buttons";
 import { ShareSheet } from "@/components/share-sheet";
+import { cleanRoastText } from "@/lib/clean-roast-text";
 import { gradeColor, scoreGlowBg, scoreTextColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
 import type { CategoryScores, Grade, OnboardingAnswers, ReportCard, RoastMode, RoastPersona } from "@/lib/roast-types";
@@ -227,7 +228,7 @@ export function RoastView({
         </p>
         <div className="rounded-xl border border-border bg-surface-2 p-6">
           <p className="whitespace-pre-wrap text-base leading-relaxed text-text">
-            {roastText}
+            {cleanRoastText(roastText)}
           </p>
         </div>
       </section>
