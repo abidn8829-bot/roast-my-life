@@ -261,7 +261,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
 
     clearTimeout(loadingTimeout);
 
-    const data = (await res.json()) as { id?: string; error?: string; followUpQuestion?: string; requiresFollowUp?: boolean; newlyUnlockedAchievements?: string[] };
+    const data = (await res.json()) as { id?: string; error?: string; code?: string; tier?: string; followUpQuestion?: string; requiresFollowUp?: boolean; newlyUnlockedAchievements?: string[] };
     const roastId =
       typeof data.id === "string" ? data.id.trim() : String(data.id ?? "");
 
@@ -277,8 +277,9 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
       console.error("[onboarding] roast API failed:", res.status, data);
       setIsGenerating(false);
 
-      // Check if it's a daily limit error
-      if (res.status === 429 && data.error?.includes("free roast today")) {
+      // Free users hitting the daily limit get the upgrade modal; Pro users fall through
+      // to the error line below, which shows the server's "come back tomorrow" message.
+      if (res.status === 429 && data.code === "daily_limit" && data.tier === "free") {
         setUpgradeReason("daily_limit");
         return;
       }
@@ -358,8 +359,9 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "submit", category: checkInCategory, answer: followUpAnswer.trim(), activeTheme: checkInTheme, question: followUpQuestion, tone: selectedTone, persona: selectedPersona }),
       });
-      const data = await res.json() as { id?: string; error?: string; newlyUnlockedAchievements?: string[] };
+      const data = await res.json() as { id?: string; error?: string; code?: string; tier?: string; newlyUnlockedAchievements?: string[] };
       if (!res.ok || !data.id) {
+        if (res.status === 429 && data.code === "daily_limit" && data.tier === "free") setUpgradeReason("daily_limit");
         setError(data.error ?? "Couldn't save your check-in. Try again.");
         return;
       }
@@ -473,6 +475,12 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
             </>
           )}
         </div>
+        <UpgradeModal
+          isOpen={upgradeReason !== null}
+          onClose={() => setUpgradeReason(null)}
+          reason={upgradeReason ?? undefined}
+          userEmail={userEmail}
+        />
       </div>
     );
   }

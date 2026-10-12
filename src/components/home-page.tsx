@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { PRO_DAILY_LIMIT } from "@/lib/daily-limit";
 import { FREE_FEATURES, PRO_FEATURES, PRO_PRICE } from "@/lib/plans";
 import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 import { useUserEmail } from "@/lib/use-user-email";
@@ -174,7 +175,7 @@ const FAQS = [
   },
   {
     q: "What happens after my free roast today?",
-    a: "Come back tomorrow for your next free roast, or upgrade to Pro for unlimited roasts, every tone, every persona.",
+    a: `Come back tomorrow for your next free roast, or upgrade to Pro for ${PRO_DAILY_LIMIT} roasts a day, every tone, every persona.`,
   },
   {
     q: "What's \"Your Arc\"?",

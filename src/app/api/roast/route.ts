@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { sendAchievementPush } from "@/lib/achievement-push";
 import { unlockAchievements, type AchievementId } from "@/lib/achievements";
 import { cleanRoastText } from "@/lib/clean-roast-text";
+import { checkDailyLimit } from "@/lib/daily-limit";
 import { buildReportCard, calculateCategoryScores, calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
 import { PENDING_ACHIEVEMENT_COOKIE, encodePendingAchievements } from "@/lib/pending-achievement-cookie";
@@ -284,6 +285,16 @@ function formatUserMessage(answers: OnboardingAnswers, continuityMemory: unknown
 }
 
 export async function POST(request: Request) {
+  // handlePost claims a daily slot; whatever happens, give it back when the request ends.
+  const slot = { release: () => {} };
+  try {
+    return await handlePost(request, slot);
+  } finally {
+    slot.release();
+  }
+}
+
+async function handlePost(request: Request, slot: { release: () => void }) {
   console.log("[api/roast] Using Groq model:", MODEL);
   const apiKey = getGroqApiKey();
   if (!apiKey) {
@@ -319,24 +330,12 @@ export async function POST(request: Request) {
   const subscriptionTier = userData?.subscription_tier || "free";
   console.log("[api/roast] User subscription tier:", subscriptionTier);
 
-  // If free tier, check if they already have a roast today
-  if (subscriptionTier === "free") {
-    const today = new Date().toISOString().split('T')[0];
-    const { data: existingRoast } = await supabase
-      .from("roasts")
-      .select("id")
-      .eq("user_id", user.id)
-      .gte("created_at", `${today}T00:00:00.000Z`)
-      .lte("created_at", `${today}T23:59:59.999Z`)
-      .maybeSingle();
-
-    if (existingRoast) {
-      return NextResponse.json(
-        { error: "You've used your free roast today. Come back tomorrow or upgrade to Pro 🔥" },
-        { status: 429 },
-      );
-    }
+  // Daily limit (free/Pro numbers live in lib/daily-limit.ts), checked before any AI call.
+  const dailyLimit = await checkDailyLimit(supabase, user.id, subscriptionTier);
+  if (!dailyLimit.allowed) {
+    return NextResponse.json(dailyLimit.body, { status: dailyLimit.status });
   }
+  slot.release = dailyLimit.release;
 
   let body: unknown;
   try {
