@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PRO_DAILY_LIMIT } from "@/lib/daily-limit";
 import { PRO_FEATURES } from "@/lib/plans";
 import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 
@@ -33,7 +34,7 @@ export function UpgradeModal({ isOpen, onClose, reason = "daily_limit", userEmai
           </h2>
           <p className="mt-2 text-sm text-neutral-400">
             {reason === "daily_limit"
-              ? "You've used your free roast for today. Upgrade to Pro for unlimited roasts!"
+              ? `You've used your free roast for today. Upgrade to Pro for ${PRO_DAILY_LIMIT} roasts a day!`
               : "This feature is available for Pro users only."}
           </p>
         </div>

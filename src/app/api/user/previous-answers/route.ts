@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkDailyLimit } from "@/lib/daily-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -12,45 +13,42 @@ export async function GET(request: Request) {
   }
 
   // Check user's subscription tier
-  const { data: userData } = await supabase
+  const { data: userData, error: userError } = await supabase
     .from("users")
     .select("subscription_tier")
     .eq("id", user.id)
     .single();
+  if (userError) console.error("[api/user/previous-answers] subscription tier read failed (treating as free):", userError.message);
 
   const subscriptionTier = userData?.subscription_tier || "free";
 
-  // If free tier, check if they already have a roast today
-  let hasUsedTodayRoast = false;
-  if (subscriptionTier === "free") {
-    const today = new Date().toISOString().split('T')[0];
-    const { data: existingRoast } = await supabase
-      .from("roasts")
-      .select("id")
-      .eq("user_id", user.id)
-      .gte("created_at", `${today}T00:00:00.000Z`)
-      .lte("created_at", `${today}T23:59:59.999Z`)
-      .maybeSingle();
-
-    hasUsedTodayRoast = !!existingRoast;
-  }
+  // Has today's limit (lib/daily-limit.ts) already been used up? Looks only, takes no slot. If the
+  // count itself fails we let the screen continue; /api/check-in and /api/roast still refuse server-side.
+  const limit = await checkDailyLimit(supabase, user.id, subscriptionTier, { claim: false });
+  const dailyLimitReached = !limit.allowed && limit.status === 429;
+  const dailyLimitMessage = !limit.allowed && limit.status === 429 ? limit.body.error : undefined;
+  // Old field, kept as it was (free tier only) so a cached older screen behaves the same.
+  const hasUsedTodayRoast = subscriptionTier === "free" && dailyLimitReached;
 
   // Get the most recent roast
-  const { data: previousRoast } = await supabase
+  const { data: previousRoast, error: previousRoastError } = await supabase
     .from("roasts")
     .select("answers, continuity_memory, roast_text, created_at, tone, persona")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (previousRoastError) console.error("[api/user/previous-answers] latest roast read failed:", previousRoastError.message);
 
   if (!previousRoast) {
-    return NextResponse.json({ isReturning: false, hasUsedTodayRoast });
+    return NextResponse.json({ isReturning: false, hasUsedTodayRoast, dailyLimitReached, dailyLimitMessage });
   }
 
   return NextResponse.json({
     isReturning: true,
     hasUsedTodayRoast,
+    dailyLimitReached,
+    dailyLimitMessage,
     answers: previousRoast.answers,
     continuityMemory: previousRoast.continuity_memory,
     previousRoastText: previousRoast.roast_text,

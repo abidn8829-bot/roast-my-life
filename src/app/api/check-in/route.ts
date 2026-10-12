@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { sendAchievementPush } from "@/lib/achievement-push";
 import { unlockAchievements, type AchievementId } from "@/lib/achievements";
 import { cleanRoastText } from "@/lib/clean-roast-text";
+import { checkDailyLimit } from "@/lib/daily-limit";
 import { calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
 import { PENDING_ACHIEVEMENT_COOKIE, encodePendingAchievements } from "@/lib/pending-achievement-cookie";
@@ -60,6 +61,16 @@ function isPlanSteps(value: unknown): value is PlanStep[] {
 type ChallengePlan = { challenge: string; steps: PlanStep[] };
 
 export async function POST(request: Request) {
+  // handlePost claims a daily slot for "submit"; whatever happens, give it back when the request ends.
+  const slot = { release: () => {} };
+  try {
+    return await handlePost(request, slot);
+  } finally {
+    slot.release();
+  }
+}
+
+async function handlePost(request: Request, slot: { release: () => void }) {
   const apiKey = getGroqApiKey();
   if (!apiKey) return NextResponse.json({ error: "Groq API key not configured" }, { status: 500 });
   const supabase = await createSupabaseServerClient();
@@ -78,7 +89,8 @@ export async function POST(request: Request) {
   // Free tier stays locked to whatever tone they already have (always "normal" in
   // practice, since /api/roast never lets a free user set anything else). Pro users
   // can pick a different tone per check-in via the tone selector.
-  const { data: userRow } = await supabase.from("users").select("subscription_tier").eq("id", user.id).single();
+  const { data: userRow, error: userRowError } = await supabase.from("users").select("subscription_tier").eq("id", user.id).single();
+  if (userRowError) console.error("[api/check-in] subscription tier read failed (treating as free):", userRowError.message);
   const subscriptionTier = userRow?.subscription_tier || "free";
   const requestedTone = typeof body.tone === "string" && ["normal", "no_mercy", "destroy_me"].includes(body.tone)
     ? (body.tone as RoastTone)
@@ -98,6 +110,10 @@ export async function POST(request: Request) {
 
   const groq = new Groq({ apiKey });
   if (body.action === "question") {
+    // Limit already used up? Say so now, before any AI call, instead of letting the user
+    // answer a question they can't submit. Looks only (claim: false): the slot is taken at "submit".
+    const questionLimit = await checkDailyLimit(supabase, user.id, subscriptionTier, { claim: false });
+    if (!questionLimit.allowed) return NextResponse.json(questionLimit.body, { status: questionLimit.status });
     try {
       const memory = (previous.continuity_memory as Record<string, unknown> | null) ?? {};
       const lastAskedCategory = memory.lastAskedCategory;
@@ -143,6 +159,13 @@ export async function POST(request: Request) {
   const activeTheme = typeof body.activeTheme === "string" ? body.activeTheme.trim() : "";
   const question = typeof body.question === "string" ? body.question.trim() : "";
   if (body.action !== "submit" || !isCategory(category) || !answer) return NextResponse.json({ error: "Invalid check-in submission" }, { status: 400 });
+
+  // Daily limit (free/Pro numbers live in lib/daily-limit.ts), checked before any AI call or write.
+  // The roasts row is only written at the very end, so a failed submit never counts as used.
+  const dailyLimit = await checkDailyLimit(supabase, user.id, subscriptionTier);
+  if (!dailyLimit.allowed) return NextResponse.json(dailyLimit.body, { status: dailyLimit.status });
+  slot.release = dailyLimit.release;
+
   const previousGrade = categoryScores[category].grade;
   let filteredGradeUpdates: Partial<Record<Category, Grade>>;
   let suggestionLine: string;

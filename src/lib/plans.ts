@@ -1,5 +1,7 @@
 // Plan feature lists, shared by the landing page, /pricing and the upgrade modal
 // so they can't drift apart.
+import { FREE_DAILY_LIMIT, PRO_DAILY_LIMIT } from "@/lib/daily-limit";
+
 export const PRO_PRICE = "$6.99";
 
 export const FREE_FEATURES = [
@@ -11,8 +13,8 @@ export const FREE_FEATURES = [
 
 export const PRO_FEATURES = [
   {
-    title: "Unlimited roasts",
-    desc: "Every day, any time — no waiting for tomorrow.",
+    title: `${PRO_DAILY_LIMIT} roasts or check-ins a day`,
+    desc: `Free gets ${FREE_DAILY_LIMIT} a day. Pro gets ${PRO_DAILY_LIMIT}.`,
   },
   {
     title: "All 6 personas + every tone",

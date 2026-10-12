@@ -109,6 +109,8 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   const [checkInCategory, setCheckInCategory] = useState<string | null>(null);
   const [checkInTheme, setCheckInTheme] = useState("");
   const [isCustomCheckIn, setIsCustomCheckIn] = useState(false);
+  // Set when today's limit is already used up: shows a "come back tomorrow" screen instead of the check-in.
+  const [limitNotice, setLimitNotice] = useState<string | null>(null);
 
   const generateFollowUpQuestion = async () => {
     setIsGeneratingFollowUp(true);
@@ -124,6 +126,10 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
         setFollowUpQuestion(data.question);
         setCheckInCategory(data.category);
         setCheckInTheme(data.activeTheme);
+      } else if (res.status === 429 && data.code === "daily_limit") {
+        // Safety net: the server refused the question because the limit is used up.
+        setLimitNotice(data.error ?? "You've used today's check-ins. Come back tomorrow.");
+        if (data.tier === "free") setUpgradeReason("daily_limit");
       }
     } catch (error) {
       console.error("Error generating follow-up question:", error);
@@ -151,8 +157,12 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
           setPreviousRoastText(answersData.previousRoastText);
           if (answersData.tone) setSelectedTone(answersData.tone);
           if (answersData.persona) setSelectedPersona(answersData.persona);
-          // Only show check-in if they haven't used today's roast
-          if (!answersData.hasUsedTodayRoast) {
+          if (userIsPro && answersData.dailyLimitReached) {
+            // Pro user who has used today's check-ins: say so right away. No persona picker,
+            // no check-in question (and no AI call for it).
+            setLimitNotice(answersData.dailyLimitMessage ?? "You've used today's check-ins. Come back tomorrow.");
+          } else if (!answersData.hasUsedTodayRoast) {
+            // Only show check-in if they haven't used today's roast
             // Pro users get to pick today's roaster before the check-in question;
             // free users stay locked to Default and skip straight to the question.
             setStep(userIsPro ? "checkin-persona" : "checkin");
@@ -261,7 +271,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
 
     clearTimeout(loadingTimeout);
 
-    const data = (await res.json()) as { id?: string; error?: string; followUpQuestion?: string; requiresFollowUp?: boolean; newlyUnlockedAchievements?: string[] };
+    const data = (await res.json()) as { id?: string; error?: string; code?: string; tier?: string; followUpQuestion?: string; requiresFollowUp?: boolean; newlyUnlockedAchievements?: string[] };
     const roastId =
       typeof data.id === "string" ? data.id.trim() : String(data.id ?? "");
 
@@ -277,8 +287,9 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
       console.error("[onboarding] roast API failed:", res.status, data);
       setIsGenerating(false);
 
-      // Check if it's a daily limit error
-      if (res.status === 429 && data.error?.includes("free roast today")) {
+      // Free users hitting the daily limit get the upgrade modal; Pro users fall through
+      // to the error line below, which shows the server's "come back tomorrow" message.
+      if (res.status === 429 && data.code === "daily_limit" && data.tier === "free") {
         setUpgradeReason("daily_limit");
         return;
       }
@@ -358,8 +369,9 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "submit", category: checkInCategory, answer: followUpAnswer.trim(), activeTheme: checkInTheme, question: followUpQuestion, tone: selectedTone, persona: selectedPersona }),
       });
-      const data = await res.json() as { id?: string; error?: string; newlyUnlockedAchievements?: string[] };
+      const data = await res.json() as { id?: string; error?: string; code?: string; tier?: string; newlyUnlockedAchievements?: string[] };
       if (!res.ok || !data.id) {
+        if (res.status === 429 && data.code === "daily_limit" && data.tier === "free") setUpgradeReason("daily_limit");
         setError(data.error ?? "Couldn't save your check-in. Try again.");
         return;
       }
@@ -382,6 +394,31 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
         <p className="text-lg text-text animate-pulse">
           Checking your profile...
         </p>
+      </div>
+    );
+  }
+
+  if (limitNotice) {
+    return (
+      <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md text-center">
+          <div className="text-8xl mb-6">🔥</div>
+          <h2 className="text-2xl sm:text-3xl font-bold text-text mb-3">Daily limit reached</h2>
+          <p className="text-lg text-text-muted mb-8">{limitNotice}</p>
+          <button
+            type="button"
+            onClick={() => router.push("/dashboard")}
+            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
+          >
+            Back to dashboard
+          </button>
+        </div>
+        <UpgradeModal
+          isOpen={upgradeReason !== null}
+          onClose={() => setUpgradeReason(null)}
+          reason={upgradeReason ?? undefined}
+          userEmail={userEmail}
+        />
       </div>
     );
   }
@@ -473,6 +510,12 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
             </>
           )}
         </div>
+        <UpgradeModal
+          isOpen={upgradeReason !== null}
+          onClose={() => setUpgradeReason(null)}
+          reason={upgradeReason ?? undefined}
+          userEmail={userEmail}
+        />
       </div>
     );
   }

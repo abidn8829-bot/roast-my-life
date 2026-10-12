@@ -1,6 +1,7 @@
 "use client";
 
 import { UpgradeBanner } from "@/components/upgrade-banner";
+import { PRO_DAILY_LIMIT } from "@/lib/daily-limit";
 
 type Props = {
   email: string;
@@ -26,7 +27,7 @@ export function ProfileContent({ email, subscriptionTier }: Props) {
                 <span className="flex items-center gap-1 rounded-full bg-[#FF3D00]/20 px-3 py-1 text-xs font-bold text-[#FF3D00]">
                   🔥 PRO
                 </span>
-                <span className="text-[#FAFAFA]">Unlimited roasts, all features</span>
+                <span className="text-[#FAFAFA]">{PRO_DAILY_LIMIT} roasts a day, all features</span>
               </>
             ) : (
               <>
