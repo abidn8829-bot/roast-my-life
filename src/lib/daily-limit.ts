@@ -45,11 +45,16 @@ export type DailyLimitResult =
  * it succeeded or failed (the row is only written at the very end, so a failed
  * request never counts as used). On a database error it refuses (500) instead of
  * letting the request through.
+ *
+ * `{ claim: false }` only LOOKS: same answer, but it takes no slot (nothing to
+ * release). Use it for "is the limit already used up?" checks that don't start a
+ * roast or check-in themselves (e.g. loading the check-in question).
  */
 export async function checkDailyLimit(
   supabase: SupabaseClient,
   userId: string,
   tier: string | null | undefined,
+  options: { claim?: boolean } = {},
 ): Promise<DailyLimitResult> {
   const isPro = tier === "pro";
   const limit = dailyLimitFor(tier);
@@ -78,6 +83,8 @@ export async function checkDailyLimit(
       body: { error: limitReachedMessage(isPro, limit), code: DAILY_LIMIT_CODE, tier: isPro ? "pro" : "free" },
     };
   }
+
+  if (options.claim === false) return { allowed: true, used: count, limit, release: () => {} };
 
   active.push(now);
   inFlight.set(userId, active);

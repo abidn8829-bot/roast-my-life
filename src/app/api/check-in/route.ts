@@ -110,6 +110,10 @@ async function handlePost(request: Request, slot: { release: () => void }) {
 
   const groq = new Groq({ apiKey });
   if (body.action === "question") {
+    // Limit already used up? Say so now, before any AI call, instead of letting the user
+    // answer a question they can't submit. Looks only (claim: false): the slot is taken at "submit".
+    const questionLimit = await checkDailyLimit(supabase, user.id, subscriptionTier, { claim: false });
+    if (!questionLimit.allowed) return NextResponse.json(questionLimit.body, { status: questionLimit.status });
     try {
       const memory = (previous.continuity_memory as Record<string, unknown> | null) ?? {};
       const lastAskedCategory = memory.lastAskedCategory;
