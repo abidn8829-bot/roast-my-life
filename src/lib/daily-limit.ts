@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // that reads them follows). One unit = one row in `roasts`, and both a roast and a
 // daily check-in write one, so roasts and check-ins share the same daily budget.
 export const FREE_DAILY_LIMIT = 1;
-export const PRO_DAILY_LIMIT = 3;
+export const PRO_DAILY_LIMIT = 2;
 
 export const DAILY_LIMIT_CODE = "daily_limit";
 
