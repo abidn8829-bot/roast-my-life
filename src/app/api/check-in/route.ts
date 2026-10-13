@@ -14,6 +14,9 @@ import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
 import { todayKey } from "@/lib/arc-trend";
 import { applyCheckInToMission } from "@/lib/missions-server";
+import { clip, outputLooksUnsafe, resolveSafety, ruleFloorLevel } from "@/lib/safety";
+import { OUTPUT_GUARDRAIL, runSafetyGrading } from "@/lib/safety-server";
+import { gentleGate, respondFlagged, respondOutputBlocked, respondUnavailable } from "@/lib/safety-response";
 
 const MODEL = "openai/gpt-oss-120b";
 const CATEGORIES = ["sleep", "fitness", "discipline", "focus", "spending"] as const;
@@ -78,6 +81,11 @@ async function handlePost(request: Request, slot: { release: () => void }) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   let body: Record<string, unknown>;
   try { body = await request.json() as Record<string, unknown>; } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+
+  // Gentle mode (72 hours after a safety flag): no check-in questions, no grading, no roasts.
+  // Enforced here, before any AI call, whatever the browser shows.
+  const gentle = await gentleGate(supabase, user.id);
+  if (gentle) return gentle;
 
   const { data: previous, error: previousError } = await supabase.from("roasts")
     .select("id, roast_text, report_card, answers, category_scores, tone, mode, persona, continuity_memory")
@@ -156,9 +164,15 @@ async function handlePost(request: Request, slot: { release: () => void }) {
 
   const category = body.category;
   const answer = typeof body.answer === "string" ? body.answer.trim() : "";
-  const activeTheme = typeof body.activeTheme === "string" ? body.activeTheme.trim() : "";
-  const question = typeof body.question === "string" ? body.question.trim() : "";
+  // The browser sends question and activeTheme back, and both are saved in continuity_memory,
+  // so they count as user-written text: size-limited here, safety-checked below.
+  const activeTheme = typeof body.activeTheme === "string" ? clip(body.activeTheme.trim(), 200) : "";
+  const question = typeof body.question === "string" ? clip(body.question.trim(), 500) : "";
   if (body.action !== "submit" || !isCategory(category) || !answer) return NextResponse.json({ error: "Invalid check-in submission" }, { status: 400 });
+
+  // Safety rule filter: needs no AI. A Level 2 match is final (fixed page, no AI call at all).
+  const ruleLevel = ruleFloorLevel(answer, question, activeTheme);
+  if (ruleLevel === 2) return respondFlagged({ request, route: "check-in", level: 2, userId: user.id });
 
   // Daily limit (free/Pro numbers live in lib/daily-limit.ts), checked before any AI call or write.
   // The roasts row is only written at the very end, so a failed submit never counts as used.
@@ -167,26 +181,24 @@ async function handlePost(request: Request, slot: { release: () => void }) {
   slot.release = dailyLimit.release;
 
   const previousGrade = categoryScores[category].grade;
-  let filteredGradeUpdates: Partial<Record<Category, Grade>>;
-  let suggestionLine: string;
-  try {
-    const completion = await groq.chat.completions.create({
-      model: MODEL, max_tokens: 500, reasoning_effort: "low", response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: "The user is answering a daily check-in about their habits. Scan the user's full answer for ANY of the 5 categories they mention — sleep, fitness, discipline, focus, spending — not just the one the question was about. Grade every category genuinely referenced, even if unprompted. Read their answer freely — it may mention one habit, several, or be vague. Only include categories genuinely relevant to what they said. For each relevant category, return an updated letter grade (A/B/C/D/F) based on whether they're improving or slipping. Also write a coaching suggestion_line: 2 sentences max, acknowledge what improved, name what's still struggling, point to one concrete next step. Tone: honest coach, not a joke. Return strict JSON only, in this exact shape: {\"grade_updates\": {\"category\": \"grade\"}, \"suggestion_line\": \"string\"}." },
-        { role: "user", content: `Check-in answer: ${answer}\nQuestion asked: ${question}\nCurrent theme: ${activeTheme}\nCurrent category grades: ${JSON.stringify(categoryScores)}` },
-      ],
-    });
-    const rawContent = completion.choices[0]?.message?.content ?? "";
-    console.error("[check-in] raw grading response:", rawContent);
-    const parsed = JSON.parse(rawContent) as { grade_updates?: unknown; suggestion_line?: unknown };
-    if (typeof parsed.suggestion_line !== "string" || !parsed.suggestion_line.trim() || typeof parsed.grade_updates !== "object" || parsed.grade_updates === null) return NextResponse.json({ error: "Invalid check-in grading response" }, { status: 502 });
-    filteredGradeUpdates = {};
-    for (const [key, value] of Object.entries(parsed.grade_updates as Record<string, unknown>)) {
-      if (isCategory(key) && isGrade(value)) filteredGradeUpdates[key] = value;
-    }
-    suggestionLine = parsed.suggestion_line.trim();
-  } catch (error) { logGroqError(error); return NextResponse.json({ error: "Failed to grade check-in" }, { status: 502 }); }
+
+  // Call #1 of the check-in. The safety level rides inside this existing grading call:
+  // no extra AI call. Everything the user typed (answer, question, theme) is in it.
+  const grading = await runSafetyGrading(groq, MODEL, { answer, question, activeTheme, categoryScores });
+  const decision = resolveSafety(grading.aiLevel, ruleLevel);
+  if (decision.kind === "unavailable") return respondUnavailable("check-in");
+  if (decision.level !== 0) {
+    // Nothing is saved except the flag: no roast, no roasts row, no score_history row, no
+    // plan / memory / punchline calls.
+    return respondFlagged({ request, route: "check-in", level: decision.level, userId: user.id, groq, texts: [answer] });
+  }
+  // Level 0 from here on. A malformed grading payload is a grading problem, not a safety one.
+  if (typeof grading.suggestionLine !== "string" || !grading.suggestionLine.trim() || typeof grading.gradeUpdates !== "object" || grading.gradeUpdates === null) return NextResponse.json({ error: "Invalid check-in grading response" }, { status: 502 });
+  const filteredGradeUpdates: Partial<Record<Category, Grade>> = {};
+  for (const [key, value] of Object.entries(grading.gradeUpdates as Record<string, unknown>)) {
+    if (isCategory(key) && isGrade(value)) filteredGradeUpdates[key] = value;
+  }
+  const suggestionLine = grading.suggestionLine.trim();
 
   const updatedCategoryScores: CategoryScores = { ...categoryScores };
   for (const key of CATEGORIES) {
@@ -219,7 +231,7 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     const planCompletion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 420, reasoning_effort: "low", response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: "Return strict JSON only: {\"challenge\":\"small concrete challenge\",\"planSteps\":[{\"step\":\"concrete action\",\"why\":\"one short sentence why it matters\"}]}. The challenge must never specify a fixed multi-day duration (no '3 days', 'next week', '2 weeks', etc.) — keep it achievable as a short, concrete action, not a multi-day program. Never reuse or repeat a stale prior ask — write a fresh challenge grounded in what the user just said. planSteps must contain 2 or 3 objects, each a concrete next action with a one-sentence why in your blunt coaching voice — never generic filler like 'this will help you improve.' Branch on direction, which is the deciding signal, not the raw answer wording, since grading already judged whether the evidence supports it. If direction is 'improved' and the answer shows real follow-through, the challenge should push further — a harder version of the same category. If direction is 'same' and the answer shows an attempt, the challenge should target the specific point it broke down instead of just repeating 'try harder.' If direction is 'worse', or the answer is a flat refusal, change the approach entirely instead of repeating the same ask. If the answer gives specific real details, respond directly to those specifics instead of a generic version of the category. Pay attention not just to WHAT the user said, but HOW they said it — frustration, sarcasm, reluctant effort, genuine pride, resignation, dismissiveness, etc. Let that tone shape your wording, not just the plan's content. If the answer is frustrated, dismissive, or sounds like giving up (e.g. rejecting an approach outright), briefly acknowledge that specifically before pivoting to the challenge — don't quietly route around it like it wasn't said. If the answer shows genuine effort or real progress, name that specifically instead of defaulting to a generic plan. The challenge text and the first step's 'why' are where this tone should show up most — they should read like they were written by someone who actually heard what was said, not just extracted the topic from it." },
+        { role: "system", content: OUTPUT_GUARDRAIL + " " + "Return strict JSON only: {\"challenge\":\"small concrete challenge\",\"planSteps\":[{\"step\":\"concrete action\",\"why\":\"one short sentence why it matters\"}]}. The challenge must never specify a fixed multi-day duration (no '3 days', 'next week', '2 weeks', etc.) — keep it achievable as a short, concrete action, not a multi-day program. Never reuse or repeat a stale prior ask — write a fresh challenge grounded in what the user just said. planSteps must contain 2 or 3 objects, each a concrete next action with a one-sentence why in your blunt coaching voice — never generic filler like 'this will help you improve.' Branch on direction, which is the deciding signal, not the raw answer wording, since grading already judged whether the evidence supports it. If direction is 'improved' and the answer shows real follow-through, the challenge should push further — a harder version of the same category. If direction is 'same' and the answer shows an attempt, the challenge should target the specific point it broke down instead of just repeating 'try harder.' If direction is 'worse', or the answer is a flat refusal, change the approach entirely instead of repeating the same ask. If the answer gives specific real details, respond directly to those specifics instead of a generic version of the category. Pay attention not just to WHAT the user said, but HOW they said it — frustration, sarcasm, reluctant effort, genuine pride, resignation, dismissiveness, etc. Let that tone shape your wording, not just the plan's content. If the answer is frustrated, dismissive, or sounds like giving up (e.g. rejecting an approach outright), briefly acknowledge that specifically before pivoting to the challenge — don't quietly route around it like it wasn't said. If the answer shows genuine effort or real progress, name that specifically instead of defaulting to a generic plan. The challenge text and the first step's 'why' are where this tone should show up most — they should read like they were written by someone who actually heard what was said, not just extracted the topic from it." },
         { role: "user", content: `Category: ${category}\nUser's answer: ${answer}\nGrade direction: ${result.direction}` },
       ],
     });
@@ -245,7 +257,7 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     const memoryCompletion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 350, reasoning_effort: "low", response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: "Return strict JSON only: {\"activeTheme\":\"short current arc\",\"followUpQuestion\":\"the question asked\",\"lastResponse\":\"the user answer\",\"callbackCount\":number,\"resolved\":boolean,\"title\":\"short funny persona label, 2-4 words, reflecting the current theme and direction (improved|same|worse)\"}. Mark resolved true only if this answer shows meaningful, sustained progress; otherwise keep the same theme and increment callbackCount." },
+        { role: "system", content: OUTPUT_GUARDRAIL + " " + "Return strict JSON only: {\"activeTheme\":\"short current arc\",\"followUpQuestion\":\"the question asked\",\"lastResponse\":\"the user answer\",\"callbackCount\":number,\"resolved\":boolean,\"title\":\"short funny persona label, 2-4 words, reflecting the current theme and direction (improved|same|worse)\"}. Mark resolved true only if this answer shows meaningful, sustained progress; otherwise keep the same theme and increment callbackCount." },
         { role: "user", content: `Previous arc: ${JSON.stringify(previous.continuity_memory ?? {})}\nTheme: ${activeTheme}\nQuestion: ${question}\nAnswer: ${answer}\nGrade result: ${result.new_grade} (${result.direction})` },
       ],
     });
@@ -270,7 +282,7 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     const roastCompletion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 350, reasoning_effort: "low",
       messages: [
-        { role: "system", content: CHECKIN_SYSTEM_PROMPTS[resolvedTone] },
+        { role: "system", content: `${CHECKIN_SYSTEM_PROMPTS[resolvedTone]}\n\n${OUTPUT_GUARDRAIL}` },
         { role: "user", content: `Categories graded this check-in (score is 0-100 for that category only, separate from life score): ${JSON.stringify(changedCategoryScores)}\nCategory directions this check-in, all 5 (qualitative only, no numbers): ${JSON.stringify(categoryDirections)}\nOverall life score (0-100 average across all categories): was ${previousLifeScore}, now ${lifeScore} (${overallDirection})\nCheck-in answer: ${answer}\nContinuity memory: ${JSON.stringify(nextMemory)}` },
       ],
     });
@@ -278,6 +290,9 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     if (!generatedRoast) return NextResponse.json({ error: "Failed to generate check-in roast" }, { status: 502 });
     newRoastText = cleanRoastText(generatedRoast);
     if (!newRoastText) return NextResponse.json({ error: "Failed to generate check-in roast" }, { status: 502 });
+    // Output check (rule-based, no AI call): a roast that mocks sadness / self-harm / pain is thrown away.
+    if (process.env.NODE_ENV !== "production" && process.env.EMBER_SAFETY_TEST_ROAST) newRoastText = process.env.EMBER_SAFETY_TEST_ROAST; // test-only override, ignored in production
+    if (outputLooksUnsafe(newRoastText)) return respondOutputBlocked(request, "check-in");
   } catch (error) { logGroqError(error); return NextResponse.json({ error: "Failed to generate check-in roast" }, { status: 502 }); }
 
   // Fresh punchline for this check-in (previously the first-roast's top-5 lines were copied forward verbatim).
@@ -289,6 +304,11 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     mode: (previous.mode ?? "roast") as RoastMode,
     checkIn: { category, answer, direction: result.direction },
   });
+
+  // Final output check over everything the AI wrote for this check-in, before anything is saved.
+  if (outputLooksUnsafe(newRoastText, suggestionLine, funnyTitle, cardPunchline, plan?.challenge, ...(plan?.steps ?? []).flatMap((x) => [x.step, x.why]), typeof nextMemory.challenge === "string" ? nextMemory.challenge : null)) {
+    return respondOutputBlocked(request, "check-in");
+  }
 
   const { data: created, error: roastError } = await insertRoastRow(supabase, {
     user_id: user.id, roast_text: newRoastText, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),

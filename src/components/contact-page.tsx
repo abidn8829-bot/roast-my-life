@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { SafetyPage } from "@/components/safety-page";
+import type { SafetyPagePayload } from "@/lib/safety";
 
 export function ContactPage() {
   const [name, setName] = useState("");
@@ -10,6 +12,7 @@ export function ContactPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [safetyPage, setSafetyPage] = useState<SafetyPagePayload | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,6 +25,15 @@ export function ContactPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, message }),
       });
+
+      const safetyData = res.ok ? ((await res.json().catch(() => null)) as { safety?: { kind?: string } } | null) : null;
+      if (safetyData?.safety?.kind === "page") {
+        // The message was not sent anywhere; show the support page and drop the typed text.
+        setSafetyPage(safetyData.safety as SafetyPagePayload);
+        setMessage("");
+        setName("");
+        return;
+      }
 
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -36,6 +48,8 @@ export function ContactPage() {
       setLoading(false);
     }
   }
+
+  if (safetyPage) return <SafetyPage payload={safetyPage} />;
 
   return (
     <main className="min-h-screen bg-[#0A0A0A] px-4 py-10 text-[#FAFAFA]">
@@ -93,7 +107,7 @@ export function ContactPage() {
                 rows={5}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                className="resize-none rounded-md border border-neutral-800 bg-[#141414] px-3 py-2 text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2"
+                className="ph-no-capture resize-none rounded-md border border-neutral-800 bg-[#141414] px-3 py-2 text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2"
               />
             </label>
 

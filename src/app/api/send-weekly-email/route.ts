@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Resend } from "resend";
+import { getGentleUserIds } from "@/lib/safety-server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -25,12 +27,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
     }
 
+    // Users inside the 72-hour gentle window after a safety flag get no "get roasted" email.
+    let gentleUserIds = new Set<string>();
+    try {
+      gentleUserIds = await getGentleUserIds(createSupabaseServiceClient());
+    } catch {
+      console.error("[safety] gentle list failed code=no-service-client");
+    }
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
 
     // Send email to each user
     const emailPromises = users.map(async (user) => {
       if (!user.email) return;
+      if (gentleUserIds.has(user.id)) return;
 
       try {
         await resend.emails.send({
