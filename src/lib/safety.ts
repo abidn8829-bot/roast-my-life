@@ -144,6 +144,22 @@ function normalize(text: string): string {
     .replace(/\s+/g, " ");
 }
 
+// ONE structural rule for the quiet "nobody would miss me" wording. It needs three parts in the same
+// sentence: (1) other people, (2) "would notice / miss / care / be fine / be better off", and (3) the
+// speaker (I / me) as the subject of an absence: gone, disappeared, vanished, not around, not existing,
+// not waking up, "without me". The absence has to END the clause (punctuation, "anymore", "for good", ...),
+// so "...if I disappeared into my editing cave" or "...without me for a week" do not match, and neither
+// does "nobody would notice if I changed the font". Anything it misses is left to the classifier.
+const OTHERS = String.raw`(?:no ?one|nobody|people|everyone|everybody|anyone|anybody|they|others|my (?:family|friends|parents))`;
+const MODAL = String.raw`(?:\s(?:would(?:n't|nt| not)?|will(?:n't| not)?|won't|wont)|'d|'ll)(?:\s(?:even|really|actually|probably|honestly|truly|ever))*`;
+const REACTION = String.raw`(?:notice|miss|care|mind|be (?:fine|okay|ok|alright|happier|relieved|better(?: off)?))`;
+const ABSENCE = String.raw`(?:gone|dead|disappear(?:ed)?|vanish(?:ed)?|die(?:d)?|never (?:existed|woke up|wake up|born)|(?:wasn't|weren't|was not|were not|am not|am no longer|didn't|did not|don't|do not)\s+(?:even\s+)?(?:around|here|alive|born|exist|exists|existing|wake up(?: tomorrow| tomorrow morning| tonight| in the morning| again)?)|stopped existing|stop existing)`;
+const IF_I = String.raw`(?:if|when|once|after|that)\s+i(?:'m)?\s+(?:(?:just|suddenly|finally|actually|really|simply|completely|totally|ever|was|were|am|got)\s+)*${ABSENCE}`;
+const CLAUSE_END = String.raw`(?=\s*(?:$|[.,!?;:)\-–—]|(?:anymore|any more|at all|for good|forever|completely|entirely|and|but|so|then|anyway|lol|lmao|haha)\b))`;
+const NOBODY_WOULD_MISS_ME = new RegExp(
+  String.raw`\b${OTHERS}${MODAL}\s${REACTION}\b[^.!?]{0,30}?\b(?:${IF_I}|without me|with me gone)${CLAUSE_END}`,
+);
+
 const LEVEL2_RULES: RegExp[] = [
   // harming / ending myself
   /\b(?:kill|killing|hurt|hurting|harm|harming|cut|cutting) (?:myself|my self)\b/,
@@ -159,6 +175,8 @@ const LEVEL2_RULES: RegExp[] = [
   /\bwish i (?:could )?(?:just )?(?:disappear|vanish|never wake up|not wake up)\b/,
   /\b(?:better|best) off without me\b/,
   /\b(?:better|best) off if i (?:was|were) (?:gone|dead)\b/,
+  // other people would not notice / miss / care if I were gone
+  NOBODY_WOULD_MISS_ME,
   // harming others / danger
   /\b(?:going to|gonna|want to|wanna|about to|will) (?:hurt|kill|stab|shoot|harm|murder) (?:someone|somebody|him|her|them|people|everyone)\b/,
   // Roman Urdu

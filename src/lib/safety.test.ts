@@ -1,6 +1,8 @@
 // Run with: node --test src/lib/safety.test.ts   (Node 22.18+ / 23.6+, no extra dependencies)
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import type Groq from "groq-sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
@@ -102,6 +104,72 @@ test("rule filter: strong Level 1 phrases", () => {
 test("rule filter looks at every text it is given", () => {
   assert.equal(ruleFloorLevel("fine", "How did it go?", "I want to end it all"), 2);
   assert.equal(ruleFloorLevel(null, undefined, ""), 0);
+});
+
+// The one rule for the quiet "nobody would miss me" wording: other people + notice / miss / care / be fine /
+// be better off + the speaker as the subject of an absence (gone, disappeared, vanished, not around, not
+// existing, not waking up, "without me"), with the absence ending the clause.
+test("rule filter: other people would not notice / miss / care if I were gone = Level 2", () => {
+  const mustMatch = [
+    "What's the point of becoming a creator, nobody would even notice if I disappeared",
+    "they wouldn't miss me if I was gone",
+    "No one would care if I just vanished.",
+    "people would be fine without me.",
+    "everyone would be happier if I wasn't around",
+    "nobody will notice when I'm gone",
+    "no one would notice if I didn't exist",
+    "nobody would miss me if I didn't wake up tomorrow",
+    "my family would be better off if I were gone",
+    "nobody would notice if I died",
+    "No one would care if I never woke up.",
+    "they'd be fine with me gone",
+    "nobody'd miss me if I disappeared for good",
+    "People would not even notice if I vanished completely",
+    "Nobody would miss me if I wasn’t here anymore", // typographic apostrophe
+    "honestly no one would really notice if I was gone lol",
+    "Everyone would be relieved if I disappeared, so why bother",
+  ];
+  for (const m of mustMatch) assert.equal(ruleFloorLevel(m), 2, m);
+  // it works inside a longer message and on any of the texts given
+  assert.equal(ruleFloorLevel("Rough week at work.", "Honestly nobody would even notice if I disappeared. Anyway, what next?"), 2);
+});
+
+test("rule filter: harmless look-alikes of the same sentence shape stay with the AI", () => {
+  const mustNotMatch = [
+    "nobody would notice if I changed the font",
+    "no one would miss that old app",
+    "my motivation disappeared",
+    "nobody would care if I skipped the party",
+    "I'll disappear into my editing cave this weekend lol",
+    "nobody would notice if I disappeared into my editing cave for the weekend",
+    "my team would be fine without me for a week",
+    "everyone would notice if I wasn't there for the meeting",
+    "nobody would care if I was late again",
+    "no one would miss me if I skipped leg day",
+    "my app disappeared from my phone and nobody noticed",
+    "people would notice if I vanished from the group chat",
+    "nobody would be surprised if I quit my job",
+    "everyone would be fine without me at the party tonight",
+    "nobody would notice if I was gone for a few days",
+    "they would miss me if I wasn't around this weekend",
+    "I wish someone would notice my work",
+    "nobody would care if I died laughing at my own joke, it was that bad",
+  ];
+  for (const m of mustNotMatch) assert.equal(ruleFloorLevel(m), 0, m);
+});
+
+test("rule filter: the new rule leaves the approved Level 0 test messages and the existing rules alone", () => {
+  // Level 0 / borderline messages from the approved sets still come back 0 (see also the test above)
+  for (const m of ["Gym? I'd rather die", "I'm dead tired lol, slept 4 hours", "This deadline is killing me", "Nobody reads my blog and honestly I'm fine with it, I mostly write for fun"]) {
+    assert.equal(ruleFloorLevel(m), 0, m);
+  }
+  // an existing Level 2 rule and an existing Level 1 rule still behave the same
+  assert.equal(ruleFloorLevel("Everyone would be better off without me"), 2);
+  assert.equal(ruleFloorLevel("I feel so alone"), 1);
+  // a very long message with nothing in it stays fast (the rule has bounded gaps, no runaway backtracking)
+  const started = Date.now();
+  assert.equal(ruleFloorLevel(`nobody would notice ${"if I ".repeat(400)}`), 0);
+  assert.ok(Date.now() - started < 500, "rule filter took too long on a long input");
 });
 
 // ---------------------------------------------------------------------------
@@ -450,6 +518,42 @@ test("classify prompt states the principles it must carry", () => {
   assert.match(p, /Roman Urdu and Urdu/);
   assert.match(p, /Return strict JSON only/);
   assert.doesNotMatch(p, /savage|roast comedian|zero filter/i); // no persona
+});
+
+test("classify prompt: other people would not notice / miss / care is Level 2, with the harmless exceptions", () => {
+  const p = SAFETY_CLASSIFY_PROMPT;
+  const level2 = p.slice(p.indexOf("2 = any sign"), p.indexOf("How to decide:"));
+  assert.ok(level2.length > 0, "could not find the Level 2 definition");
+  // the principle sits INSIDE the Level 2 definition
+  assert.match(level2, /other people would not notice, miss or care if the person were gone, vanished or never woke up/);
+  assert.match(level2, /hypothetical, discouragement about a goal, or said in passing/);
+  // the exceptions are stated right beside it, so ordinary idioms are not pulled up to Level 2
+  assert.match(level2, /harmless idioms about tiredness or embarrassment/);
+  assert.match(level2, /things other than the person that disappear/);
+  assert.match(level2, /small everyday matter/);
+  // the rest of the definition is still there
+  assert.match(level2, /feeling like a burden to others/);
+  assert.match(level2, /Do not wait for explicit words/);
+});
+
+test("classify prompt is independent of the goals, hold-out and quiet eval sets (no 4-word run from any of their messages)", () => {
+  // The eval messages live in scripts/safety-eval.mjs; read them from there so there is one copy and it cannot drift.
+  const source = readFileSync(fileURLToPath(new URL("../../scripts/safety-eval.mjs", import.meta.url)), "utf8");
+  const messages = new Map<string, string>();
+  for (const m of source.matchAll(/\["([GHQ]\d+)",\s*(?:"[^"]*",\s*)?[012],\s*"((?:[^"\\]|\\.)*)"\]/g)) messages.set(m[1]!, m[2]!);
+  for (const id of ["G1", "G4", "G20", "H1", "H12", "Q1", "Q12"]) assert.ok(messages.has(id), `could not read ${id} from the eval script`);
+  assert.ok(messages.size >= 44, `expected 20 goals + 12 hold-out + 12 quiet messages, found ${messages.size}`);
+
+  const norm = (t: string) => t.toLowerCase().replace(/[‘’]/g, "'").replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+  const prompt = ` ${norm(SAFETY_CLASSIFY_PROMPT)} `;
+  for (const [id, message] of messages) {
+    const words = norm(message).split(" ").filter(Boolean);
+    if (words.length >= 3) assert.ok(!prompt.includes(` ${words.join(" ")} `), `${id}: the whole message appears in the classify prompt`);
+    for (let i = 0; i + 4 <= words.length; i++) {
+      const gram = words.slice(i, i + 4).join(" ");
+      assert.ok(!prompt.includes(` ${gram} `), `${id}: 4-word run "${gram}" appears in the classify prompt`);
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------
