@@ -109,6 +109,28 @@ export function resolveSafety(ai: unknown, rule: SafetyLevel): SafetyDecision {
   return { kind: "level", level: Math.max(parsed, rule) as SafetyLevel };
 }
 
+/**
+ * Combines every signal for the first-time roast and the returning-user follow-up paths:
+ *   rule      the phrase filter (needs no AI)
+ *   classify  the dedicated classify-only call, run BEFORE anything is generated
+ *   inCall    the safety_level key that the roast / follow-up call itself returns (extra signal)
+ *
+ * The final level is the HIGHEST of all signals ("unsure = higher level").
+ * Fail closed: if the classify call gave no usable answer (failed, timed out, bad JSON) and no
+ * phrase matched, the check could not be done: "unavailable" (never a roast, never a flag).
+ * The in-call level can only raise the result; a missing in-call level is never a failure
+ * because the classifier has already answered.
+ */
+export function combineSignals(signals: {
+  rule: SafetyLevel;
+  classify: SafetyLevel | null;
+  inCall?: SafetyLevel | null;
+}): SafetyDecision {
+  if (signals.classify === null && signals.rule === 0) return { kind: "unavailable" };
+  const level = Math.max(signals.rule, signals.classify ?? 0, signals.inCall ?? 0) as SafetyLevel;
+  return { kind: "level", level };
+}
+
 // ---------------------------------------------------------------------------
 // Rule filter: high-precision phrases that can only RAISE the level.
 // Needs no AI. English, Roman Urdu and Urdu script. First-person wording only, so

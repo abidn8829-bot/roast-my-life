@@ -12,8 +12,8 @@ import type { OnboardingAnswers, RoastTone, RoastMode, RoastPersona } from "@/li
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
-import { outputLooksUnsafe, resolveSafety, ruleFloorLevel, type SafetyLevel } from "@/lib/safety";
-import { OUTPUT_GUARDRAIL, SAFETY_CALL_OPTIONS } from "@/lib/safety-server";
+import { combineSignals, outputLooksUnsafe, ruleFloorLevel, type SafetyLevel } from "@/lib/safety";
+import { OUTPUT_GUARDRAIL, SAFETY_CALL_OPTIONS, runSafetyClassify } from "@/lib/safety-server";
 import {
   DEFAULT_PERSONA_PROMPT,
   FOLLOWUP_CALL_PARAMS,
@@ -28,6 +28,11 @@ import {
 import { gentleGate, respondFlagged, respondOutputBlocked, respondUnavailable } from "@/lib/safety-response";
 
 const MODEL = "openai/gpt-oss-120b";
+
+// Seconds this route may run on Vercel. The pipeline is a safety classify call, then the roast, then
+// the punchline and memory calls (each with a timeout of its own), and a slow Groq day can add up.
+// 60 is within the Hobby plan's documented maximum whether or not Fluid Compute is on.
+export const maxDuration = 60;
 
 const CONTINUITY_MEMORY_SYSTEM_PROMPT = `You are building lightweight current-arc memory for a roast AI. Remember only the current habit storyline, not a transcript. Return a JSON object with these fields:
 - activeTheme: the current theme/issue (e.g., "procrastination", "phone addiction")
@@ -335,25 +340,40 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     );
   }
 
-  // Check if this is a returning user (has previous roasts)
-  const { data: previousRoasts } = await supabase
-    .from("roasts")
-    .select("id, roast_text, continuity_memory, created_at")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1);
+  const groq = new Groq({ apiKey });
+
+  // The dedicated safety classification runs BEFORE anything is generated, alongside the database
+  // read below (so it hides behind that read's latency). It has no roast task and no persona.
+  const [classifyLevel, { data: previousRoasts }] = await Promise.all([
+    runSafetyClassify(groq, MODEL, userTexts),
+    // Check if this is a returning user (has previous roasts)
+    supabase
+      .from("roasts")
+      .select("id, roast_text, continuity_memory, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1),
+  ]);
+
+  // Final level = the highest of the rule filter and the classifier. Fail closed: if the classifier
+  // could not answer and no phrase matched, nothing is generated, saved or flagged, and no daily
+  // slot is used (the roasts row is only written at the very end; the slot is released in POST).
+  const preDecision = combineSignals({ rule: ruleLevel, classify: classifyLevel });
+  if (preDecision.kind === "unavailable") return respondUnavailable("roast");
+  if (preDecision.level !== 0) {
+    return respondFlagged({ request, route: "roast", level: preDecision.level, userId: user.id, groq, texts: userTexts });
+  }
 
   const isReturningUser = previousRoasts && previousRoasts.length > 0;
   const previousRoast = isReturningUser ? previousRoasts[0] : null;
   const continuityMemory = previousRoast?.continuity_memory || null;
-
-  const groq = new Groq({ apiKey });
 
   // If returning user and no follow-up answer, generate follow-up question.
   // The safety level rides inside this existing call (it now returns JSON).
   if (isReturningUser && !followUpAnswer) {
     let aiLevel: SafetyLevel | null = null;
     let followUpQuestion = "";
+    let followUpCallFailed = false;
     try {
       const completion = await groq.chat.completions.create(
         {
@@ -368,12 +388,13 @@ async function handlePost(request: Request, slot: { release: () => void }) {
       followUpQuestion = parsedFollowUp.question;
     } catch (error) {
       logGroqError(error);
-      // Unchanged behaviour: if the follow-up call fails, fall through to the roast call below,
-      // which carries its own safety check.
+      // Unchanged behaviour: if the follow-up call fails, fall through to the roast call below.
+      followUpCallFailed = true;
     }
 
-    const followUpDecision = resolveSafety(aiLevel, ruleLevel);
-    if (followUpDecision.kind === "level") {
+    // The safety_level key the follow-up call returns is an extra signal that can only raise the level.
+    const followUpDecision = combineSignals({ rule: ruleLevel, classify: classifyLevel, inCall: aiLevel });
+    if (!followUpCallFailed && followUpDecision.kind === "level") {
       if (followUpDecision.level !== 0) {
         return respondFlagged({ request, route: "roast", level: followUpDecision.level, userId: user.id, groq, texts: userTexts });
       }
@@ -419,8 +440,10 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     logGroqError(err);
   }
 
-  const decision = resolveSafety(aiLevel, ruleLevel);
-  if (decision.kind === "unavailable") return respondUnavailable("roast");
+  // The roast call's own safety_level can only raise the level; a missing one is not a failure
+  // because the classifier already answered.
+  const decision = combineSignals({ rule: ruleLevel, classify: classifyLevel, inCall: aiLevel });
+  if (decision.kind === "unavailable") return respondUnavailable("roast"); // cannot happen after the pre-check; fail closed anyway
   if (decision.level !== 0) {
     return respondFlagged({ request, route: "roast", level: decision.level, userId: user.id, groq, texts: userTexts });
   }
