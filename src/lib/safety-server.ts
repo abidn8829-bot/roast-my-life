@@ -12,6 +12,7 @@ import { logGroqError } from "./groq-error.ts";
 import {
   GENTLE_WINDOW_MS,
   clip,
+  combineSignals,
   parseLevel,
   supportLinesOrFallback,
   type FlagLevel,
@@ -236,6 +237,76 @@ export async function runSafetyClassify(
 }
 
 // ---------------------------------------------------------------------------
+// The check-in's safety decision: the same three signals as the first roast and the follow-up.
+// ---------------------------------------------------------------------------
+
+export type CheckInSafetyInput = GradingInput & {
+  /** The phrase filter's level for everything the person typed (the caller runs ruleFloorLevel). */
+  ruleLevel: SafetyLevel;
+};
+
+export type CheckInSafetySignals = {
+  rule: SafetyLevel;
+  /** The classify-only call's level, or null if it was not asked or could not answer. */
+  classify: SafetyLevel | null;
+  /** The safety_level the grading call itself returned (null = not asked, or no usable answer). */
+  inCall: SafetyLevel | null;
+};
+
+export type CheckInSafety =
+  /** The check could not be done and no phrase matched: fail closed (nothing saved, no flag, no roast). */
+  | { kind: "unavailable"; signals: CheckInSafetySignals }
+  /** Level 1 or 2 from the highest signal. The caller shows the support page and writes the flag. */
+  | { kind: "flagged"; level: FlagLevel; signals: CheckInSafetySignals }
+  /** Level 0 on all three signals. `grading` is the grading call's result, ready to use. */
+  | { kind: "clear"; grading: GradingResult; signals: CheckInSafetySignals };
+
+/**
+ * The check-in's safety decision. Final level = the HIGHEST of the phrase filter, the dedicated
+ * classify-only call and the safety_level the grading call returns ("unsure = higher level").
+ * Mirrors /api/roast:
+ *   1. A Level 2 phrase match is final: no AI call at all.
+ *   2. The classify-only call runs on what the person typed (the answer) BEFORE grading or anything
+ *      else is generated. A classifier that could not answer with no phrase matched fails closed
+ *      ("unavailable") and stops here: the grading call is never made. A classifier level of 2 is
+ *      final too (nothing can be higher).
+ *   3. Otherwise the grading call runs, including when the phrase filter or the classifier already
+ *      said Level 1, so its own level can still raise that to 2 (a check-in with a phrase hit at
+ *      Level 1 and a grading level of 2 has always become Level 2; that must not get weaker).
+ *      The grading call can only raise the result, never lower it. A grading call that returns no
+ *      usable level is not a safety failure once the classifier has answered (the route's own check
+ *      of the grading result still applies and nothing is saved on a bad one).
+ *
+ * The classifier's failure handling is runSafetyClassify's, unchanged: one bounded retry on a 429
+ * with a Retry-After of 3 s or less, every other failure fails closed at once. Never throws.
+ * Logs status / error codes only, never text. `deps.sleep` is for tests.
+ */
+export async function runCheckInSafety(
+  groq: Groq,
+  model: string,
+  input: CheckInSafetyInput,
+  deps: { sleep?: (ms: number) => Promise<void> } = {},
+): Promise<CheckInSafety> {
+  const { ruleLevel, ...gradingInput } = input;
+
+  if (ruleLevel === 2) return { kind: "flagged", level: 2, signals: { rule: 2, classify: null, inCall: null } };
+
+  // Only what the person typed goes to the classifier. The question and theme are AI-written and are
+  // sent back by the browser; they stay covered by the phrase filter and the grading call, as before.
+  const classify = await runSafetyClassify(groq, model, [input.answer], deps);
+  const pre = combineSignals({ rule: ruleLevel, classify });
+  if (pre.kind === "unavailable") return { kind: "unavailable", signals: { rule: ruleLevel, classify, inCall: null } };
+  if (pre.level === 2) return { kind: "flagged", level: 2, signals: { rule: ruleLevel, classify, inCall: null } };
+
+  const grading = await runSafetyGrading(groq, model, gradingInput);
+  const signals: CheckInSafetySignals = { rule: ruleLevel, classify, inCall: grading.aiLevel };
+  const final = combineSignals(signals);
+  if (final.kind === "unavailable") return { kind: "unavailable", signals }; // cannot happen after the pre-check; fail closed anyway
+  if (final.level !== 0) return { kind: "flagged", level: final.level, signals };
+  return { kind: "clear", grading, signals };
+}
+
+// ---------------------------------------------------------------------------
 // Level 1: the two AI-written opening lines (separate call; only on the flagged path)
 // ---------------------------------------------------------------------------
 
@@ -292,12 +363,20 @@ function errorCode(error: unknown): string {
  * Stores ONE flag row: user id, level, date. No text anywhere. `service` must be the
  * service-role client (browsers cannot insert). A failed insert is logged by code only and
  * must never stop the support page from being shown.
+ *
+ * The write is VERIFIED: the inserted row is read back (`.select("id")`) and exactly one row
+ * must come back. An error, no row, or any other count is a failure (logged by code only,
+ * `code=no-row` for the "nothing was written" case), never a silent success.
  */
 export async function recordFlag(service: SupabaseClient, userId: string, level: FlagLevel): Promise<boolean> {
   try {
-    const { error } = await service.from("safety_flags").insert({ user_id: userId, level });
+    const { data, error } = await service.from("safety_flags").insert({ user_id: userId, level }).select("id");
     if (error) {
       console.error(`[safety] flag write failed code=${errorCode(error)}`);
+      return false;
+    }
+    if (!Array.isArray(data) || data.length !== 1) {
+      console.error("[safety] flag write failed code=no-row");
       return false;
     }
     return true;

@@ -16,7 +16,15 @@ import {
   supportLinesOrFallback,
   validateSupportLines,
 } from "./safety.ts";
-import { SAFETY_CLASSIFY_PROMPT, generateSupportLines, recordFlag, runSafetyClassify, runSafetyGrading } from "./safety-server.ts";
+import {
+  GRADING_SYSTEM_PROMPT,
+  SAFETY_CLASSIFY_PROMPT,
+  generateSupportLines,
+  recordFlag,
+  runCheckInSafety,
+  runSafetyClassify,
+  runSafetyGrading,
+} from "./safety-server.ts";
 
 // ---------------------------------------------------------------------------
 // parseLevel / resolveSafety
@@ -396,24 +404,37 @@ test("support lines prompt carries every strict rule", async () => {
 // Flag write: user id + level only
 // ---------------------------------------------------------------------------
 
-test("recordFlag inserts only user_id and level, and logs only a code on failure", async () => {
-  const inserted: unknown[] = [];
-  const ok = {
+// A fake service client whose insert(...).select(...) resolves to `outcome` (what PostgREST would return).
+function fakeFlagClient(outcome: { data: unknown; error: unknown } | (() => never), inserted: unknown[] = []) {
+  return {
     from: (table: string) => {
       assert.equal(table, "safety_flags");
-      return { insert: async (row: unknown) => (inserted.push(row), { error: null }) };
+      return {
+        insert: (row: unknown) => {
+          inserted.push(row);
+          return {
+            select: async (columns: string) => {
+              assert.equal(columns, "id"); // only the id is read back, never any text
+              return typeof outcome === "function" ? outcome() : outcome;
+            },
+          };
+        },
+      };
     },
   } as unknown as SupabaseClient;
-  assert.equal(await recordFlag(ok, "user-1", 2), true);
-  assert.deepEqual(inserted, [{ user_id: "user-1", level: 2 }]);
+}
+
+test("recordFlag inserts only user_id and level, verifies ONE row came back, and logs only a code on failure", async () => {
+  const inserted: unknown[] = [];
+  assert.equal(await recordFlag(fakeFlagClient({ data: [{ id: "flag-1" }], error: null }, inserted), "user-1", 2), true);
+  assert.equal(await recordFlag(fakeFlagClient({ data: [{ id: "flag-2" }], error: null }, inserted), "user-1", 1), true);
+  assert.deepEqual(inserted, [{ user_id: "user-1", level: 2 }, { user_id: "user-1", level: 1 }]);
 
   const original = console.error;
   const logged: string[] = [];
   console.error = (...a: unknown[]) => logged.push(a.join(" "));
   try {
-    const failing = {
-      from: () => ({ insert: async () => ({ error: { code: "42P01", message: "relation safety_flags does not exist: I want to end it all" } }) }),
-    } as unknown as SupabaseClient;
+    const failing = fakeFlagClient({ data: null, error: { code: "42P01", message: "relation safety_flags does not exist: I want to end it all" } });
     assert.equal(await recordFlag(failing, "user-1", 1), false);
     const throwing = { from: () => { throw new Error("secret text"); } } as unknown as SupabaseClient;
     assert.equal(await recordFlag(throwing, "user-1", 1), false);
@@ -421,6 +442,21 @@ test("recordFlag inserts only user_id and level, and logs only a code on failure
     console.error = original;
   }
   assert.deepEqual(logged, ["[safety] flag write failed code=42P01", "[safety] flag write failed code=exception"]);
+});
+
+test("recordFlag: a write that returns no row (0 rows) or the wrong number of rows is a FAILURE, not a success", async () => {
+  const original = console.error;
+  const logged: string[] = [];
+  console.error = (...a: unknown[]) => logged.push(a.join(" "));
+  try {
+    for (const data of [[], null, undefined, {}, "x", [{ id: "a" }, { id: "b" }]]) {
+      assert.equal(await recordFlag(fakeFlagClient({ data, error: null }), "user-1", 2), false, JSON.stringify(data));
+    }
+  } finally {
+    console.error = original;
+  }
+  assert.equal(logged.length, 6);
+  assert.ok(logged.every((l) => l === "[safety] flag write failed code=no-row"), "failures are logged by code only");
 });
 
 
@@ -702,4 +738,207 @@ test("classify: logs carry status and error code only, never text", async () => 
   const all = cap.lines.join("\n");
   assert.match(all, /\[safety\] classify failed kind=http status=429 code=rate_limit_exceeded/);
   for (const secret of ["SECRET", "end it all", "feel so alone"]) assert.ok(!all.includes(secret), `log leaked: ${secret}`);
+});
+
+
+// ---------------------------------------------------------------------------
+// runCheckInSafety: the check-in's three signals (phrase filter, classifier, grading call's own level)
+// ---------------------------------------------------------------------------
+
+const CHECKIN_INPUT = {
+  answer: "ANSWER-TEXT-XYZ",
+  question: "QUESTION-TEXT-ABC",
+  activeTheme: "THEME-TEXT-DEF",
+  categoryScores: { sleep: { score: 60, grade: "C" } },
+};
+const GRADE_OK = { safety_level: 0, grade_updates: { sleep: "B" }, suggestion_line: "Keep going." };
+const gradeLevel = (n: number) => ({ safety_level: n, grade_updates: {}, suggestion_line: "" });
+const noWait = async () => {};
+
+test("check-in safety: all three signals 0 = clear; the classifier runs FIRST, then grading, and the grading result is passed through", async () => {
+  const { groq, calls } = scriptedGroq([{ safety_level: 0 }, GRADE_OK]);
+  const r = await runCheckInSafety(groq, "m", { ...CHECKIN_INPUT, ruleLevel: 0 }, { sleep: noWait });
+  assert.equal(r.kind, "clear");
+  if (r.kind !== "clear") return;
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0]!.body.messages[0]!.content, SAFETY_CLASSIFY_PROMPT); // the classifier is the first AI call
+  assert.equal(calls[1]!.body.messages[0]!.content, GRADING_SYSTEM_PROMPT);
+  assert.equal(r.grading.suggestionLine, "Keep going.");
+  assert.deepEqual(r.grading.gradeUpdates, { sleep: "B" });
+  assert.deepEqual(r.signals, { rule: 0, classify: 0, inCall: 0 });
+});
+
+test("check-in safety: the classifier sees ONLY the answer (not the browser-echoed question or theme)", async () => {
+  const { groq, calls } = scriptedGroq([{ safety_level: 0 }, GRADE_OK]);
+  await runCheckInSafety(groq, "m", { ...CHECKIN_INPUT, ruleLevel: 0 }, { sleep: noWait });
+  const sentToClassifier = calls[0]!.body.messages[1]!.content;
+  assert.ok(sentToClassifier.includes("ANSWER-TEXT-XYZ"));
+  assert.ok(!sentToClassifier.includes("QUESTION-TEXT-ABC") && !sentToClassifier.includes("THEME-TEXT-DEF"));
+  // the grading call still gets everything, as before
+  const sentToGrading = calls[1]!.body.messages[1]!.content;
+  assert.ok(sentToGrading.includes("ANSWER-TEXT-XYZ") && sentToGrading.includes("QUESTION-TEXT-ABC") && sentToGrading.includes("THEME-TEXT-DEF"));
+});
+
+test("check-in safety: the classifier alone flags Level 1 or 2 (grading says 0 and cannot lower it)", async () => {
+  const lvl1 = scriptedGroq([{ safety_level: 1 }, gradeLevel(0)]);
+  assert.deepEqual(await runCheckInSafety(lvl1.groq, "m", { ...CHECKIN_INPUT, ruleLevel: 0 }, { sleep: noWait }), {
+    kind: "flagged",
+    level: 1,
+    signals: { rule: 0, classify: 1, inCall: 0 },
+  });
+  const lvl2 = scriptedGroq([{ safety_level: 2 }, gradeLevel(0)]);
+  assert.deepEqual(await runCheckInSafety(lvl2.groq, "m", { ...CHECKIN_INPUT, ruleLevel: 0 }, { sleep: noWait }), {
+    kind: "flagged",
+    level: 2,
+    signals: { rule: 0, classify: 2, inCall: null },
+  });
+  assert.equal(lvl2.calls.length, 1, "a classifier Level 2 is final: grading is not called");
+});
+
+test("check-in safety: the grading call's own level still raises a 0 or a 1 (the highest of the three wins)", async () => {
+  for (const level of [1, 2] as const) {
+    const { groq, calls } = scriptedGroq([{ safety_level: 0 }, gradeLevel(level)]);
+    const r = await runCheckInSafety(groq, "m", { ...CHECKIN_INPUT, ruleLevel: 0 }, { sleep: noWait });
+    assert.deepEqual(r, { kind: "flagged", level, signals: { rule: 0, classify: 0, inCall: level } });
+    assert.equal(calls.length, 2);
+  }
+  // classifier 1 + grading 2 = 2 (the grading call is still asked after a Level 1)
+  const escalated = scriptedGroq([{ safety_level: 1 }, gradeLevel(2)]);
+  const r = await runCheckInSafety(escalated.groq, "m", { ...CHECKIN_INPUT, ruleLevel: 0 }, { sleep: noWait });
+  assert.deepEqual(r, { kind: "flagged", level: 2, signals: { rule: 0, classify: 1, inCall: 2 } });
+});
+
+test("check-in safety: a phrase hit at Level 1 plus a grading Level 2 is still Level 2 (no weaker than before this change)", async () => {
+  const { groq, calls } = scriptedGroq([{ safety_level: 0 }, gradeLevel(2)]);
+  const r = await runCheckInSafety(groq, "m", { ...CHECKIN_INPUT, ruleLevel: 1 }, { sleep: noWait });
+  assert.deepEqual(r, { kind: "flagged", level: 2, signals: { rule: 1, classify: 0, inCall: 2 } });
+  assert.equal(calls.length, 2);
+});
+
+test("check-in safety: the final level is the highest of rule / classifier / grading in all 18 combinations", async () => {
+  for (const rule of [0, 1] as const) {
+    for (const classify of [0, 1, 2]) {
+      for (const grading of [0, 1, 2]) {
+        const { groq } = scriptedGroq([{ safety_level: classify }, gradeLevel(grading)]);
+        const r = await runCheckInSafety(groq, "m", { ...CHECKIN_INPUT, ruleLevel: rule }, { sleep: noWait });
+        // grading is not asked after a classifier Level 2 (nothing can be higher)
+        const expected = Math.max(rule, classify, classify === 2 ? 0 : grading);
+        const got = r.kind === "flagged" ? r.level : r.kind === "clear" ? 0 : -1;
+        assert.equal(got, expected, `rule=${rule} classify=${classify} grading=${grading}`);
+      }
+    }
+  }
+});
+
+test("check-in safety: a Level 2 phrase match is final with NO AI call at all", async () => {
+  const { groq, calls } = scriptedGroq([{ safety_level: 0 }, GRADE_OK]);
+  const r = await runCheckInSafety(groq, "m", { ...CHECKIN_INPUT, ruleLevel: 2 }, { sleep: noWait });
+  assert.deepEqual(r, { kind: "flagged", level: 2, signals: { rule: 2, classify: null, inCall: null } });
+  assert.equal(calls.length, 0);
+});
+
+test("check-in safety: classifier fails and no phrase matched = unavailable (fail closed), grading never called, no text logged", async () => {
+  for (const failure of [
+    new FakeApiError(500, { code: "internal_error" }),
+    new FakeApiError(401, { code: "invalid_api_key" }),
+    "not json at all I want to end it all",
+    { grade_updates: {} }, // valid JSON, no safety_level
+    "",
+  ]) {
+    const { groq, calls } = scriptedGroq([failure, GRADE_OK]);
+    const cap = captureConsoleError();
+    let r;
+    try {
+      r = await runCheckInSafety(groq, "m", { ...CHECKIN_INPUT, ruleLevel: 0 }, { sleep: noWait });
+    } finally {
+      cap.restore();
+    }
+    assert.deepEqual(r, { kind: "unavailable", signals: { rule: 0, classify: null, inCall: null } });
+    assert.equal(calls.length, 1, "fail closed at once: the grading call is never made");
+    const logged = cap.lines.join("\n");
+    assert.ok(!/SECRET|end it all|ANSWER-TEXT/.test(logged), "logs carry status / codes only, never text");
+  }
+});
+
+test("check-in safety: classifier fails but a phrase matched at Level 1 = the phrase level stands, and grading can still raise it", async () => {
+  const keep = scriptedGroq([new FakeApiError(500), gradeLevel(0)]);
+  const cap = captureConsoleError();
+  try {
+    const r = await runCheckInSafety(keep.groq, "m", { ...CHECKIN_INPUT, ruleLevel: 1 }, { sleep: noWait });
+    assert.deepEqual(r, { kind: "flagged", level: 1, signals: { rule: 1, classify: null, inCall: 0 } });
+    const raised = scriptedGroq([new FakeApiError(500), gradeLevel(2)]);
+    const r2 = await runCheckInSafety(raised.groq, "m", { ...CHECKIN_INPUT, ruleLevel: 1 }, { sleep: noWait });
+    assert.deepEqual(r2, { kind: "flagged", level: 2, signals: { rule: 1, classify: null, inCall: 2 } });
+  } finally {
+    cap.restore();
+  }
+});
+
+test("check-in safety 429: Retry-After of 3 s or less = ONE retry after that wait, then it carries on", async () => {
+  const { groq, calls } = scriptedGroq([new FakeApiError(429, { retryAfter: "2" }), { safety_level: 0 }, GRADE_OK]);
+  const waits: number[] = [];
+  const cap = captureConsoleError();
+  let r;
+  try {
+    r = await runCheckInSafety(groq, "m", { ...CHECKIN_INPUT, ruleLevel: 0 }, { sleep: async (ms) => void waits.push(ms) });
+  } finally {
+    cap.restore();
+  }
+  assert.equal(r.kind, "clear");
+  assert.deepEqual(waits, [2000]);
+  assert.equal(calls.length, 3); // classify (429), classify (retry), grading
+  assert.equal(calls[1]!.body.messages[0]!.content, SAFETY_CLASSIFY_PROMPT);
+});
+
+test("check-in safety 429: twice, or Retry-After above 3 s = unavailable (fail closed), never a loop, grading never called", async () => {
+  const twice = scriptedGroq([new FakeApiError(429, { retryAfter: "1" }), new FakeApiError(429, { retryAfter: "1" }), GRADE_OK]);
+  const cap = captureConsoleError();
+  try {
+    const r = await runCheckInSafety(twice.groq, "m", { ...CHECKIN_INPUT, ruleLevel: 0 }, { sleep: noWait });
+    assert.equal(r.kind, "unavailable");
+    assert.equal(twice.calls.length, 2, "exactly one retry");
+
+    const waits: number[] = [];
+    const long = scriptedGroq([new FakeApiError(429, { retryAfter: "10" }), GRADE_OK]);
+    const r2 = await runCheckInSafety(long.groq, "m", { ...CHECKIN_INPUT, ruleLevel: 0 }, { sleep: async (ms) => void waits.push(ms) });
+    assert.equal(r2.kind, "unavailable");
+    assert.equal(long.calls.length, 1);
+    assert.deepEqual(waits, [], "no wait, no retry");
+  } finally {
+    cap.restore();
+  }
+});
+
+test("check-in safety: classifier says 0 but the grading call fails or has no level = still 'clear' (the route's grading-shape check then stops it, nothing saved)", async () => {
+  const cap = captureConsoleError();
+  try {
+    const failing = scriptedGroq([{ safety_level: 0 }, new FakeApiError(500)]);
+    const r = await runCheckInSafety(failing.groq, "m", { ...CHECKIN_INPUT, ruleLevel: 0 }, { sleep: noWait });
+    assert.equal(r.kind, "clear");
+    if (r.kind === "clear") {
+      assert.equal(r.grading.aiLevel, null);
+      assert.equal(r.grading.suggestionLine, undefined); // the route returns its 502 for this; nothing is saved
+      assert.deepEqual(r.signals, { rule: 0, classify: 0, inCall: null });
+    }
+  } finally {
+    cap.restore();
+  }
+});
+
+test("check-in route: the safety decision runs before any plan, memory, roast, punchline or write, and uses the shared helpers", () => {
+  const source = readFileSync(fileURLToPath(new URL("../app/api/check-in/route.ts", import.meta.url)), "utf8");
+  const at = (needle: string) => {
+    const i = source.indexOf(needle);
+    assert.ok(i !== -1, `route no longer contains: ${needle}`);
+    return i;
+  };
+  const decision = at("await runCheckInSafety(");
+  assert.ok(at("checkDailyLimit(supabase, user.id, subscriptionTier);") < decision, "the daily-limit check stays before the AI calls");
+  for (const later of ["const planCompletion", "const memoryCompletion", "const roastCompletion", "generateCardPunchline(groq", "insertRoastRow(supabase", 'from("score_history").insert']) {
+    assert.ok(decision < at(later), `the safety decision must come before: ${later}`);
+  }
+  // flagged and unavailable results go through the same helpers /api/roast uses (flag write, pages, gentle mode)
+  assert.match(source, /respondFlagged\(\{ request, route: "check-in", level: safety\.level/);
+  assert.match(source, /respondUnavailable\("check-in"\)/);
+  assert.doesNotMatch(source, /recordFlag|safety_flags/, "the route must not write flags itself; respondFlagged does");
 });

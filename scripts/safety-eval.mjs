@@ -1,13 +1,14 @@
 // Runs the approved safety test messages through the REAL safety code paths, using the real
 // prompts, request settings and response parsing from src/lib:
 //
-//   (a) check-in grading          runSafetyGrading (src/lib/safety-server.ts): safety level folded
-//                                 into the grading call (unchanged)
+//   (a) check-in                  rule filter -> classify-only call (runSafetyClassify) -> the grading
+//                                 call, whose own safety_level is an extra signal. This is the SAME
+//                                 function the check-in route calls (runCheckInSafety)
 //   (b) first-time roast          rule filter -> classify-only call (runSafetyClassify) -> the roast
 //                                 call, whose own safety_level is an extra signal
 //   (c) returning-user follow-up  the same, with the follow-up question call
 //
-// Paths (b) and (c) mirror the route: the classify call runs BEFORE anything is generated, the final
+// All three mirror the routes: the classify call runs BEFORE anything is generated, the final
 // level is the HIGHEST of all signals (combineSignals), a flagged level stops before generation, and a
 // classify call that cannot answer with no phrase matched is "unavail" (fail closed).
 // Level 1 results can also run the Level 1 support-lines call (--lines). Row 30 runs the output check.
@@ -111,8 +112,8 @@ if (!apiKey) {
   process.exit(2);
 }
 
-const { ruleFloorLevel, resolveSafety, combineSignals, outputLooksUnsafe, parseLevel } = await import("../src/lib/safety.ts");
-const { runSafetyGrading, runSafetyClassify, generateSupportLines, SAFETY_MODEL, SAFETY_CALL_OPTIONS } = await import("../src/lib/safety-server.ts");
+const { ruleFloorLevel, combineSignals, outputLooksUnsafe, parseLevel } = await import("../src/lib/safety.ts");
+const { runCheckInSafety, runSafetyClassify, generateSupportLines, SAFETY_MODEL, SAFETY_CALL_OPTIONS } = await import("../src/lib/safety-server.ts");
 const P = await import("../src/lib/safety-prompts.ts");
 const { cleanRoastText } = await import("../src/lib/clean-roast-text.ts");
 
@@ -299,15 +300,18 @@ function marksOf(level, signals) {
 
 async function pathCheckIn(message) {
   const rule = aiOnly ? 0 : ruleFloorLevel(message, "How did your habits go yesterday?", "daily habits");
-  if (rule === 2) return { level: 2, marks: "r" };
-  const grading = await runSafetyGrading(groq, SAFETY_MODEL, {
+  // The very function the check-in route calls: a Level 2 phrase match stops with no AI call, then the
+  // classify-only call BEFORE grading, then the grading call whose own level can only raise the result.
+  const result = await runCheckInSafety(groq, SAFETY_MODEL, {
     answer: message,
     question: "How did your habits go yesterday?",
     activeTheme: "daily habits",
     categoryScores: CATEGORY_SCORES,
+    ruleLevel: rule,
   });
-  const decision = resolveSafety(grading.aiLevel, rule);
-  return decision.kind === "unavailable" ? { level: null, marks: "" } : { level: decision.level, marks: marksOf(decision.level, { r: rule, g: grading.aiLevel }) };
+  if (result.kind === "unavailable") return { level: null, marks: "" };
+  const level = result.kind === "flagged" ? result.level : 0;
+  return { level, marks: marksOf(level, { r: result.signals.rule, k: result.signals.classify, g: result.signals.inCall }) };
 }
 
 /** What the routes pass to the classifier: the typed fields (worstApp, neverDoThing; followUpAnswer is empty on these paths). */
@@ -625,7 +629,7 @@ const onlySet = onlyRaw ? parseOnly(onlyRaw) : null;
 const selected = TESTS_ACTIVE.filter((t) => !onlySet || onlySet.has(String(t[0]).toLowerCase()));
 const run30 = !lettered && !classifyOnly && (!onlySet || onlySet.has("30"));
 
-const callsPerRow = classifyOnly ? 1 : 5; // check-in 1, roast 2 (classify + roast), follow-up 2 (classify + question)
+const callsPerRow = classifyOnly ? 1 : 6; // check-in 2 (classify + grading), roast 2 (classify + roast), follow-up 2 (classify + question)
 const modeLabel = [holdout && "hold-out set", goals && "goals set", quiet && "quiet set", classifyOnly && "classify-only", aiOnly && "ai-only", onlySet && "--only"].filter(Boolean).join(", ");
 console.log(`Running ${selected.length + (run30 ? 1 : 0)} rows${modeLabel ? ` (${modeLabel})` : ""}${classifyOnly && repeatCount > 1 ? ` x ${repeatCount} runs` : ""}, one AI call at a time, ${pauseMs} ms pause between calls, up to ${MAX_ATTEMPTS - 1} retries per failed call.`);
 if (selected.length >= 5) {

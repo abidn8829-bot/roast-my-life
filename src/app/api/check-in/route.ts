@@ -14,8 +14,8 @@ import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
 import { todayKey } from "@/lib/arc-trend";
 import { applyCheckInToMission } from "@/lib/missions-server";
-import { clip, outputLooksUnsafe, resolveSafety, ruleFloorLevel } from "@/lib/safety";
-import { OUTPUT_GUARDRAIL, runSafetyGrading } from "@/lib/safety-server";
+import { clip, outputLooksUnsafe, ruleFloorLevel } from "@/lib/safety";
+import { OUTPUT_GUARDRAIL, runCheckInSafety } from "@/lib/safety-server";
 import { gentleGate, respondFlagged, respondOutputBlocked, respondUnavailable } from "@/lib/safety-response";
 
 const MODEL = "openai/gpt-oss-120b";
@@ -182,16 +182,22 @@ async function handlePost(request: Request, slot: { release: () => void }) {
 
   const previousGrade = categoryScores[category].grade;
 
-  // Call #1 of the check-in. The safety level rides inside this existing grading call:
-  // no extra AI call. Everything the user typed (answer, question, theme) is in it.
-  const grading = await runSafetyGrading(groq, MODEL, { answer, question, activeTheme, categoryScores });
-  const decision = resolveSafety(grading.aiLevel, ruleLevel);
-  if (decision.kind === "unavailable") return respondUnavailable("check-in");
-  if (decision.level !== 0) {
+  // The same three signals as /api/roast and the follow-up: the phrase filter (above), the dedicated
+  // classify-only call on the answer, and the safety_level the grading call returns. The final level
+  // is the HIGHEST of the three. The classifier runs FIRST, before grading or anything else is
+  // generated or saved. A classifier that cannot answer (with no phrase matched) fails closed and the
+  // grading call is never made; a classifier Level 2 is final. Its failure handling is the roast
+  // route's: one bounded retry on a short 429, everything else fails closed at once.
+  const safety = await runCheckInSafety(groq, MODEL, { answer, question, activeTheme, categoryScores, ruleLevel });
+  // Could not check and no phrase matched: nothing saved, no flag, no roast, and no daily slot used
+  // (the slot is released when the request ends; the roasts row is only written at the very end).
+  if (safety.kind === "unavailable") return respondUnavailable("check-in");
+  if (safety.kind === "flagged") {
     // Nothing is saved except the flag: no roast, no roasts row, no score_history row, no
     // plan / memory / punchline calls.
-    return respondFlagged({ request, route: "check-in", level: decision.level, userId: user.id, groq, texts: [answer] });
+    return respondFlagged({ request, route: "check-in", level: safety.level, userId: user.id, groq, texts: [answer] });
   }
+  const grading = safety.grading;
   // Level 0 from here on. A malformed grading payload is a grading problem, not a safety one.
   if (typeof grading.suggestionLine !== "string" || !grading.suggestionLine.trim() || typeof grading.gradeUpdates !== "object" || grading.gradeUpdates === null) return NextResponse.json({ error: "Invalid check-in grading response" }, { status: 502 });
   const filteredGradeUpdates: Partial<Record<Category, Grade>> = {};
