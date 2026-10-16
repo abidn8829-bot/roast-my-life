@@ -180,6 +180,125 @@ test("rule filter: the new rule leaves the approved Level 0 test messages and th
   assert.ok(Date.now() - started < 500, "rule filter took too long on a long input");
 });
 
+// Roman Urdu and Urdu script: "I am a burden" and "everyone is better off without me". Narrow, structural, Level 2.
+test("rule filter (Roman Urdu): 'I am a burden' needs a first-person verb right after the noun, and allows spelling variants", () => {
+  const mustMatch = [
+    "mujhe lagta hai main sab ke liye bojh hoon aur mere bina sab behtar honge",
+    "main sab par bojh hoon",
+    "main ghar walon ke liye bhoj hun", // bhoj, hun
+    "main boojh ban gaya hoon", // boojh, ban gaya
+    "main sab ke liye bojh ban gayi hoon", // ban gayi
+    "sab ke liye bhoj hoon", // no explicit "main": the verb is first person
+    "mai bojh ban gaya", // no copula: needs main/mai and the sentence must end there
+    "main sab ke liye bojh ban gaya",
+    "main sab ke liye bhoojh ban gaya.",
+    "main sab ko bojh lagta hoon",
+    "MAIN SAB KE LIYE BOJH HOON", // upper case
+    "bojh ban gaya hoon main",
+    "main bojh bana hua hoon",
+    "main sab pe bhooj hu", // bhooj, hu
+    "kya main bojh hoon?",
+    "main ab bojh ban chuki hoon",
+    "main sab ke liye bhojh hoon aur kuch nahi", // bhojh
+  ];
+  for (const m of mustMatch) assert.equal(ruleFloorLevel(m), 2, m);
+});
+
+test("rule filter (Roman Urdu): 'everyone is better off without me' = mere bina + an everyone word + behtar in one sentence, any order, spelling variants", () => {
+  const mustMatch = [
+    "mere bina sab behtar honge",
+    "sab mere baghair behtar rahenge", // baghair
+    "mere bagair ghar wale behtar hon ge", // bagair, ghar wale
+    "mery bghair log behtr ho jayenge", // mery, bghair, behtr
+    "behtar hoga sab ke liye mere bina", // behtar first
+    "mere binaa sab better honge", // binaa, better
+    "meray bna sab behter honge", // meray, bna, behter
+    "mere bina family behtar hogi",
+    "SAB LOG MERE BAGHAYR BAHTAR HONGE",
+  ];
+  for (const m of mustMatch) assert.equal(ruleFloorLevel(m), 2, m);
+});
+
+test("rule filter (Urdu script): burden and better off, with letter-form variants and zero-width joiners", () => {
+  const mustMatch = [
+    "میں سب کے لیے بوجھ ہوں",
+    "میں سب پر بوجھ بن گئی ہوں",
+    "میں بوجھ بن گیا ہوں",
+    "سب کے لیے بوجھ ہوں", // no explicit میں
+    "میرے بغیر سب بہتر ہوں گے",
+    "سب لوگ میرے بنا بہتر رہیں گے",
+    "میرے بغیر گھر والے بہتر ہوں گے",
+    "میں سب کے لیے بوجھ ہوں اور میرے بغیر سب بہتر ہوں گے",
+    "میں سب پر بوجہ ہوں", // heh goal instead of heh doachashmee
+    "میں سب پر بوجه ہوں", // Arabic heh
+    "میں بوجھ بن گيا ہوں", // Arabic yeh
+    "میں بوجھ ہون", // noon instead of noon ghunna
+    "میں بوجھ بن\u200cگئی ہوں", // zero-width non-joiner inside
+  ];
+  for (const m of mustMatch) assert.equal(ruleFloorLevel(m), 2, m);
+});
+
+test("rule filter (Roman Urdu and Urdu script): ordinary 'bojh' / 'mere bina' / 'meri jaan' talk does NOT fire", () => {
+  const mustNotMatch = [
+    // the four examples that must never fire
+    "mujh par kaam ka bohat bojh hai",
+    "exam ka bojh bahut hai",
+    "mere bina party shuru mat karna",
+    "yaar ye deadline to meri jaan le legi",
+    // more look-alikes
+    "mere bina party shuru mat karna, main late hoon",
+    "main kaam ke bojh tale dab gaya hoon", // crushed under work: bojh is not followed by the verb
+    "main bojh utha kar thak gaya hoon",
+    "main bojh nahi hoon", // "I am not a burden"
+    "main sab ke liye bojh nahi hoon",
+    "kaam mein ye bojh ban gaya hai", // third person: it has become a burden
+    "ye bojh ban gaya hai",
+    "wo sab par bojh ban gaya hai",
+    "tum mere liye bojh ho", // "ho" = you
+    "main ne ye project uthaya aur ab mere liye bojh ban gaya", // "main ne" = "I (did)", not "I am"
+    "main ne yeh kaam uthaya, bojh ban gaya", // short form of the same: the burden is the work, not me
+    "mere bina kaam behtar chal raha hai", // no "everyone" word
+    "mere bina sab theek hai", // no behtar
+    "sab behtar hai", // no "mere bina"
+    "main shaadi ke bhoj mein hoon", // bhoj = feast
+    "main bhojan kha raha hoon", // bhojan = food
+    "aaj gym nahi gaya, bilkul sust ho gaya hoon",
+    "mujh par kaam ka bohat bojh hai is hafte",
+    "is hafte ka bojh bahut hai, main thak gaya hoon",
+    "kya sab log behtar ho gaye? mere bina bhi chalega", // the words sit in different sentences
+    // Urdu script
+    "کام کا بہت بوجھ ہے",
+    "میرے بغیر پارٹی شروع مت کرنا",
+    "یہ ڈیڈ لائن تو میری جان لے لے گی",
+    "میں کام کے بوجھ تلے دب گیا ہوں",
+    "میں بوجھ نہیں ہوں",
+    "گھر میں یہ بوجھ بن گیا ہے",
+    "میں بوجھل ہوں", // heavy-hearted: a different word
+    "میرے بغیر کام بہتر چل رہا ہے",
+    "سب بہتر ہے",
+    "امتحان کا بوجھ بہت ہے",
+    "بہتری کی امید ہے",
+  ];
+  for (const m of mustNotMatch) assert.equal(ruleFloorLevel(m), 0, m);
+});
+
+test("rule filter: the new rules sit beside the old ones (nothing else changed) and use no regex lookbehind (old Safari)", () => {
+  // the existing Roman Urdu / Urdu rules and the English quiet rule still behave exactly as before
+  for (const m of ["ab jeene ka mann nahi karta", "mujhe jeena nahi hai", "main khudkushi karna chahta hoon", "میں اب جینا نہیں چاہتا", "مجھے خود کشی کے خیال آتے ہیں"]) assert.equal(ruleFloorLevel(m), 2, m);
+  assert.equal(ruleFloorLevel("aaj bohat akela mehsoos ho raha hai"), 1);
+  assert.equal(ruleFloorLevel("nobody would even notice if I disappeared"), 2);
+  assert.equal(ruleFloorLevel("Everyone would be better off without me"), 2);
+  // safety.ts can end up in browser code; a lookbehind there crashes Safari before 16.4 when the file loads
+  const source = readFileSync(fileURLToPath(new URL("./safety.ts", import.meta.url)), "utf8");
+  assert.doesNotMatch(source, /\(\?<[=!]/, "a regex lookbehind was added to safety.ts");
+  // long inputs stay fast: the rules use bounded gaps, not open-ended backtracking
+  const started = Date.now();
+  assert.equal(ruleFloorLevel(`mere bina ${"sab ".repeat(300)}`), 0);
+  assert.equal(ruleFloorLevel(`${"main ".repeat(300)}bojh`), 0);
+  assert.equal(ruleFloorLevel(`${"میں ".repeat(300)}بوجھ`), 0);
+  assert.ok(Date.now() - started < 500, "rule filter took too long on a long input");
+});
+
 // ---------------------------------------------------------------------------
 // Output check: whole-word matching
 // ---------------------------------------------------------------------------
@@ -572,15 +691,21 @@ test("classify prompt: other people would not notice / miss / care is Level 2, w
   assert.match(level2, /Do not wait for explicit words/);
 });
 
-test("classify prompt is independent of the goals, hold-out and quiet eval sets (no 4-word run from any of their messages)", () => {
-  // The eval messages live in scripts/safety-eval.mjs; read them from there so there is one copy and it cannot drift.
+// The eval messages live in scripts/safety-eval.mjs; read them from there so there is one copy and it cannot drift.
+// Returns [id, expected level, message] for every G*, H*, Q* and U* row (goals, hold-out, quiet, urdu).
+function readEvalMessages(): Array<[string, number, string]> {
   const source = readFileSync(fileURLToPath(new URL("../../scripts/safety-eval.mjs", import.meta.url)), "utf8");
-  const messages = new Map<string, string>();
-  for (const m of source.matchAll(/\["([GHQ]\d+)",\s*(?:"[^"]*",\s*)?[012],\s*"((?:[^"\\]|\\.)*)"\]/g)) messages.set(m[1]!, m[2]!);
-  for (const id of ["G1", "G4", "G20", "H1", "H12", "Q1", "Q12"]) assert.ok(messages.has(id), `could not read ${id} from the eval script`);
-  assert.ok(messages.size >= 44, `expected 20 goals + 12 hold-out + 12 quiet messages, found ${messages.size}`);
+  const rows: Array<[string, number, string]> = [];
+  for (const m of source.matchAll(/\["([GHQU]\d+)",\s*(?:"[^"]*",\s*)?([012]),\s*"((?:[^"\\]|\\.)*)"\]/g)) rows.push([m[1]!, Number(m[2]), m[3]!]);
+  return rows;
+}
 
-  const norm = (t: string) => t.toLowerCase().replace(/[‘’]/g, "'").replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+test("classify prompt is independent of the goals, hold-out, quiet and urdu eval sets (no 4-word run from any of their messages)", () => {
+  const messages = new Map(readEvalMessages().map(([id, , message]) => [id, message]));
+  for (const id of ["G1", "G4", "G20", "H1", "H3", "H12", "Q1", "Q12", "U1", "U6", "U14"]) assert.ok(messages.has(id), `could not read ${id} from the eval script`);
+  assert.ok(messages.size >= 58, `expected 20 goals + 12 hold-out + 12 quiet + 14 urdu messages, found ${messages.size}`);
+
+  const norm = (t: string) => t.toLowerCase().replace(/[\u2018\u2019]/g, "'").replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
   const prompt = ` ${norm(SAFETY_CLASSIFY_PROMPT)} `;
   for (const [id, message] of messages) {
     const words = norm(message).split(" ").filter(Boolean);
@@ -590,6 +715,24 @@ test("classify prompt is independent of the goals, hold-out and quiet eval sets 
       assert.ok(!prompt.includes(` ${gram} `), `${id}: 4-word run "${gram}" appears in the classify prompt`);
     }
   }
+});
+
+test("classify prompt: burden / better off without them is Level 2 in any language, Urdu and Roman Urdu included", () => {
+  const p = SAFETY_CLASSIFY_PROMPT;
+  const level2 = p.slice(p.indexOf("2 = any sign"), p.indexOf("How to decide:"));
+  assert.match(level2, /In any language, including Urdu and Roman Urdu, feeling like a burden to the people around them, or saying that those people would fare better without them, counts as level 2\./);
+  // it is ONE added sentence: the paragraph still ends with it, after the exceptions, so those exceptions do not excuse it
+  assert.ok(level2.trimEnd().endsWith("counts as level 2."), "the new sentence is the last one in the Level 2 definition");
+  assert.equal(level2.match(/including Urdu and Roman Urdu/g)?.length, 1, "added once");
+  // the earlier principle and the burden clause are untouched
+  assert.match(level2, /feeling like a burden to others\. Do not wait for explicit words\./);
+  assert.match(level2, /other people would not notice, miss or care if the person were gone, vanished or never woke up/);
+});
+
+test("eval messages: the phrase filter alone is never ABOVE the expected level on the goals, hold-out, quiet and urdu sets", () => {
+  const rows = readEvalMessages();
+  assert.ok(rows.length >= 58);
+  for (const [id, expected, message] of rows) assert.ok(ruleFloorLevel("Instagram", message) <= expected, `${id}: the phrase filter alone gives more than the expected Level ${expected}`);
 });
 
 // ---------------------------------------------------------------------------

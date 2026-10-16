@@ -160,6 +160,48 @@ const NOBODY_WOULD_MISS_ME = new RegExp(
   String.raw`\b${OTHERS}${MODAL}\s${REACTION}\b[^.!?]{0,30}?\b(?:${IF_I}|without me|with me gone)${CLAUSE_END}`,
 );
 
+// Roman Urdu and Urdu script: "I am a burden" and "everyone is better off without me". Two narrow rules per
+// script, all Level 2. They match STRUCTURE, never one sentence:
+//   burden      the noun (bojh / bhoj / boojh ..., بوجھ) directly followed by a FIRST-PERSON verb (hoon / hun,
+//               "ban gaya/gayi hoon", "lagta hoon"), or "main/mai ... bojh ban gaya" ending the sentence.
+//               "kaam ka bojh hai", "bojh nahi hoon", "bojh utha kar thak gaya hoon" do not match.
+//   better off  "mere bina / mere baghair / میرے بغیر" + an "everyone" word (sab, log, ghar wale, ...) + "behtar /
+//               بہتر" in the same sentence, in any order. "mere bina party shuru mat karna" does not match.
+// No lookbehind (old Safari) and no \b next to Urdu letters (JavaScript's \b ignores them): Urdu words are
+// fenced with explicit letter classes instead. Anything these miss is left to the classifier.
+const RU_SENTENCE = String.raw`[^.!?\n۔؟]`; // stays inside one sentence
+const RU_BURDEN_WORD = String.raw`b(?:ho+j|o+jh)h?`; // bojh, boojh, bhoj, bhooj, bhojh, bhoojh
+const RU_I_AM = String.raw`(?:ho{2,3}n|hoo|hun?)`; // hoon, hun, hu, hoo: first person only ("ho" = you, so it is left out)
+const RU_BECAME = String.raw`ban\s*(?:gaya|gya|gayi|gai|gayee|chuka|chuki)`;
+const ROMAN_URDU_BURDEN = new RegExp(
+  String.raw`\b${RU_BURDEN_WORD}\s+(?:(?:${RU_BECAME}|ban(?:a|i)\s+hu[ai]|lag\s*(?:ta|ti))\s+)?${RU_I_AM}\b` +
+    String.raw`|\bm(?:ain|ai)\b(?!\s+ne\b)${RU_SENTENCE}{0,24}?\b${RU_BURDEN_WORD}\s+${RU_BECAME}(?=\s*(?:$|[.,!?;:]))`,
+);
+const RU_ME_WITHOUT = String.raw`mer(?:e|ey|ay|y)\s+(?:bina|binaa|bna|bagair|baghair|baghayr|bagher|bghair|bgair|begair)`;
+const RU_BETTER = String.raw`(?:behtar|behter|behtr|bahtar|bhetar|bhtar|better)`;
+const RU_EVERYONE = String.raw`(?:sab|sabhi|sabhee|saare|sare|log|logon|sabko|ghar\s*wa(?:le|lay|lon)|gharwa(?:le|lay|lon)|family|ammi|abbu|ami|abu|dost|doston)`;
+const ROMAN_URDU_BETTER_OFF = new RegExp(
+  String.raw`(?=${RU_SENTENCE}{0,80}?\b${RU_ME_WITHOUT}\b)(?=${RU_SENTENCE}{0,80}?\b${RU_EVERYONE}\b)${RU_SENTENCE}{0,80}?\b${RU_BETTER}\b`,
+);
+
+const UR_LETTERS = "\\u0600-\\u06FF"; // Arabic / Urdu script letters
+const UR_START = `(?:^|[^${UR_LETTERS}])`; // start of a word
+const UR_END = `(?![${UR_LETTERS}])`; // end of a word
+const UR_SPACE = "[\\s\\u200c\\u200d]*"; // spaces and zero-width joiners
+const UR_SENTENCE = "[^.!?\\n۔؟]";
+const UR_BURDEN_WORD = "بوج[ھہه]"; // بوجھ (also typed بوجہ / بوجه)
+const UR_I_AM = "[ہهھ]و[ںن]"; // ہوں / ہون
+const UR_BECAME = `بن${UR_SPACE}(?:گ(?:[یي]ا|ئ[یي])|چک[ایي])`; // بن گیا / بن گئی / بن چکا / بن چکی
+const URDU_BURDEN = new RegExp(
+  `${UR_START}${UR_BURDEN_WORD}${UR_END}${UR_SPACE}(?:(?:${UR_BECAME})${UR_END}${UR_SPACE})?${UR_I_AM}${UR_END}`,
+);
+const UR_ME_WITHOUT = `میرے${UR_SPACE}(?:بغیر|بنا)${UR_END}`; // میرے بغیر / میرے بنا
+const UR_BETTER = `ب[ہهھ]تر${UR_END}`; // بہتر
+const UR_EVERYONE = `(?:سب|سبھی|سارے|لوگ|لوگوں|گھر${UR_SPACE}والے|گھر${UR_SPACE}والوں|خاندان|امی|ابو|دوست|دوستوں)${UR_END}`;
+const URDU_BETTER_OFF = new RegExp(
+  `(?=${UR_SENTENCE}{0,80}?${UR_START}${UR_ME_WITHOUT})(?=${UR_SENTENCE}{0,80}?${UR_START}${UR_EVERYONE})${UR_SENTENCE}{0,80}?${UR_START}${UR_BETTER}`,
+);
+
 const LEVEL2_RULES: RegExp[] = [
   // harming / ending myself
   /\b(?:kill|killing|hurt|hurting|harm|harming|cut|cutting) (?:myself|my self)\b/,
@@ -188,12 +230,16 @@ const LEVEL2_RULES: RegExp[] = [
   /khud ?kushi|khud ?kashi/,
   /khud ko (?:khatam|maar)/,
   /apni jaan (?:le|de)/,
+  ROMAN_URDU_BURDEN,
+  ROMAN_URDU_BETTER_OFF,
   // Urdu script
   /جینے کا (?:من|دل) نہیں/,
   /جینا نہیں چاہ/,
   /مرنا چاہ/,
   /خود ?کشی/,
   /زندگی (?:ختم|سے تنگ)/,
+  URDU_BURDEN,
+  URDU_BETTER_OFF,
 ];
 
 const LEVEL1_RULES: RegExp[] = [
