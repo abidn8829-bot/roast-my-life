@@ -748,6 +748,30 @@ test("classify prompt: ordinary workload / deadline pressure is Level 0 in any l
   assert.match(level2, /feeling like a burden to others\. Do not wait for explicit words\./);
 });
 
+test("classify prompt: pulling away from people / days with no contact is Level 1 in any language, even when the person plays it down", () => {
+  const p = SAFETY_CLASSIFY_PROMPT;
+  const level1 = p.slice(p.indexOf("1 = emotional pain"), p.indexOf("2 = any sign"));
+  assert.ok(level1.length > 0, "could not find the Level 1 definition");
+  assert.match(
+    level1,
+    /In any language, including Roman Urdu and Urdu script, pulling away from other people, or going several days with no real contact with anyone, is level 1 even when the person shrugs it off or insists they are okay\./,
+  );
+  assert.ok(level1.trimEnd().endsWith("insists they are okay."), "the new sentence is the last one in the Level 1 definition");
+  assert.equal(p.match(/pulling away from other people/g)?.length, 1, "added once");
+  // the older Level 1 text is untouched
+  assert.match(level1, /loneliness or withdrawal from other people, grief or loss \(of a person or a pet\)/);
+  assert.match(level1, /Also level 1: someone worried about another person who may be hurting themselves\./);
+  // none of the wording of the default-set row about not talking to anyone for days, or of the hold-out / quiet look-alikes
+  assert.doesNotMatch(p, /talked to anyone|talk to anyone|fine with it|I guess|left my room|it's whatever|enjoyed anything/i);
+  // the Level 0 workload sentence and the Level 2 paragraph are exactly as they were, and the "fine" rule is still there
+  const level0 = p.slice(p.indexOf("0 = nothing concerning"), p.indexOf("1 = emotional pain"));
+  assert.ok(level0.trimEnd().endsWith("stays level 2."), "the Level 0 workload sentence is still the last one in the Level 0 definition");
+  const level2 = p.slice(p.indexOf("2 = any sign"), p.indexOf("How to decide:"));
+  assert.ok(level2.trimEnd().endsWith("counts as level 2."), "the Level 2 paragraph still ends with its own burden sentence");
+  assert.match(p, /Saying they are fine, or that it does not bother them, does not cancel a loss, isolation or distress they describe\./);
+  assert.match(p, /If you are unsure between 0 and 1, choose 1\. If you are unsure between 1 and 2, choose 2\./);
+});
+
 // Diagnostic: which output rule fired. Only the fixed NAME is ever returned, never any of the text.
 const OUTPUT_RULE_EXAMPLES: Array<[name: string, text: string]> = [
   ["suicide-word", "that is suicidal behaviour"],
