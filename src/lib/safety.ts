@@ -269,36 +269,46 @@ export function ruleFloorLevel(...texts: Array<string | null | undefined>): Safe
 // "cry" and "died laughing" are fine.
 // ---------------------------------------------------------------------------
 
-const UNSAFE_OUTPUT_RULES: RegExp[] = [
-  /\bsuicid(?:e|al)\b/,
-  /\bself[- ]?harm(?:ing)?\b/,
-  /\bkill (?:yourself|urself|yourselves)\b/,
-  /\bkys\b/,
-  /\bend (?:it all|your life|yourself)\b/,
-  /\b(?:hang|hurt|harm|cut|starve) (?:yourself|urself)\b/,
-  /\b(?:no ?one|nobody) (?:would|will|'d) (?:even )?(?:miss|notice|care)\b/,
-  /\bworld (?:would be|is|'d be) better (?:off )?without you\b/,
-  /\b(?:go|just) die\b/,
-  /\b(?:should|deserve to) (?:just )?die\b/,
-  /\bdepress(?:ed|ion)\b/,
-  /\bcry (?:about it|me a river|yourself to sleep|in (?:a|the) corner)\b/,
-  /\bcry ?babies\b|\bcry ?baby\b/,
-  /\bemo\b/,
-  /\bsad (?:boy|girl|loser|sack|little)\b/,
-  /\bforever alone\b/,
-  /\bdead inside\b/,
-  /\b(?:your|ur) (?:own )?funeral\b/,
-  /\bloner\b/,
-  /\b(?:no ?one|nobody) (?:loves|likes|cares about) you\b/,
+// Each rule has a short fixed NAME so a diagnostic can say WHICH rule fired without ever printing the text it fired on.
+const UNSAFE_OUTPUT_RULES: ReadonlyArray<readonly [name: string, rule: RegExp]> = [
+  ["suicide-word", /\bsuicid(?:e|al)\b/],
+  ["self-harm-word", /\bself[- ]?harm(?:ing)?\b/],
+  ["kill-yourself", /\bkill (?:yourself|urself|yourselves)\b/],
+  ["kys", /\bkys\b/],
+  ["end-it-all-or-your-life", /\bend (?:it all|your life|yourself)\b/],
+  ["hurt-yourself", /\b(?:hang|hurt|harm|cut|starve) (?:yourself|urself)\b/],
+  ["nobody-would-miss-notice-care", /\b(?:no ?one|nobody) (?:would|will|'d) (?:even )?(?:miss|notice|care)\b/],
+  ["world-better-without-you", /\bworld (?:would be|is|'d be) better (?:off )?without you\b/],
+  ["go-die", /\b(?:go|just) die\b/],
+  ["should-die", /\b(?:should|deserve to) (?:just )?die\b/],
+  ["depression-word", /\bdepress(?:ed|ion)\b/],
+  ["cry-about-it", /\bcry (?:about it|me a river|yourself to sleep|in (?:a|the) corner)\b/],
+  ["crybaby", /\bcry ?babies\b|\bcry ?baby\b/],
+  ["emo", /\bemo\b/],
+  ["sad-boy-girl-loser", /\bsad (?:boy|girl|loser|sack|little)\b/],
+  ["forever-alone", /\bforever alone\b/],
+  ["dead-inside", /\bdead inside\b/],
+  ["your-funeral", /\b(?:your|ur) (?:own )?funeral\b/],
+  ["loner", /\bloner\b/],
+  ["nobody-loves-you", /\b(?:no ?one|nobody) (?:loves|likes|cares about) you\b/],
 ];
 
 export function outputLooksUnsafe(...texts: Array<string | null | undefined>): boolean {
+  return outputRuleThatFired(...texts) !== null;
+}
+
+/**
+ * Diagnostic: the NAME of the first output rule that fires on any of the texts, or null if none does.
+ * It returns only the fixed rule name (for example "your-funeral"), never any of the text, so it is safe to
+ * print or log. outputLooksUnsafe is exactly "a rule fired".
+ */
+export function outputRuleThatFired(...texts: Array<string | null | undefined>): string | null {
   for (const t of texts) {
     if (!t) continue;
     const n = normalize(t);
-    if (UNSAFE_OUTPUT_RULES.some((r) => r.test(n))) return true;
+    for (const [name, rule] of UNSAFE_OUTPUT_RULES) if (rule.test(n)) return name;
   }
-  return false;
+  return null;
 }
 
 // ---------------------------------------------------------------------------

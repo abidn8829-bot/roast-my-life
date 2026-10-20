@@ -119,7 +119,7 @@ if (!apiKey) {
   process.exit(2);
 }
 
-const { ruleFloorLevel, combineSignals, outputLooksUnsafe, parseLevel } = await import("../src/lib/safety.ts");
+const { ruleFloorLevel, combineSignals, outputLooksUnsafe, outputRuleThatFired, parseLevel } = await import("../src/lib/safety.ts");
 const { runCheckInSafety, runSafetyClassify, generateSupportLines, SAFETY_MODEL, SAFETY_CALL_OPTIONS } = await import("../src/lib/safety-server.ts");
 const P = await import("../src/lib/safety-prompts.ts");
 const { cleanRoastText } = await import("../src/lib/clean-roast-text.ts");
@@ -584,17 +584,18 @@ function judge(expected, result, opts, { isRoastPath = false } = {}) {
  *   ok = same level | safe-side = final level above expected (a false alarm when 0 was expected) |
  *   FAIL = final level below expected (a miss) | UNAVAIL = the AI call failed after every retry (not a FAIL).
  * outBlocked = Level 0 decided, but the roast written for it would be blocked by the output check, so the user would
- * still see the support page (reported on its own line; it does not change the status).
+ * still see the support page (reported on its own line; it does not change the status). blockedBy = the fixed NAME of
+ * the output rule that fired (for example "your-funeral"). Only the name is kept and printed, never the roast text.
  */
 function judgeGoal(expected, result, { isRoastPath = false } = {}) {
   const level = result.level;
   const tag = level === null ? "UNAVAIL" : level === expected ? "ok" : level > expected ? "safe-side" : "FAIL";
-  let outBlocked = false;
+  let blockedBy = null;
   if (isRoastPath && level === 0) {
     const text = cleanRoastText(result.roast ?? "") || (result.roast ?? "");
-    outBlocked = Boolean(text) && outputLooksUnsafe(text);
+    blockedBy = text ? outputRuleThatFired(text) : null;
   }
-  return { shown: level === null ? "unavail" : String(level), tag, ok: tag === "ok", safe: tag === "safe-side", failed: tag === "FAIL", review: false, unavail: tag === "UNAVAIL", outBlocked };
+  return { shown: level === null ? "unavail" : String(level), tag, ok: tag === "ok", safe: tag === "safe-side", failed: tag === "FAIL", review: false, unavail: tag === "UNAVAIL", outBlocked: blockedBy !== null, blockedBy };
 }
 
 const PATHS = classifyOnly
@@ -827,7 +828,7 @@ function printGoalsReport() {
     }
     if (key === "b") {
       const blocked = rows.filter((r) => r.cells.b.outBlocked);
-      if (blocked.length) console.log(`      Also: the roast written for ${blocked.map((r) => idLabel(r.num)).join(", ")} (level 0) would be blocked by the output check, so the user would see the support page (no flag)`);
+      if (blocked.length) console.log(`      Also: the roast written for ${blocked.map((r) => `${idLabel(r.num)} (output rule: ${r.cells.b.blockedBy})`).join(", ")} (level 0) would be blocked by the output check, so the user would see the support page (no flag). Only the rule's name is shown, never the text.`);
     }
   }
   console.log("");

@@ -10,6 +10,7 @@ import {
   combineSignals,
   isPakistan,
   outputLooksUnsafe,
+  outputRuleThatFired,
   parseLevel,
   resolveSafety,
   ruleFloorLevel,
@@ -727,6 +728,79 @@ test("classify prompt: burden / better off without them is Level 2 in any langua
   // the earlier principle and the burden clause are untouched
   assert.match(level2, /feeling like a burden to others\. Do not wait for explicit words\./);
   assert.match(level2, /other people would not notice, miss or care if the person were gone, vanished or never woke up/);
+});
+
+test("classify prompt: ordinary workload / deadline pressure is Level 0 in any language; being a burden oneself stays Level 2", () => {
+  const p = SAFETY_CLASSIFY_PROMPT;
+  const level0 = p.slice(p.indexOf("0 = nothing concerning"), p.indexOf("1 = emotional pain"));
+  assert.ok(level0.length > 0, "could not find the Level 0 definition");
+  assert.match(
+    level0,
+    /In any language, including Roman Urdu and Urdu script, ordinary workload or deadline pressure with no personal distress is level 0, not level 1, even when the work itself is called heavy, a load or a burden; being a burden oneself, or others faring better without oneself, stays level 2\./,
+  );
+  assert.ok(level0.trimEnd().endsWith("stays level 2."), "the new sentence is the last one in the Level 0 definition");
+  assert.equal(p.match(/ordinary workload or deadline pressure/g)?.length, 1, "added once");
+  // everything around it is untouched: the older Level 0 sentence, the unsure rule, and the Level 2 paragraph's own ending
+  assert.match(level0, /\("I'm starving", "that joke killed me"\) are level 0\./);
+  assert.match(p, /If you are unsure between 0 and 1, choose 1\. If you are unsure between 1 and 2, choose 2\./);
+  const level2 = p.slice(p.indexOf("2 = any sign"), p.indexOf("How to decide:"));
+  assert.ok(level2.trimEnd().endsWith("counts as level 2."), "the Level 2 paragraph still ends with its own burden sentence");
+  assert.match(level2, /feeling like a burden to others\. Do not wait for explicit words\./);
+});
+
+// Diagnostic: which output rule fired. Only the fixed NAME is ever returned, never any of the text.
+const OUTPUT_RULE_EXAMPLES: Array<[name: string, text: string]> = [
+  ["suicide-word", "that is suicidal behaviour"],
+  ["self-harm-word", "self-harm is not a joke"],
+  ["kill-yourself", "just kill yourself already"],
+  ["kys", "kys lol"],
+  ["end-it-all-or-your-life", "you could end it all"],
+  ["hurt-yourself", "starve yourself for a week"],
+  ["nobody-would-miss-notice-care", "nobody would notice your streak"],
+  ["world-better-without-you", "the world would be better without you"],
+  ["go-die", "go die in a fire"],
+  ["should-die", "you should die"],
+  ["depression-word", "you sound depressed"],
+  ["cry-about-it", "go ahead and cry about it"],
+  ["crybaby", "stop being a crybaby"],
+  ["emo", "your playlist is so emo"],
+  ["sad-boy-girl-loser", "sad boy hours at midnight"],
+  ["forever-alone", "forever alone with your phone"],
+  ["dead-inside", "dead inside like your sleep schedule"],
+  ["your-funeral", "that deadline is your own funeral"],
+  ["loner", "typical loner behaviour"],
+  ["nobody-loves-you", "nobody likes you when you scroll"],
+];
+
+test("output rule diagnostic: each of the 20 output rules reports its own fixed name, and only the name", () => {
+  assert.equal(OUTPUT_RULE_EXAMPLES.length, 20);
+  assert.equal(new Set(OUTPUT_RULE_EXAMPLES.map(([name]) => name)).size, 20, "20 distinct names");
+  for (const [name, text] of OUTPUT_RULE_EXAMPLES) {
+    const fired = outputRuleThatFired(text);
+    assert.equal(fired, name, `"${text}" should fire the rule ${name}`);
+    assert.match(fired!, /^[a-z]+(?:-[a-z]+)*$/, "a rule name is a short fixed label");
+    assert.equal(outputLooksUnsafe(text), true);
+  }
+  // surrounding words are never echoed: bury a trigger in a long sentence and only the label comes back
+  const long = "Honestly your sleep schedule is a rumor and your phone is a lifestyle, so basically you are the typical loner of this whole building, congratulations on the screen time record";
+  assert.equal(outputRuleThatFired(long), "loner");
+  assert.ok(outputRuleThatFired(long)!.length <= 40);
+});
+
+test("output rule diagnostic: null for ordinary text, the first rule in order when several fire, every text is checked", () => {
+  for (const ok of ["Nine hours on TikTok is a full-time job with no pay.", "You went to the gym twice and want a medal.", "dead tired, killing it, emotional, died laughing", "", "   "]) {
+    assert.equal(outputRuleThatFired(ok), null, ok);
+    assert.equal(outputLooksUnsafe(ok), false, ok);
+  }
+  assert.equal(outputRuleThatFired(null, undefined, ""), null);
+  // "kill yourself" comes before "loner" in the list, so it is the one reported
+  assert.equal(outputRuleThatFired("Your streak is so dead you should just cry about it, loner. Or kill yourself, same energy."), "kill-yourself");
+  // the second text is checked when the first is clean
+  assert.equal(outputRuleThatFired("fine roast", "typical loner behaviour"), "loner");
+  // the boolean and the diagnostic always agree
+  for (const t of ["", "hello", "you deserve to die", "forever alone", "nobody would care", "cry me a river", "uninstall the app"]) {
+    assert.equal(outputLooksUnsafe(t), outputRuleThatFired(t) !== null, t);
+  }
 });
 
 test("eval messages: the phrase filter alone is never ABOVE the expected level on the goals, hold-out, quiet and urdu sets", () => {

@@ -119,7 +119,7 @@ export async function runSafetyGrading(groq: Groq, model: string, input: Grading
  */
 export const SAFETY_CLASSIFY_PROMPT = `SAFETY CHECK (classification only). You are a safety classifier for a habit-tracking app. You never write replies, roasts, questions or advice. Read everything the person typed, in any language or script (including Roman Urdu and Urdu), and answer with one number, "safety_level":
 
-0 = nothing concerning. Ordinary habit talk, app names, numbers, jokes, sarcasm, exaggeration and figures of speech about tiredness, hunger, embarrassment, effort or annoyance ("I'm starving", "that joke killed me") are level 0.
+0 = nothing concerning. Ordinary habit talk, app names, numbers, jokes, sarcasm, exaggeration and figures of speech about tiredness, hunger, embarrassment, effort or annoyance ("I'm starving", "that joke killed me") are level 0. In any language, including Roman Urdu and Urdu script, ordinary workload or deadline pressure with no personal distress is level 0, not level 1, even when the work itself is called heavy, a load or a burden; being a burden oneself, or others faring better without oneself, stays level 2.
 
 1 = emotional pain or vulnerability: sadness, low mood, loneliness or withdrawal from other people, grief or loss (of a person or a pet), heavy stress or exhaustion with life, feeling like a failure or worthless. Also level 1: someone worried about another person who may be hurting themselves.
 
