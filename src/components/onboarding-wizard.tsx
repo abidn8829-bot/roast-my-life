@@ -7,6 +7,8 @@ import posthog from "posthog-js";
 import { ToneSelector } from "@/components/tone-selector";
 import { PersonaSelector } from "@/components/persona-selector";
 import { UpgradeModal } from "@/components/upgrade-modal";
+import { GentleNotice, SafetyPage, SafetyUnavailable } from "@/components/safety-page";
+import type { SafetyPayload, SafetyPagePayload } from "@/lib/safety";
 
 const LOADING_MESSAGES = [
   "Analyzing your poor life choices...",
@@ -111,6 +113,11 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   const [isCustomCheckIn, setIsCustomCheckIn] = useState(false);
   // Set when today's limit is already used up: shows a "come back tomorrow" screen instead of the check-in.
   const [limitNotice, setLimitNotice] = useState<string | null>(null);
+  // Safety layer: the support page (Level 1 / 2), the "couldn't check" notice, or gentle mode.
+  // All three come from the server; the typed text is cleared as soon as one of them shows.
+  const [safetyPage, setSafetyPage] = useState<SafetyPagePayload | null>(null);
+  const [safetyUnavailable, setSafetyUnavailable] = useState(false);
+  const [gentleNotice, setGentleNotice] = useState(false);
 
   const generateFollowUpQuestion = async () => {
     setIsGeneratingFollowUp(true);
@@ -122,6 +129,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
       });
 
       const data = await res.json();
+      if (handleSafetyResponse(data)) return;
       if (res.ok && data.question && data.category && data.activeTheme) {
         setFollowUpQuestion(data.question);
         setCheckInCategory(data.category);
@@ -131,8 +139,8 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
         setLimitNotice(data.error ?? "You've used today's check-ins. Come back tomorrow.");
         if (data.tier === "free") setUpgradeReason("daily_limit");
       }
-    } catch (error) {
-      console.error("Error generating follow-up question:", error);
+    } catch {
+      console.error("Error generating follow-up question");
       setError("Couldn't load today's check-in. Please try again.");
     } finally {
       setIsGeneratingFollowUp(false);
@@ -189,6 +197,26 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   const [neverDoThing, setNeverDoThing] = useState("");
   const [socialMediaHours, setSocialMediaHours] = useState("");
   const [workoutFrequency, setWorkoutFrequency] = useState("");
+
+  /** Returns true if the response was a safety / gentle response and has been handled. */
+  function handleSafetyResponse(data: { safety?: SafetyPayload; gentle?: boolean } | null): boolean {
+    if (data?.gentle) {
+      setGentleNotice(true);
+    } else if (data?.safety?.kind === "page") {
+      setSafetyPage(data.safety);
+    } else if (data?.safety?.kind === "unavailable") {
+      setSafetyUnavailable(true);
+    } else {
+      return false;
+    }
+    // Drop everything the user typed from memory.
+    setFollowUpAnswer("");
+    setNeverDoThing("");
+    setWorstApp("");
+    setIsCustomCheckIn(false);
+    setIsGenerating(false);
+    return true;
+  }
 
   const allQuestions = [...BASE_QUESTIONS, ...(isPro ? PRO_QUESTIONS : [])];
 
@@ -271,7 +299,8 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
 
     clearTimeout(loadingTimeout);
 
-    const data = (await res.json()) as { id?: string; error?: string; code?: string; tier?: string; followUpQuestion?: string; requiresFollowUp?: boolean; newlyUnlockedAchievements?: string[] };
+    const data = (await res.json()) as { id?: string; error?: string; code?: string; tier?: string; followUpQuestion?: string; requiresFollowUp?: boolean; newlyUnlockedAchievements?: string[]; safety?: SafetyPayload; gentle?: boolean };
+    if (handleSafetyResponse(data)) return;
     const roastId =
       typeof data.id === "string" ? data.id.trim() : String(data.id ?? "");
 
@@ -284,7 +313,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
     }
 
     if (!res.ok || !roastId) {
-      console.error("[onboarding] roast API failed:", res.status, data);
+      console.error("[onboarding] roast API failed:", res.status);
       setIsGenerating(false);
 
       // Free users hitting the daily limit get the upgrade modal; Pro users fall through
@@ -369,7 +398,8 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "submit", category: checkInCategory, answer: followUpAnswer.trim(), activeTheme: checkInTheme, question: followUpQuestion, tone: selectedTone, persona: selectedPersona }),
       });
-      const data = await res.json() as { id?: string; error?: string; code?: string; tier?: string; newlyUnlockedAchievements?: string[] };
+      const data = await res.json() as { id?: string; error?: string; code?: string; tier?: string; newlyUnlockedAchievements?: string[]; safety?: SafetyPayload; gentle?: boolean };
+      if (handleSafetyResponse(data)) return;
       if (!res.ok || !data.id) {
         if (res.status === 429 && data.code === "daily_limit" && data.tier === "free") setUpgradeReason("daily_limit");
         setError(data.error ?? "Couldn't save your check-in. Try again.");
@@ -385,6 +415,20 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  if (safetyPage) return <SafetyPage payload={safetyPage} />;
+  if (gentleNotice) return <GentleNotice />;
+  if (safetyUnavailable) {
+    return (
+      <SafetyUnavailable
+        onDismiss={() => {
+          setSafetyUnavailable(false);
+          // Back to the form they came from (the typed answer was cleared; they can try again).
+          setStep(step === "loading" ? allQuestions.length - 1 : step);
+        }}
+      />
+    );
   }
 
   if (isCheckingReturning) {
@@ -490,7 +534,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
                   placeholder="Your answer..."
                   value={followUpAnswer}
                   onChange={(e) => setFollowUpAnswer(e.target.value)}
-                  className={`${inputClass} resize-y min-h-[6rem] mb-6`}
+                  className={`ph-no-capture ${inputClass} resize-y min-h-[6rem] mb-6`}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -536,7 +580,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
             placeholder="Your answer..."
             value={followUpAnswer}
             onChange={(e) => setFollowUpAnswer(e.target.value)}
-            className={`${inputClass} resize-y min-h-[6rem] mb-6`}
+            className={`ph-no-capture ${inputClass} resize-y min-h-[6rem] mb-6`}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -649,7 +693,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
                 placeholder={q.placeholder}
                 value={values[q.key]}
                 onChange={(e) => setters[q.key](e.target.value)}
-                className={`${inputClass} resize-y min-h-[4rem]`}
+                className={`ph-no-capture ${inputClass} resize-y min-h-[4rem]`}
               />
             ) : (
               <input

@@ -4,6 +4,7 @@ import { parseCategoryScores } from "@/lib/parse-category-scores";
 import { buildPushNudge } from "@/lib/roast-nudge";
 import { calculateStreak } from "@/lib/streak";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { getGentleUserIds } from "@/lib/safety-server";
 import { sendPushNotification } from "@/lib/webpush";
 
 export const dynamic = "force-dynamic";
@@ -42,12 +43,19 @@ export async function GET(request: Request) {
   }
 
   const userIds = Array.from(new Set(subs.map((s) => s.user_id as string)));
+  // Users inside the 72-hour gentle window get no nudges at all (the copy here is streak / roast pressure).
+  const gentleUserIds = await getGentleUserIds(supabase);
   let notified = 0;
   let skipped = 0;
   let cleaned = 0;
 
   for (const userId of userIds) {
     const userSubs = subs.filter((s) => s.user_id === userId);
+
+    if (gentleUserIds.has(userId)) {
+      skipped++;
+      continue;
+    }
 
     const [{ data: userRow }, { data: roastRows }] = await Promise.all([
       supabase.from("users").select("achievements").eq("id", userId).maybeSingle(),

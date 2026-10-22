@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { isPakistan, ruleFloorLevel, safetyLog, supportLinesOrFallback } from "@/lib/safety";
+import { safetyJson } from "@/lib/safety-response";
+import { recordFlag } from "@/lib/safety-server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -16,6 +21,22 @@ export async function POST(request: Request) {
       { error: "Name, email, and message are required" },
       { status: 400 },
     );
+  }
+
+  // Safety rule filter (no AI call on this route). If the message shows sadness or risk it is
+  // NOT emailed anywhere: the support page is shown instead. A flag is stored only when the
+  // sender is logged in. Nothing from the message is logged.
+  const ruleLevel = ruleFloorLevel(name, message);
+  if (ruleLevel !== 0) {
+    safetyLog(ruleLevel, "contact");
+    try {
+      const supabase = await createSupabaseServerClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await recordFlag(createSupabaseServiceClient(), user.id, ruleLevel);
+    } catch {
+      console.error("[safety] flag write failed code=contact");
+    }
+    return safetyJson({ kind: "page", level: ruleLevel, lines: ruleLevel === 1 ? supportLinesOrFallback(null) : [], inPakistan: isPakistan(request.headers) });
   }
 
   const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
@@ -48,7 +69,8 @@ export async function POST(request: Request) {
   });
 
   if (error) {
-    console.error("[contact] Failed to send email via Resend:", error);
+    // Name / status only: the full error object could carry the message.
+    console.error("[contact] Failed to send email via Resend:", { name: error.name, statusCode: (error as { statusCode?: number | null }).statusCode ?? null });
     return NextResponse.json({ error: "Failed to send message" }, { status: 500 });
   }
 

@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getGroqApiKey } from "@/lib/groq-error";
+import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
+import { OUTPUT_GUARDRAIL } from "@/lib/safety-server";
 import type { CategoryScores, OnboardingAnswers, RoastMode } from "@/lib/roast-types";
 
 export const PUNCHLINE_MODEL = "openai/gpt-oss-120b";
@@ -75,7 +76,7 @@ export async function generateCardPunchline(
   ].filter(Boolean);
 
   const messages = [
-    { role: "system" as const, content: SYSTEM_PROMPT + (mode === "coach" ? COACH_ADDENDUM : "") },
+    { role: "system" as const, content: SYSTEM_PROMPT + (mode === "coach" ? COACH_ADDENDUM : "") + `\n${OUTPUT_GUARDRAIL}` },
     {
       role: "user" as const,
       content: [
@@ -100,7 +101,9 @@ export async function generateCardPunchline(
       const line = cleanPunchline(parsed.punchline);
       if (line) return line;
     } catch (error) {
-      console.error(`[card-punchline] attempt ${attempt} failed:`, error);
+      // Sanitized: the raw error can quote the roast / the user's answer.
+      console.error(`[card-punchline] attempt ${attempt} failed`);
+      logGroqError(error);
     }
   }
   return null;

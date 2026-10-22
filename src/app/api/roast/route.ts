@@ -12,10 +12,27 @@ import type { OnboardingAnswers, RoastTone, RoastMode, RoastPersona } from "@/li
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
+import { combineSignals, outputLooksUnsafe, ruleFloorLevel, type SafetyLevel } from "@/lib/safety";
+import { OUTPUT_GUARDRAIL, SAFETY_CALL_OPTIONS, runSafetyClassify } from "@/lib/safety-server";
+import {
+  DEFAULT_PERSONA_PROMPT,
+  FOLLOWUP_CALL_PARAMS,
+  ROAST_CALL_PARAMS,
+  buildFollowUpMessages,
+  buildFollowUpUserMessage,
+  buildRoastMessages,
+  formatUserMessage,
+  parseFollowUpResponse,
+  parseRoastResponse,
+} from "@/lib/safety-prompts";
+import { gentleGate, respondFlagged, respondOutputBlocked, respondUnavailable } from "@/lib/safety-response";
 
 const MODEL = "openai/gpt-oss-120b";
 
-const FOLLOW_UP_SYSTEM_PROMPT = `You are a savage roast comedian who remembers everything. Based on the user's previous roast and their current habits, ask ONE intelligent follow-up question to dig deeper into their failures. The question should be specific, brutal, and expose a pattern of bad behavior. Keep it under 20 words. No markdown, no extra text, just the question.`;
+// Seconds this route may run on Vercel. The pipeline is a safety classify call, then the roast, then
+// the punchline and memory calls (each with a timeout of its own), and a slow Groq day can add up.
+// 60 is within the Hobby plan's documented maximum whether or not Fluid Compute is on.
+export const maxDuration = 60;
 
 const CONTINUITY_MEMORY_SYSTEM_PROMPT = `You are building lightweight current-arc memory for a roast AI. Remember only the current habit storyline, not a transcript. Return a JSON object with these fields:
 - activeTheme: the current theme/issue (e.g., "procrastination", "phone addiction")
@@ -101,22 +118,7 @@ IMPORTANT: You must respond with valid JSON in this exact format:
 No markdown, no extra text, just the JSON.`;
 
 const PERSONA_PROMPTS: Record<RoastPersona, string> = {
-  default: `You are a savage roast comedian with zero filter who remembers everything. Use their exact numbers to destroy them. Connect every bad habit to real consequences. Heavy Gen Z slang. No softening, no "I'm not judging", no encouragement. Just brutal facts. End with a devastating one liner. 150-200 words.
-
-IMPORTANT: You must respond with valid JSON in this exact format:
-{
-  "roast_text": "your full roast paragraph here"
-}
-
-No markdown, no extra text, just the JSON.
-
-CONTINUITY INSTRUCTIONS:
-- Reference previous sessions naturally using the continuity memory
-- Continue the running joke if appropriate
-- Never repeat the exact same joke from previous roasts
-- Never assume improvement - be skeptical of their answers
-- Focus on patterns and persistent failures
-- Use the activeTopic and runningJoke from continuity memory to build on previous sessions`,
+  default: DEFAULT_PERSONA_PROMPT,
   gordon_ramsay: `You are Gordon Ramsay, the screaming chef who remembers everything. Use their exact numbers to destroy them with food metaphors and kitchen rage. Compare their habits to raw chicken, burnt dishes, and kitchen disasters. Use your signature shouting style, "WAKE UP!", "IT'S RAW!", "DISASTER!" No softening, just pure chef fury. End with a devastating food-related insult. 150-200 words.
 
 IMPORTANT: You must respond with valid JSON in this exact format:
@@ -253,37 +255,6 @@ function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastT
   };
 }
 
-function formatUserMessage(answers: OnboardingAnswers, continuityMemory: unknown, followUpAnswer?: string, previousRoastText?: string): string {
-  let message = `Roast this person based on their habits:
-
-- Phone screen time: ${answers.phoneHours} hours per day
-- Biggest time-waster app: ${answers.worstApp}
-- Average sleep: ${answers.sleepHours} hours per night
-- Weekly food delivery spending: $${answers.foodDeliverySpend}
-- Keeps saying they'll do but never does: "${answers.neverDoThing}"`;
-
-  if (answers.socialMediaHours !== undefined) {
-    message += `\n- Social media hours per day: ${answers.socialMediaHours}`;
-  }
-  if (answers.workoutFrequency !== undefined) {
-    message += `\n- Workouts this week: ${answers.workoutFrequency}`;
-  }
-
-  if (continuityMemory) {
-    message += `\n\nPrevious context (what I remember about them): ${JSON.stringify(continuityMemory)}`;
-  }
-
-  if (previousRoastText) {
-    message += `\n\nPrevious roast: "${previousRoastText}"`;
-  }
-
-  if (followUpAnswer) {
-    message += `\n\nTheir answer to my follow-up question: "${followUpAnswer}"`;
-  }
-
-  return message;
-}
-
 export async function POST(request: Request) {
   // handlePost claims a daily slot; whatever happens, give it back when the request ends.
   const slot = { release: () => {} };
@@ -295,7 +266,8 @@ export async function POST(request: Request) {
 }
 
 async function handlePost(request: Request, slot: { release: () => void }) {
-  console.log("[api/roast] Using Groq model:", MODEL);
+  // Logging rule for this route: never print anything a user typed or anything the AI wrote
+  // (answers, follow-up answers, prompts, roast text, memory, insert payloads, emails).
   const apiKey = getGroqApiKey();
   if (!apiKey) {
     return NextResponse.json(
@@ -309,12 +281,14 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  console.log("[api/roast] Auth user retrieved:", user ? { id: user.id, email: user.email } : null);
-
   if (!user) {
     console.error("[api/roast] No authenticated user found");
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Gentle mode (72 hours after a safety flag): no roasts. Enforced here, before any AI call.
+  const gentle = await gentleGate(supabase, user.id);
+  if (gentle) return gentle;
 
   // Check user's subscription tier
   const { data: userData, error: userError } = await supabase
@@ -324,11 +298,10 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     .single();
 
   if (userError) {
-    console.error("[api/roast] Error fetching user subscription tier:", userError);
+    console.error("[api/roast] Error fetching user subscription tier:", userError.code);
   }
 
   const subscriptionTier = userData?.subscription_tier || "free";
-  console.log("[api/roast] User subscription tier:", subscriptionTier);
 
   // Daily limit (free/Pro numbers live in lib/daily-limit.ts), checked before any AI call.
   const dailyLimit = await checkDailyLimit(supabase, user.id, subscriptionTier);
@@ -346,12 +319,17 @@ async function handlePost(request: Request, slot: { release: () => void }) {
 
   const parsed = parseAnswers(body);
   if (!parsed) {
-    console.error("[api/roast] Failed to parse answers:", body);
+    console.error("[api/roast] Invalid answers");
     return NextResponse.json({ error: "Invalid answers" }, { status: 400 });
   }
 
   const { answers, tone, mode, persona, followUpAnswer } = parsed;
-  console.log("[api/roast] Parsed answers:", { answers, tone, mode, persona, followUpAnswer });
+
+  // Safety rule filter: needs no AI. A Level 2 match is final (fixed page, no AI call at all).
+  // neverDoThing is only READ here; its question, validation and storage are unchanged.
+  const ruleLevel = ruleFloorLevel(answers.worstApp, answers.neverDoThing, followUpAnswer);
+  const userTexts = [answers.worstApp, answers.neverDoThing, followUpAnswer ?? ""];
+  if (ruleLevel === 2) return respondFlagged({ request, route: "roast", level: 2, userId: user.id });
 
   // Free tier only gets the default persona and normal tone — everything else is Pro-gated.
   // (Client UI already disables these for free users; this is the server-side enforcement.)
@@ -362,62 +340,77 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     );
   }
 
-  // Check if this is a returning user (has previous roasts)
-  const { data: previousRoasts } = await supabase
-    .from("roasts")
-    .select("id, roast_text, continuity_memory, created_at")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1);
+  const groq = new Groq({ apiKey });
+
+  // The dedicated safety classification runs BEFORE anything is generated, alongside the database
+  // read below (so it hides behind that read's latency). It has no roast task and no persona.
+  const [classifyLevel, { data: previousRoasts }] = await Promise.all([
+    runSafetyClassify(groq, MODEL, userTexts),
+    // Check if this is a returning user (has previous roasts)
+    supabase
+      .from("roasts")
+      .select("id, roast_text, continuity_memory, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1),
+  ]);
+
+  // Final level = the highest of the rule filter and the classifier. Fail closed: if the classifier
+  // could not answer and no phrase matched, nothing is generated, saved or flagged, and no daily
+  // slot is used (the roasts row is only written at the very end; the slot is released in POST).
+  const preDecision = combineSignals({ rule: ruleLevel, classify: classifyLevel });
+  if (preDecision.kind === "unavailable") return respondUnavailable("roast");
+  if (preDecision.level !== 0) {
+    return respondFlagged({ request, route: "roast", level: preDecision.level, userId: user.id, groq, texts: userTexts });
+  }
 
   const isReturningUser = previousRoasts && previousRoasts.length > 0;
   const previousRoast = isReturningUser ? previousRoasts[0] : null;
   const continuityMemory = previousRoast?.continuity_memory || null;
 
-  console.log("[api/roast] Is returning user:", isReturningUser);
-  console.log("[api/roast] Continuity memory:", continuityMemory);
-
-  const groq = new Groq({ apiKey });
-
-  // If returning user and no follow-up answer, generate follow-up question
+  // If returning user and no follow-up answer, generate follow-up question.
+  // The safety level rides inside this existing call (it now returns JSON).
   if (isReturningUser && !followUpAnswer) {
+    let aiLevel: SafetyLevel | null = null;
+    let followUpQuestion = "";
+    let followUpCallFailed = false;
     try {
-      const followUpPrompt = `Previous roast: "${previousRoast?.roast_text}"
-Current habits:
-- Phone screen time: ${answers.phoneHours} hours per day
-- Biggest time-waster app: ${answers.worstApp}
-- Average sleep: ${answers.sleepHours} hours per night
-- Weekly food delivery spending: $${answers.foodDeliverySpend}
-- Keeps saying they'll do but never does: "${answers.neverDoThing}"
-${answers.socialMediaHours ? `- Social media hours per day: ${answers.socialMediaHours}` : ''}
-${answers.workoutFrequency ? `- Workouts this week: ${answers.workoutFrequency}` : ''}
+      const completion = await groq.chat.completions.create(
+        {
+          model: MODEL,
+          ...FOLLOWUP_CALL_PARAMS,
+          messages: buildFollowUpMessages(buildFollowUpUserMessage(answers, previousRoast?.roast_text, continuityMemory)),
+        },
+        SAFETY_CALL_OPTIONS,
+      );
+      const parsedFollowUp = parseFollowUpResponse(completion.choices[0]?.message?.content ?? "");
+      aiLevel = parsedFollowUp.aiLevel;
+      followUpQuestion = parsedFollowUp.question;
+    } catch (error) {
+      logGroqError(error);
+      // Unchanged behaviour: if the follow-up call fails, fall through to the roast call below.
+      followUpCallFailed = true;
+    }
 
-Continuity memory: ${JSON.stringify(continuityMemory)}`;
-
-      const completion = await groq.chat.completions.create({
-        model: MODEL,
-        max_tokens: 250,
-        reasoning_effort: "low",
-        messages: [
-          { role: "system", content: FOLLOW_UP_SYSTEM_PROMPT },
-          { role: "user", content: followUpPrompt },
-        ],
-      });
-
-      const followUpQuestion = completion.choices[0]?.message?.content?.trim() || "Still making the same mistakes?";
-      console.log("[api/roast] Generated follow-up question:", followUpQuestion);
-
+    // The safety_level key the follow-up call returns is an extra signal that can only raise the level.
+    const followUpDecision = combineSignals({ rule: ruleLevel, classify: classifyLevel, inCall: aiLevel });
+    if (!followUpCallFailed && followUpDecision.kind === "level") {
+      if (followUpDecision.level !== 0) {
+        return respondFlagged({ request, route: "roast", level: followUpDecision.level, userId: user.id, groq, texts: userTexts });
+      }
+      const question = followUpQuestion || "Still making the same mistakes?";
+      if (outputLooksUnsafe(question)) return respondOutputBlocked(request, "roast");
       return NextResponse.json({
-        followUpQuestion,
+        followUpQuestion: question,
         requiresFollowUp: true,
       });
-    } catch (error) {
-      console.error("[api/roast] Error generating follow-up question:", error);
-      // If follow-up generation fails, proceed with roast generation
     }
   }
 
-  let roastText: string;
+  // The roast call. The safety level is the first key of its JSON; if it is 1 or 2 the roast
+  // text is empty and nothing is saved.
+  let aiLevel: SafetyLevel | null = null;
+  let generatedRoast = "";
   try {
     let systemPrompt: string;
     if (mode === "coach") {
@@ -426,51 +419,35 @@ Continuity memory: ${JSON.stringify(continuityMemory)}`;
       systemPrompt = PERSONA_PROMPTS[persona];
     }
 
-    console.log("[api/roast] Calling Groq API with model:", MODEL);
-    console.log("[api/roast] System prompt length:", systemPrompt.length);
-    console.log("[api/roast] User message:", formatUserMessage(answers, continuityMemory, followUpAnswer, previousRoast?.roast_text));
+    const completion = await groq.chat.completions.create(
+      {
+        model: MODEL,
+        ...ROAST_CALL_PARAMS,
+        messages: buildRoastMessages(systemPrompt, formatUserMessage(answers, continuityMemory, followUpAnswer, previousRoast?.roast_text)),
+      },
+      SAFETY_CALL_OPTIONS,
+    );
 
-    const completion = await groq.chat.completions.create({
-      model: MODEL,
-      max_tokens: 1200,
-      reasoning_effort: "low",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: formatUserMessage(answers, continuityMemory, followUpAnswer, previousRoast?.roast_text) },
-      ],
-      response_format: { type: "json_object" },
-    });
-
-    console.log("[api/roast] Groq API response received successfully");
-    console.log("[api/roast] Completion choices:", completion.choices.length);
-    console.log("[api/roast] First choice:", {
+    console.log("[api/roast] Groq response:", {
       finish_reason: completion.choices[0]?.finish_reason,
       has_content: !!completion.choices[0]?.message?.content,
     });
 
-    const content = completion.choices[0]?.message?.content?.trim() ?? "";
-    if (!content) {
-      console.error(
-        "[api/roast] Empty content in response:",
-        completion.choices,
-      );
-      return NextResponse.json(
-        { error: "Empty response from model" },
-        { status: 502 },
-      );
-    }
-
-    // Parse JSON response
-    try {
-      const parsed = JSON.parse(content);
-      roastText = parsed.roast_text || content;
-      console.log("[api/roast] Parsed AI response:", { roastText: roastText.substring(0, 100) });
-    } catch (parseError) {
-      console.error("[api/roast] Failed to parse JSON response, using raw content:", parseError);
-      roastText = content;
-    }
+    const parsedRoast = parseRoastResponse(completion.choices[0]?.message?.content?.trim() ?? "");
+    aiLevel = parsedRoast.aiLevel;
+    generatedRoast = parsedRoast.roastText;
   } catch (err) {
     logGroqError(err);
+  }
+
+  // The roast call's own safety_level can only raise the level; a missing one is not a failure
+  // because the classifier already answered.
+  const decision = combineSignals({ rule: ruleLevel, classify: classifyLevel, inCall: aiLevel });
+  if (decision.kind === "unavailable") return respondUnavailable("roast"); // cannot happen after the pre-check; fail closed anyway
+  if (decision.level !== 0) {
+    return respondFlagged({ request, route: "roast", level: decision.level, userId: user.id, groq, texts: userTexts });
+  }
+  if (!generatedRoast.trim()) {
     return NextResponse.json(
       { error: "Failed to generate roast" },
       { status: 502 },
@@ -478,7 +455,11 @@ Continuity memory: ${JSON.stringify(continuityMemory)}`;
   }
 
   // Roasts are rendered as plain text, so drop any markdown the model slipped in before it is saved or reused.
-  roastText = cleanRoastText(roastText) || roastText;
+  let roastText = cleanRoastText(generatedRoast) || generatedRoast;
+
+  // Output check (rule-based, no AI call): a roast that mocks sadness / self-harm / pain is thrown away.
+  if (process.env.NODE_ENV !== "production" && process.env.EMBER_SAFETY_TEST_ROAST) roastText = process.env.EMBER_SAFETY_TEST_ROAST; // test-only override, ignored in production
+  if (outputLooksUnsafe(roastText)) return respondOutputBlocked(request, "roast");
 
   const report_card = buildReportCard(answers);
   const week_start_date = getWeekStartDate();
@@ -517,7 +498,7 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
       max_tokens: 400,
       reasoning_effort: "low",
       messages: [
-        { role: "system", content: CONTINUITY_MEMORY_SYSTEM_PROMPT },
+        { role: "system", content: `${OUTPUT_GUARDRAIL}\n\n${CONTINUITY_MEMORY_SYSTEM_PROMPT}` },
         { role: "user", content: memoryPrompt },
       ],
       response_format: { type: "json_object" },
@@ -529,15 +510,21 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
       // Update timestamp
       parsedMemory.updatedAt = new Date().toISOString();
       newContinuityMemory = parsedMemory;
-      console.log("[api/roast] Generated continuity memory:", newContinuityMemory);
     }
   } catch (memoryError) {
-    console.error("[api/roast] Error generating continuity memory:", memoryError);
+    // Never print the error object: a JSON.parse error quotes the text it choked on.
+    console.error("[api/roast] Error generating continuity memory:", memoryError instanceof Error ? memoryError.name : "unknown");
     // Use previous memory or empty if generation fails
     newContinuityMemory.updatedAt = new Date().toISOString();
   }
 
   const cardPunchline = await punchlinePromise;
+
+  // Final output check over everything the AI wrote, before anything is saved.
+  const memoryChallenge = (newContinuityMemory as Record<string, unknown>).challenge;
+  if (outputLooksUnsafe(cardPunchline, typeof memoryChallenge === "string" ? memoryChallenge : null)) {
+    return respondOutputBlocked(request, "roast");
+  }
 
   const baseRow = {
     user_id: user.id,
@@ -558,42 +545,11 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     continuity_memory: newContinuityMemory,
   };
 
-  console.log("[api/roast] Preparing to insert roast with data:", {
-    user_id: baseRow.user_id,
-    roast_text_length: baseRow.roast_text.length,
-    report_card_keys: Object.keys(baseRow.report_card),
-    week_start_date: baseRow.week_start_date,
-    model_used: baseRow.model_used,
-    share_slug: baseRow.share_slug,
-    life_score: baseRow.life_score,
-    life_score_type: typeof baseRow.life_score,
-    funny_title: baseRow.funny_title,
-    funny_title_type: typeof baseRow.funny_title,
-    card_punchline: baseRow.card_punchline,
-    category_scores: baseRow.category_scores,
-    category_scores_type: typeof baseRow.category_scores,
-    tone: baseRow.tone,
-    tone_type: typeof baseRow.tone,
-    mode: baseRow.mode,
-    mode_type: typeof baseRow.mode,
-    persona: baseRow.persona,
-    persona_type: typeof baseRow.persona,
-  });
-
-  console.log("[api/roast] Full insert object keys:", Object.keys(baseRow));
-  console.log("[api/roast] Full insert object:", JSON.stringify(baseRow, null, 2));
-
   const { data, error } = await insertRoastRow(supabase, baseRow);
 
   if (error) {
-    console.error("[api/roast] Full Supabase error object:", JSON.stringify(error, null, 2));
-    console.error("[api/roast] Supabase insert error:", {
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
-      user_id: baseRow.user_id,
-    });
+    // Code only: Postgres "details" can echo the failing row, which holds the user's text.
+    console.error("[api/roast] Supabase insert error:", { code: error.code });
     return NextResponse.json(
       { error: "Failed to save roast" },
       { status: 500 },
@@ -680,7 +636,7 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
 
   const roastId = data?.id ? String(data.id) : "";
   if (!roastId) {
-    console.error("[api/roast] insert ok but missing id in response:", data);
+    console.error("[api/roast] insert ok but missing id in response");
     return NextResponse.json(
       { error: "Failed to save roast" },
       { status: 500 },

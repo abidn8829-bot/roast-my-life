@@ -1,33 +1,21 @@
 import Groq from "groq-sdk";
 
+/**
+ * Logs a Groq / parsing failure WITHOUT any text that could come from a user.
+ *
+ * It used to print the whole error object. Groq's error body can include the model's
+ * failed output ("failed_generation"), and a JSON.parse SyntaxError quotes the start of the
+ * text it choked on. Both can contain what a user typed, so only the error class, the HTTP
+ * status and Groq's short error code are logged now.
+ */
 export function logGroqError(err: unknown): void {
-  console.error("Groq error (full):", err);
-
+  const name = err instanceof Error ? err.name : typeof err;
   if (err instanceof Groq.APIError) {
-    console.error("Groq APIError details:", {
-      status: err.status,
-      name: err.name,
-      message: err.message,
-      headers: Object.fromEntries(err.headers?.entries() ?? []),
-      error: err.error,
-    });
+    const code = (err.error as { code?: unknown } | undefined)?.code;
+    console.error("Groq APIError:", { name, status: err.status, code: typeof code === "string" ? code.slice(0, 40) : undefined });
     return;
   }
-
-  if (err instanceof Error) {
-    console.error("Groq Error message:", err.message);
-    console.error("Groq Error stack:", err.stack);
-    return;
-  }
-
-  try {
-    console.error(
-      "Groq error (serialized):",
-      JSON.stringify(err, Object.getOwnPropertyNames(err as object), 2),
-    );
-  } catch {
-    console.error("Groq error (could not serialize)");
-  }
+  console.error("Groq call failed:", { name });
 }
 
 export function getGroqApiKey(): string | undefined {
