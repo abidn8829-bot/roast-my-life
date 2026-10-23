@@ -62,8 +62,21 @@ export const GENTLE_TEXT = {
 /** How long gentle mode lasts after a flag. */
 export const GENTLE_WINDOW_MS = 72 * 60 * 60 * 1000;
 
-/** The three fixed check-in buttons. They are never a safety signal. */
+/**
+ * The three preset check-in buttons, in screen order. The only place their wording lives: the wizard renders
+ * its buttons from this list and runCheckInSafety skips the classifier for an answer that is exactly one of
+ * them, so editing a label here changes both together.
+ */
 export const CHECKIN_CHIP_LABELS = ["I actually did it", "I tried", "I failed again"] as const;
+
+/**
+ * True only when the (trimmed) answer is EXACTLY one of the preset button labels: same letters, same case,
+ * nothing added. These carry no words of the person's own, and the classifier judged "I failed again" with
+ * no question next to it as sadness. Any other text, even a label plus one word, is not a match.
+ */
+export function isCheckInChipAnswer(answer: unknown): boolean {
+  return typeof answer === "string" && (CHECKIN_CHIP_LABELS as readonly string[]).includes(answer.trim());
+}
 
 // ---------------------------------------------------------------------------
 // Response shapes shared by the routes and the browser
