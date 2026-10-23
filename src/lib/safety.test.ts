@@ -6,8 +6,10 @@ import { fileURLToPath } from "node:url";
 import type Groq from "groq-sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  CHECKIN_CHIP_LABELS,
   LEVEL1_FALLBACK_LINES,
   combineSignals,
+  isCheckInChipAnswer,
   isPakistan,
   outputLooksUnsafe,
   outputRuleThatFired,
@@ -1164,6 +1166,159 @@ test("check-in safety: classifier says 0 but the grading call fails or has no le
   } finally {
     cap.restore();
   }
+});
+
+// ---------------------------------------------------------------------------
+// The three preset check-in buttons: an EXACT match skips the classifier call, nothing else changes
+// ---------------------------------------------------------------------------
+
+const classifierWasCalled = (calls: Array<{ body: { messages: Array<{ content: string }> } }>) =>
+  calls.some((c) => c.body.messages[0]!.content === SAFETY_CLASSIFY_PROMPT);
+
+test("preset buttons: the shared list is exactly the three labels, in screen order", () => {
+  assert.deepEqual([...CHECKIN_CHIP_LABELS], ["I actually did it", "I tried", "I failed again"]);
+});
+
+test("preset buttons: isCheckInChipAnswer matches the exact labels (trimmed) and nothing else", () => {
+  for (const label of CHECKIN_CHIP_LABELS) {
+    assert.equal(isCheckInChipAnswer(label), true, label);
+    assert.equal(isCheckInChipAnswer(`  ${label}\n`), true, `${label} with surrounding spaces`);
+  }
+  for (const other of [
+    "",
+    "   ",
+    "I failed again, I want to disappear",
+    "I failed again.",
+    "I failed again!",
+    "i failed again",
+    "I FAILED AGAIN",
+    "I failed againn",
+    "I tried 2",
+    "I tried and failed",
+    "Also I tried",
+    "I actually did it lol",
+    "I  failed again", // two spaces inside
+    "I failed  again",
+    "I failed\nagain",
+  ]) {
+    assert.equal(isCheckInChipAnswer(other), false, JSON.stringify(other));
+  }
+  for (const notText of [null, undefined, 0, 1, {}, [], ["I tried"]]) assert.equal(isCheckInChipAnswer(notText), false);
+});
+
+test("preset buttons: each exact label skips the classifier call; the grading call still runs and the answer is clear", async () => {
+  for (const label of CHECKIN_CHIP_LABELS) {
+    for (const answer of [label, `  ${label}  `]) {
+      const { groq, calls } = scriptedGroq([GRADE_OK]);
+      const r = await runCheckInSafety(groq, "m", { ...CHECKIN_INPUT, answer, ruleLevel: 0 }, { sleep: noWait });
+      assert.equal(calls.length, 1, `${label}: exactly one AI call (grading only)`);
+      assert.equal(classifierWasCalled(calls), false, `${label}: the classify call must not be made`);
+      assert.equal(calls[0]!.body.messages[0]!.content, GRADING_SYSTEM_PROMPT);
+      assert.ok(calls[0]!.body.messages[1]!.content.includes(label), "the grading call still receives the answer");
+      assert.equal(r.kind, "clear");
+      if (r.kind !== "clear") continue;
+      assert.deepEqual(r.signals, { rule: 0, classify: 0, inCall: 0 });
+      assert.equal(r.grading.suggestionLine, "Keep going.");
+    }
+  }
+});
+
+test("preset buttons: a skipped classifier cannot fail closed (no call to fail), while a typed answer still does", async () => {
+  const cap = captureConsoleError();
+  try {
+    const chip = scriptedGroq([GRADE_OK]);
+    assert.equal((await runCheckInSafety(chip.groq, "m", { ...CHECKIN_INPUT, answer: "I tried", ruleLevel: 0 }, { sleep: noWait })).kind, "clear");
+    // same situation for typed text: the classifier call fails, nothing can be judged, so it fails closed (unchanged)
+    const typed = scriptedGroq([new FakeApiError(500, { code: "server_error" })]);
+    const r = await runCheckInSafety(typed.groq, "m", { ...CHECKIN_INPUT, answer: "I tried again and again", ruleLevel: 0 }, { sleep: noWait });
+    assert.equal(r.kind, "unavailable");
+    assert.equal(typed.calls.length, 1, "grading is never made after a failed classifier");
+  } finally {
+    cap.restore();
+  }
+});
+
+test("preset buttons: a label plus extra words still goes to the classifier (and its level counts)", async () => {
+  for (const answer of ["I failed again, I want to disappear", "I failed again.", "i failed again", "I tried 2", "I actually did it lol"]) {
+    const { groq, calls } = scriptedGroq([{ safety_level: 0 }, GRADE_OK]);
+    await runCheckInSafety(groq, "m", { ...CHECKIN_INPUT, answer, ruleLevel: 0 }, { sleep: noWait });
+    assert.equal(calls[0]!.body.messages[0]!.content, SAFETY_CLASSIFY_PROMPT, `${answer}: the classifier is still the first AI call`);
+    assert.ok(calls[0]!.body.messages[1]!.content.includes(answer.replace(/\s+/g, " ").trim()), "and it sees the whole answer");
+  }
+});
+
+test("preset buttons: with a classifier that returns Level 1 or 2 for non-exact text, the result is still flagged", async () => {
+  const typed = "I failed again, I want to disappear";
+  const lvl2 = scriptedGroq([{ safety_level: 2 }, gradeLevel(0)]);
+  assert.deepEqual(await runCheckInSafety(lvl2.groq, "m", { ...CHECKIN_INPUT, answer: typed, ruleLevel: 0 }, { sleep: noWait }), {
+    kind: "flagged",
+    level: 2,
+    signals: { rule: 0, classify: 2, inCall: null },
+  });
+  assert.equal(lvl2.calls.length, 1);
+  const lvl1 = scriptedGroq([{ safety_level: 1 }, gradeLevel(0)]);
+  assert.deepEqual(await runCheckInSafety(lvl1.groq, "m", { ...CHECKIN_INPUT, answer: typed, ruleLevel: 0 }, { sleep: noWait }), {
+    kind: "flagged",
+    level: 1,
+    signals: { rule: 0, classify: 1, inCall: 0 },
+  });
+});
+
+test("preset buttons: for an exact label the grading call's own level still raises the result", async () => {
+  for (const label of CHECKIN_CHIP_LABELS) {
+    for (const level of [1, 2] as const) {
+      const { groq, calls } = scriptedGroq([gradeLevel(level)]);
+      const r = await runCheckInSafety(groq, "m", { ...CHECKIN_INPUT, answer: label, ruleLevel: 0 }, { sleep: noWait });
+      assert.deepEqual(r, { kind: "flagged", level, signals: { rule: 0, classify: 0, inCall: level } }, `${label} grading ${level}`);
+      assert.equal(calls.length, 1);
+      assert.equal(classifierWasCalled(calls), false);
+    }
+  }
+});
+
+test("preset buttons: the phrase filter's level still counts for an exact label (a Level 1 hit flags, a Level 2 hit stops with no AI call)", async () => {
+  const lvl1 = scriptedGroq([GRADE_OK]);
+  assert.deepEqual(await runCheckInSafety(lvl1.groq, "m", { ...CHECKIN_INPUT, answer: "I tried", ruleLevel: 1 }, { sleep: noWait }), {
+    kind: "flagged",
+    level: 1,
+    signals: { rule: 1, classify: 0, inCall: 0 },
+  });
+  const lvl2 = scriptedGroq([GRADE_OK]);
+  assert.deepEqual(await runCheckInSafety(lvl2.groq, "m", { ...CHECKIN_INPUT, answer: "I tried", ruleLevel: 2 }, { sleep: noWait }), {
+    kind: "flagged",
+    level: 2,
+    signals: { rule: 2, classify: null, inCall: null },
+  });
+  assert.equal(lvl2.calls.length, 0);
+});
+
+test("preset buttons: the three labels still pass the phrase filter on their own (rule level 0)", () => {
+  for (const label of CHECKIN_CHIP_LABELS) assert.equal(ruleFloorLevel(label), 0, label);
+});
+
+test("preset buttons: the wizard and the safety code use the same shared list (nobody can edit a button and silently break the skip)", () => {
+  const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), "utf8");
+  const wizard = read("../components/onboarding-wizard.tsx");
+  const server = read("./safety-server.ts");
+  // the wizard renders its buttons FROM the shared list ...
+  assert.match(wizard, /import \{[^}]*\bCHECKIN_CHIP_LABELS\b[^}]*\} from "@\/lib\/safety";/);
+  assert.match(wizard, /CHECKIN_CHIP_LABELS\.map\(/);
+  // ... and the safety code decides from the same list through one helper
+  assert.match(server, /import \{[^}]*\bisCheckInChipAnswer\b[^}]*\} from "\.\/safety\.ts";/);
+  assert.match(server, /isCheckInChipAnswer\(input\.answer\) \? 0 : await runSafetyClassify\(/);
+  // neither the wizard nor the check-in decision carries its own copy of the wording
+  const decisionCode = server.slice(server.indexOf("export async function runCheckInSafety("));
+  assert.ok(decisionCode.length > 100, "runCheckInSafety not found");
+  for (const label of CHECKIN_CHIP_LABELS) {
+    assert.ok(!wizard.includes(`"${label}"`), `the wizard must not hard-code "${label}"`);
+    assert.ok(!decisionCode.slice(0, decisionCode.indexOf("\n}\n")).includes(`"${label}"`), `runCheckInSafety must not hard-code "${label}"`);
+  }
+});
+
+test("preset buttons: the grading prompt's own sentence about the buttons names every label in the shared list (catches a stale copy)", () => {
+  // The grading / roast / follow-up prompts say the three buttons are always level 0. That sentence is a prompt
+  // (not touched here), so it keeps its own copy of the wording: this test fails if a label is edited in one place only.
+  for (const label of CHECKIN_CHIP_LABELS) assert.ok(GRADING_SYSTEM_PROMPT.includes(`"${label}"`), `the safety rules block no longer names "${label}"`);
 });
 
 test("check-in route: the safety decision runs before any plan, memory, roast, punchline or write, and uses the shared helpers", () => {

@@ -8,7 +8,10 @@ import { ToneSelector } from "@/components/tone-selector";
 import { PersonaSelector } from "@/components/persona-selector";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { GentleNotice, SafetyPage, SafetyUnavailable } from "@/components/safety-page";
-import type { SafetyPayload, SafetyPagePayload } from "@/lib/safety";
+import { CHECKIN_CHIP_LABELS, type SafetyPayload, type SafetyPagePayload } from "@/lib/safety";
+
+// One emoji per preset check-in button, in the order of CHECKIN_CHIP_LABELS (the wording lives in @/lib/safety).
+const CHECKIN_CHIP_EMOJIS = ["😎", "😅", "🤡"] as const;
 
 const LOADING_MESSAGES = [
   "Analyzing your poor life choices...",
@@ -506,11 +509,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
                 {followUpQuestion || "How did your habits go yesterday?"}
               </p>
               <div className="mb-5 grid gap-3">
-                {[
-                  ["😎", "I actually did it"],
-                  ["😅", "I tried"],
-                  ["🤡", "I failed again"],
-                ].map(([emoji, label]) => (
+                {CHECKIN_CHIP_LABELS.map((label, i) => [CHECKIN_CHIP_EMOJIS[i], label] as const).map(([emoji, label]) => (
                   <button
                     key={label}
                     type="button"

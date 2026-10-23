@@ -13,6 +13,7 @@ import {
   GENTLE_WINDOW_MS,
   clip,
   combineSignals,
+  isCheckInChipAnswer,
   parseLevel,
   supportLinesOrFallback,
   type FlagLevel,
@@ -267,7 +268,8 @@ export type CheckInSafety =
  * Mirrors /api/roast:
  *   1. A Level 2 phrase match is final: no AI call at all.
  *   2. The classify-only call runs on what the person typed (the answer) BEFORE grading or anything
- *      else is generated. A classifier that could not answer with no phrase matched fails closed
+ *      else is generated (skipped, counted as 0, when the answer is exactly one of the three preset
+ *      buttons: see isCheckInChipAnswer). A classifier that could not answer with no phrase matched fails closed
  *      ("unavailable") and stops here: the grading call is never made. A classifier level of 2 is
  *      final too (nothing can be higher).
  *   3. Otherwise the grading call runs, including when the phrase filter or the classifier already
@@ -293,7 +295,11 @@ export async function runCheckInSafety(
 
   // Only what the person typed goes to the classifier. The question and theme are AI-written and are
   // sent back by the browser; they stay covered by the phrase filter and the grading call, as before.
-  const classify = await runSafetyClassify(groq, model, [input.answer], deps);
+  // An answer that is EXACTLY one of the three preset buttons has no words of the person's own, and the
+  // classifier (which sees the answer without the question) read the "failed" button as sadness. That one
+  // signal is counted as 0 without the call. Anything else, even a label plus one word, still goes to the
+  // classifier. The phrase filter, the grading call and its own level are unchanged for every answer.
+  const classify = isCheckInChipAnswer(input.answer) ? 0 : await runSafetyClassify(groq, model, [input.answer], deps);
   const pre = combineSignals({ rule: ruleLevel, classify });
   if (pre.kind === "unavailable") return { kind: "unavailable", signals: { rule: ruleLevel, classify, inCall: null } };
   if (pre.level === 2) return { kind: "flagged", level: 2, signals: { rule: ruleLevel, classify, inCall: null } };
