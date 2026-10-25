@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getProComparisons } from "@/lib/arc-comparisons";
 import { addDays, todayKey } from "@/lib/arc-trend";
-import { computeTarget, MISSION_LENGTH, pickMissionCategory, toMissionView } from "@/lib/missions";
+import { computeTarget, MISSION_LENGTH, MISSIONS_PAUSED_MESSAGE, pickMissionCategory, toMissionView } from "@/lib/missions";
 import {
   advanceMission,
   buildMissionContext,
@@ -12,6 +12,7 @@ import {
   loadActiveMission,
   loadLatestFinishedMission,
 } from "@/lib/missions-server";
+import { getGentleState } from "@/lib/safety-server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,12 @@ export async function GET() {
   if ("error" in auth) return auth.error;
   const { supabase, userId } = auth;
   const today = todayKey();
+
+  // A pause is on (24 or 72 hours after a safety flag): do not settle, fail or write anything about the mission
+  // now. It settles normally on the first load after the pause. The card shows a calm note instead.
+  if ((await getGentleState(supabase, userId)).active) {
+    return NextResponse.json({ mission: null, canStart: false, paused: true }, { headers: { "Cache-Control": "no-store" } });
+  }
 
   const latest = await getLatestScores(supabase, userId);
   if (!latest) return NextResponse.json({ mission: null, canStart: false, reason: "Get roasted first to start a mission." });
@@ -62,6 +69,11 @@ export async function POST() {
   if ("error" in auth) return auth.error;
   const { supabase, userId } = auth;
   const today = todayKey();
+
+  // No new mission (and no AI call to write one) while Ember is paused.
+  if ((await getGentleState(supabase, userId)).active) {
+    return NextResponse.json({ error: MISSIONS_PAUSED_MESSAGE, paused: true }, { status: 409, headers: { "Cache-Control": "no-store" } });
+  }
 
   const latest = await getLatestScores(supabase, userId);
   if (!latest) return NextResponse.json({ error: "Get roasted first to start a mission." }, { status: 409 });

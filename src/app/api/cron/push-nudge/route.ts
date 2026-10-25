@@ -4,7 +4,7 @@ import { parseCategoryScores } from "@/lib/parse-category-scores";
 import { buildPushNudge } from "@/lib/roast-nudge";
 import { calculateStreak } from "@/lib/streak";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-import { getGentleUserIds } from "@/lib/safety-server";
+import { getPauseSummaries } from "@/lib/safety-server";
 import { sendPushNotification } from "@/lib/webpush";
 
 export const dynamic = "force-dynamic";
@@ -43,8 +43,9 @@ export async function GET(request: Request) {
   }
 
   const userIds = Array.from(new Set(subs.map((s) => s.user_id as string)));
-  // Users inside the 72-hour gentle window get no nudges at all (the copy here is streak / roast pressure).
-  const gentleUserIds = await getGentleUserIds(supabase);
+  // Users who are paused (24 or 72 hours after a safety flag, see lib/safety-pause.ts) get no nudges at all.
+  // For 3 days after a pause ends the nudge is a soft, plain line instead of the usual roast / streak copy.
+  const pauseSummaries = await getPauseSummaries(supabase);
   let notified = 0;
   let skipped = 0;
   let cleaned = 0;
@@ -52,7 +53,8 @@ export async function GET(request: Request) {
   for (const userId of userIds) {
     const userSubs = subs.filter((s) => s.user_id === userId);
 
-    if (gentleUserIds.has(userId)) {
+    const pause = pauseSummaries.get(userId);
+    if (pause?.paused) {
       skipped++;
       continue;
     }
@@ -86,7 +88,7 @@ export async function GET(request: Request) {
       achievements.first_running_joke_created?.unlocked_at && !achievements.running_joke_retired?.unlocked_at,
     );
 
-    const nudge = buildPushNudge({ streak, daysSinceLastActivity, latestScores, hasRunningJoke });
+    const nudge = buildPushNudge({ streak, daysSinceLastActivity, latestScores, hasRunningJoke, soft: pause?.softNudge === true });
 
     for (const sub of userSubs) {
       const result = await sendPushNotification(

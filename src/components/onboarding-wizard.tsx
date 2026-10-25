@@ -120,7 +120,8 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   // All three come from the server; the typed text is cleared as soon as one of them shows.
   const [safetyPage, setSafetyPage] = useState<SafetyPagePayload | null>(null);
   const [safetyUnavailable, setSafetyUnavailable] = useState(false);
-  const [gentleNotice, setGentleNotice] = useState(false);
+  // null = no pause; otherwise the whole minutes left, or null inside the object if the server could not say.
+  const [gentleNotice, setGentleNotice] = useState<{ minutesLeft: number | null } | null>(null);
 
   const generateFollowUpQuestion = async () => {
     setIsGeneratingFollowUp(true);
@@ -202,9 +203,9 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   const [workoutFrequency, setWorkoutFrequency] = useState("");
 
   /** Returns true if the response was a safety / gentle response and has been handled. */
-  function handleSafetyResponse(data: { safety?: SafetyPayload; gentle?: boolean } | null): boolean {
+  function handleSafetyResponse(data: { safety?: SafetyPayload; gentle?: boolean; minutesLeft?: number | null } | null): boolean {
     if (data?.gentle) {
-      setGentleNotice(true);
+      setGentleNotice({ minutesLeft: typeof data.minutesLeft === "number" ? data.minutesLeft : null });
     } else if (data?.safety?.kind === "page") {
       setSafetyPage(data.safety);
     } else if (data?.safety?.kind === "unavailable") {
@@ -302,7 +303,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
 
     clearTimeout(loadingTimeout);
 
-    const data = (await res.json()) as { id?: string; error?: string; code?: string; tier?: string; followUpQuestion?: string; requiresFollowUp?: boolean; newlyUnlockedAchievements?: string[]; safety?: SafetyPayload; gentle?: boolean };
+    const data = (await res.json()) as { id?: string; error?: string; code?: string; tier?: string; followUpQuestion?: string; requiresFollowUp?: boolean; newlyUnlockedAchievements?: string[]; safety?: SafetyPayload; gentle?: boolean; minutesLeft?: number | null };
     if (handleSafetyResponse(data)) return;
     const roastId =
       typeof data.id === "string" ? data.id.trim() : String(data.id ?? "");
@@ -401,7 +402,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "submit", category: checkInCategory, answer: followUpAnswer.trim(), activeTheme: checkInTheme, question: followUpQuestion, tone: selectedTone, persona: selectedPersona }),
       });
-      const data = await res.json() as { id?: string; error?: string; code?: string; tier?: string; newlyUnlockedAchievements?: string[]; safety?: SafetyPayload; gentle?: boolean };
+      const data = await res.json() as { id?: string; error?: string; code?: string; tier?: string; newlyUnlockedAchievements?: string[]; safety?: SafetyPayload; gentle?: boolean; minutesLeft?: number | null };
       if (handleSafetyResponse(data)) return;
       if (!res.ok || !data.id) {
         if (res.status === 429 && data.code === "daily_limit" && data.tier === "free") setUpgradeReason("daily_limit");
@@ -421,7 +422,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   }
 
   if (safetyPage) return <SafetyPage payload={safetyPage} />;
-  if (gentleNotice) return <GentleNotice />;
+  if (gentleNotice) return <GentleNotice minutesLeft={gentleNotice.minutesLeft} />;
   if (safetyUnavailable) {
     return (
       <SafetyUnavailable

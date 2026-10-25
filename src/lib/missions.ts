@@ -14,6 +14,9 @@ import type { CategoryScores } from "@/lib/roast-types";
 export const MISSION_LENGTH = 7;
 const NEEDS_WORK_PERCENTILE = 50;
 
+/** Shown instead of the mission while Ember is paused after a safety flag (the mission is not settled or failed meanwhile). */
+export const MISSIONS_PAUSED_MESSAGE = "Your mission is on hold while Ember takes a break. It picks up when Ember is back.";
+
 export type MissionStatus = "active" | "completed" | "failed" | "abandoned";
 export type MissionDayStatus = "pending" | "done" | "missed";
 export type MissionDay = {

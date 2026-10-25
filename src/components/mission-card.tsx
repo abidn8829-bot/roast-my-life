@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import type { MissionDay, MissionView } from "@/lib/missions";
+import { MISSIONS_PAUSED_MESSAGE, type MissionDay, type MissionView } from "@/lib/missions";
 import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 
-type MissionResponse = { mission: MissionView | null; canStart: boolean; reason?: string };
+type MissionResponse = { mission: MissionView | null; canStart: boolean; reason?: string; paused?: boolean };
 
 function DayPill({ day, isToday }: { day: MissionDay | { day: number; status: "upcoming" }; isToday: boolean }) {
   const status = day.status;
@@ -148,6 +148,11 @@ export function MissionCard({ isPro, variant, userEmail }: Props) {
   if (!isPro) return <LockedMission compact={variant === "compact"} userEmail={userEmail} />;
   if (loadError) return <p className="text-sm text-text-faint">Couldn&apos;t load your mission. Refresh to try again.</p>;
   if (!data) return <p className="text-sm text-text-faint">Loading your mission…</p>;
+
+  // Ember is paused after a safety flag: no mission, no day pills, no "failed" / "target missed" wording, no buttons.
+  if (data.paused) {
+    return <p className="rounded-xl border border-border bg-surface-3 px-4 py-3 text-sm text-text-muted">{MISSIONS_PAUSED_MESSAGE}</p>;
+  }
 
   const mission = data.mission;
   const active = mission?.status === "active" ? mission : null;
