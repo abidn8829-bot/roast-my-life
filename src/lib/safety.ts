@@ -55,12 +55,37 @@ export const UNAVAILABLE_TEXT = {
 } as const;
 
 export const GENTLE_TEXT = {
-  message: "Ember is taking a break from roasting for a few days. Be gentle with yourself.",
   back: "Back to dashboard",
 } as const;
 
-/** How long gentle mode lasts after a flag. */
-export const GENTLE_WINDOW_MS = 72 * 60 * 60 * 1000;
+// How long the pause lasts is decided by src/lib/safety-pause.ts (24 hours for every flag today). The words
+// below turn "minutes left" into plain language (they can also say "in 3 days" if a longer pause is ever set).
+
+/**
+ * "in 5 hours" / "in 24 hours" / "in 3 days". Always rounds UP, so the user is never told a shorter wait
+ * than the real one (49 hours left reads "in 3 days"). Under an hour: "in less than an hour".
+ */
+export function describePauseWait(minutesLeft: number): string {
+  if (!Number.isFinite(minutesLeft) || minutesLeft <= 0) return "very soon";
+  if (minutesLeft < 60) return "in less than an hour";
+  const hours = Math.ceil(minutesLeft / 60);
+  if (hours < 48) return hours === 1 ? "in 1 hour" : `in ${hours} hours`;
+  return `in ${Math.ceil(hours / 24)} days`;
+}
+
+/** The sentence on the Level 1 support page, or null when no pause is known (never promise a pause that is not there). */
+export function level1PauseLine(minutesLeft: number | null | undefined): string | null {
+  if (typeof minutesLeft !== "number" || !Number.isFinite(minutesLeft) || minutesLeft <= 0) return null;
+  return `Ember will be back ${describePauseWait(minutesLeft)}.`;
+}
+
+/** The text of the break notice a paused user sees when they come back to a roast or a check-in. */
+export function gentleNoticeText(minutesLeft: number | null | undefined): string {
+  const known = typeof minutesLeft === "number" && Number.isFinite(minutesLeft) && minutesLeft > 0;
+  return known
+    ? `Ember is taking a break from roasts and check-ins. It will be back ${describePauseWait(minutesLeft)}. Be gentle with yourself.`
+    : "Ember is taking a break from roasts and check-ins for now. Be gentle with yourself.";
+}
 
 /**
  * The three preset check-in buttons, in screen order. The only place their wording lives: the wizard renders
@@ -88,7 +113,15 @@ export type SafetyPagePayload = {
   /** Level 1 only: AI (or fallback) lines shown after the fixed opener. */
   lines: string[];
   inPakistan: boolean;
+  /**
+   * Level 1 only: minutes Ember is paused, read back from the database AFTER the flag was saved. Missing or
+   * null when no pause is confirmed (the flag could not be saved or read), and then the page says nothing about time.
+   */
+  pauseMinutes?: number | null;
 };
+
+/** What the roast / check-in gate answers while a pause is on. `minutesLeft` is null if it could not be worked out. */
+export type GentlePayload = { gentle: true; minutesLeft: number | null };
 export type SafetyUnavailablePayload = { kind: "unavailable" };
 export type SafetyPayload = SafetyPagePayload | SafetyUnavailablePayload;
 

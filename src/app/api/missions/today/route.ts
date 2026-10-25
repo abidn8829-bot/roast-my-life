@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { todayKey } from "@/lib/arc-trend";
-import { missionDayNumber, MISSION_LENGTH, settleMission, toMissionView, type MissionDay, type MissionDayStatus } from "@/lib/missions";
+import { missionDayNumber, MISSION_LENGTH, MISSIONS_PAUSED_MESSAGE, settleMission, toMissionView, type MissionDay, type MissionDayStatus } from "@/lib/missions";
 import { advanceMission, getLatestScores, getSubscriptionTier, loadActiveMission } from "@/lib/missions-server";
+import { getGentleState } from "@/lib/safety-server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,12 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if ((await getSubscriptionTier(supabase, user.id)) !== "pro") {
     return NextResponse.json({ error: "Missions are a Pro feature" }, { status: 403 });
+  }
+
+  // Marking a day settles the whole mission (missed days, finishing it), so nothing is written while Ember is
+  // paused after a safety flag. It settles normally after the pause.
+  if ((await getGentleState(supabase, user.id)).active) {
+    return NextResponse.json({ error: MISSIONS_PAUSED_MESSAGE, paused: true }, { status: 409, headers: { "Cache-Control": "no-store" } });
   }
 
   let body: { status?: unknown };

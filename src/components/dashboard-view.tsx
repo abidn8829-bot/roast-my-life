@@ -47,6 +47,8 @@ type Props = {
   newlyUnlockedAchievements: string[];
   isPro: boolean;
   userEmail?: string;
+  /** Ember is paused after a safety flag: no "keep it going" pressure on the streak banner. */
+  paused?: boolean;
 };
 
 const CATEGORY_LABELS: { key: keyof CategoryScores; label: string }[] = [
@@ -213,7 +215,7 @@ function AchievementCelebration({
   );
 }
 
-export function DashboardView({ name, roasts, scoreHistory, streak, longestStreak, achievements, newlyUnlockedAchievements, isPro, userEmail }: Props) {
+export function DashboardView({ name, roasts, scoreHistory, streak, longestStreak, achievements, newlyUnlockedAchievements, isPro, userEmail, paused = false }: Props) {
   const [celebrationQueue, setCelebrationQueue] = useState<string[]>([]);
   const [activeCelebration, setActiveCelebration] = useState<string | null>(null);
   const latest = roasts[0] ?? null;
@@ -312,7 +314,7 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
           <span className="text-xs font-semibold uppercase tracking-widest text-text-faint">
             day streak
           </span>
-          {!hasActivityToday && (
+          {!hasActivityToday && !paused && (
             <span className="text-[11px] text-text-faint">
               · keep it going today
             </span>
