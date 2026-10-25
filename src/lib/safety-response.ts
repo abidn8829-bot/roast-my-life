@@ -50,7 +50,7 @@ export function respondGentle(state: Pick<GentleState, "minutesLeft">) {
   return NextResponse.json(payload, { headers: NO_STORE });
 }
 
-/** Returns the pause response if this user is paused right now (24 or 72 hours, see safety-pause.ts), else null. READ ONLY. */
+/** Returns the pause response if this user is paused right now (24 hours, see safety-pause.ts), else null. READ ONLY. */
 export async function gentleGate(supabase: SupabaseClient, userId: string) {
   const state = await getGentleState(supabase, userId);
   return state.active ? respondGentle(state) : null;

@@ -42,7 +42,7 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  // Is Ember paused after a safety flag (24 or 72 hours, see lib/safety-pause.ts)? READ ONLY. If the read fails the
+  // Is Ember paused after a safety flag (24 hours, see lib/safety-pause.ts)? READ ONLY. If the read fails the
   // answer is "not paused" (fails open, as everywhere else).
   const paused = (await getGentleState(supabase, user.id)).active;
 

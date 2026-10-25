@@ -432,7 +432,7 @@ export type GentleState = {
   flaggedAt: string | null;
   /** When the pause ends (ISO). */
   until: string | null;
-  /** True when this is the longer pause earned by a repeat Level 1 flag. */
+  /** True when the deciding flag is a repeat Level 1 (today a repeat has the same 24 h pause; see safety-pause.ts). */
   repeat: boolean;
   /** Whole minutes left (rounded up), or null when not paused. */
   minutesLeft: number | null;

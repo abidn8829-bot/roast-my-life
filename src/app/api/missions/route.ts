@@ -35,7 +35,7 @@ export async function GET() {
   const { supabase, userId } = auth;
   const today = todayKey();
 
-  // A pause is on (24 or 72 hours after a safety flag): do not settle, fail or write anything about the mission
+  // A pause is on (24 hours after a safety flag): do not settle, fail or write anything about the mission
   // now. It settles normally on the first load after the pause. The card shows a calm note instead.
   if ((await getGentleState(supabase, userId)).active) {
     return NextResponse.json({ mission: null, canStart: false, paused: true }, { headers: { "Cache-Control": "no-store" } });

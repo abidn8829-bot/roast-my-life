@@ -16,7 +16,9 @@ import {
   REPEAT_WINDOW_HOURS,
   SOFT_NUDGE_HOURS,
   computePause,
+  DEFAULT_PAUSE_RULES,
   minutesLeft,
+  type PauseRules,
   type PauseFlag,
 } from "./safety-pause.ts";
 import { describePauseWait, gentleNoticeText, level1PauseLine } from "./safety.ts";
@@ -35,6 +37,11 @@ const hoursAgo = (h: number) => new Date(NOW - h * H).toISOString();
 /** An ISO timestamp this many minutes before NOW. */
 const minutesAgo = (m: number) => new Date(NOW - m * M).toISOString();
 const flag = (level: number, createdAt: string, fromContact?: boolean): PauseFlag => ({ level, createdAt, fromContact });
+// Every live pause is 24 hours. The calculator can still do longer pauses when it is given other lengths, so the tests
+// below marked "longer pauses" run it with the first version of stage 2 (Level 1: 24 h, Level 2: 72 h, repeat: 72 h).
+// That keeps the repeat / Level 2 logic proven for the day someone raises those numbers again.
+const LONG: PauseRules = { level1Hours: 24, level2Hours: 72, repeatHours: 72 };
+const computeLong = (flags: readonly PauseFlag[], now: number) => computePause(flags, now, LONG);
 // recordFlagAndReadPause reads the REAL clock (like the routes do), so tests that go through it seed rows relative to the real now.
 const realHoursAgo = (h: number) => new Date(Date.now() - h * H).toISOString();
 const realMinutesAgo = (m: number) => new Date(Date.now() - m * M).toISOString();
@@ -43,16 +50,17 @@ const realMinutesAgo = (m: number) => new Date(Date.now() - m * M).toISOString()
 // The constants
 // ---------------------------------------------------------------------------
 
-test("pause constants are the agreed numbers, and the database look-back covers the longest possible chain", () => {
+test("pause constants are the agreed numbers: every pause is 24 hours, and the database look-back covers the longest possible chain", () => {
   assert.equal(LEVEL1_PAUSE_HOURS, 24);
-  assert.equal(LEVEL2_PAUSE_HOURS, 72);
-  assert.equal(REPEAT_PAUSE_HOURS, 72);
+  assert.equal(LEVEL2_PAUSE_HOURS, 24);
+  assert.equal(REPEAT_PAUSE_HOURS, 24);
   assert.equal(REPEAT_WINDOW_HOURS, 72);
   assert.equal(REPEAT_MIN_GAP_MINUTES, 60);
   assert.equal(SOFT_NUDGE_HOURS, 72);
-  // the longest a flag can matter is its 72 h pause + the 72 h soft window = 144 h, and that flag may need an
-  // earlier Level 1 flag up to 72 h before it: 216 hours (9 days)
-  assert.equal(PAUSE_LOOKBACK_HOURS, 216);
+  assert.deepEqual(DEFAULT_PAUSE_RULES, { level1Hours: 24, level2Hours: 24, repeatHours: 24 });
+  // the longest a flag can matter is its 24 h pause + the 72 h soft window, and that flag may need an earlier
+  // Level 1 flag up to 72 h before it: 24 + 72 + 72 = 168 hours (7 days)
+  assert.equal(PAUSE_LOOKBACK_HOURS, 168);
 });
 
 // ---------------------------------------------------------------------------
@@ -111,14 +119,14 @@ test("Level 1: the pause ends exactly 24 hours after the flag (open at the bound
 // Level 2: 72 hours
 // ---------------------------------------------------------------------------
 
-test("Level 2 at 71 hours = still paused; at 73 hours = open again", () => {
-  const at71 = computePause([flag(2, hoursAgo(71))], NOW);
+test("longer pauses: Level 2 at 71 hours = still paused; at 73 hours = open again", () => {
+  const at71 = computeLong([flag(2, hoursAgo(71))], NOW);
   assert.equal(at71.paused, true);
   assert.equal(at71.level, 2);
   assert.equal(at71.repeat, false);
   assert.equal(at71.endsAt, new Date(NOW + 1 * H).toISOString());
 
-  const at73 = computePause([flag(2, hoursAgo(73))], NOW);
+  const at73 = computeLong([flag(2, hoursAgo(73))], NOW);
   assert.equal(at73.paused, false);
   assert.equal(at73.level, null);
   assert.equal(at73.softNudge, true); // the soft 3 days run AFTER the 72 h pause: until 144 h after the flag
@@ -128,11 +136,11 @@ test("Level 2 at 71 hours = still paused; at 73 hours = open again", () => {
 // Two Level 1 flags: the repeat rule
 // ---------------------------------------------------------------------------
 
-test("repeat Level 1: a second flag 71 hours after the first is a repeat; 73 hours after is not", () => {
+test("longer pauses: repeat Level 1: a second flag 71 hours after the first is a repeat; 73 hours after is not", () => {
   // first flag at T0, second flag at T0 + 71 h; NOW is 1 hour after the second
   const second71 = hoursAgo(1);
   const first71 = new Date(NOW - 1 * H - 71 * H).toISOString();
-  const r71 = computePause([flag(1, first71), flag(1, second71)], NOW);
+  const r71 = computeLong([flag(1, first71), flag(1, second71)], NOW);
   assert.equal(r71.paused, true);
   assert.equal(r71.repeat, true);
   assert.equal(r71.level, 1);
@@ -141,21 +149,21 @@ test("repeat Level 1: a second flag 71 hours after the first is a repeat; 73 hou
 
   // second flag at T0 + 73 h: the first one is too old to count
   const first73 = new Date(NOW - 1 * H - 73 * H).toISOString();
-  const r73 = computePause([flag(1, first73), flag(1, second71)], NOW);
+  const r73 = computeLong([flag(1, first73), flag(1, second71)], NOW);
   assert.equal(r73.paused, true);
   assert.equal(r73.repeat, false);
   assert.equal(r73.endsAt, new Date(NOW - 1 * H + 24 * H).toISOString()); // second flag + 24 h
 });
 
-test("repeat Level 1: a second flag 59 minutes after the first is NOT a repeat; 61 minutes after is", () => {
+test("longer pauses: repeat Level 1: a second flag 59 minutes after the first is NOT a repeat; 61 minutes after is", () => {
   const second = minutesAgo(10);
   const first59 = new Date(NOW - 10 * M - 59 * M).toISOString();
-  const r59 = computePause([flag(1, first59), flag(1, second)], NOW);
+  const r59 = computeLong([flag(1, first59), flag(1, second)], NOW);
   assert.equal(r59.repeat, false);
   assert.equal(r59.endsAt, new Date(NOW - 10 * M + 24 * H).toISOString());
 
   const first61 = new Date(NOW - 10 * M - 61 * M).toISOString();
-  const r61 = computePause([flag(1, first61), flag(1, second)], NOW);
+  const r61 = computeLong([flag(1, first61), flag(1, second)], NOW);
   assert.equal(r61.repeat, true);
   assert.equal(r61.endsAt, new Date(NOW - 10 * M + 72 * H).toISOString());
 });
@@ -170,20 +178,20 @@ test("repeat Level 1: both edges are inclusive (exactly 60 minutes and exactly 7
   assert.equal(computePause([flag(1, gap(72 * H + 1)), flag(1, second)], NOW).repeat, false);
 });
 
-test("repeat Level 1: the longer pause is measured from the SECOND flag, not the first", () => {
+test("longer pauses: repeat Level 1: the longer pause is measured from the SECOND flag, not the first", () => {
   // first 100 h ago, second 50 h ago (50 h apart). Second + 72 h = 22 h from now. First + 72 h would already be over.
-  const r = computePause([flag(1, hoursAgo(100)), flag(1, hoursAgo(50))], NOW);
+  const r = computeLong([flag(1, hoursAgo(100)), flag(1, hoursAgo(50))], NOW);
   assert.equal(r.paused, true);
   assert.equal(r.repeat, true);
   assert.equal(r.flaggedAt, hoursAgo(50));
   assert.equal(r.endsAt, new Date(NOW + 22 * H).toISOString());
   assert.equal(minutesLeft(r, NOW), 22 * 60);
   // once that is over the user is open again
-  assert.equal(computePause([flag(1, hoursAgo(100)), flag(1, hoursAgo(73))], NOW).paused, false);
+  assert.equal(computeLong([flag(1, hoursAgo(100)), flag(1, hoursAgo(73))], NOW).paused, false);
 });
 
-test("repeat Level 1: two flags 2 hours apart = 72 hours from the second; three quick flags: only the one 60+ minutes after the first is a repeat", () => {
-  const r = computePause([flag(1, hoursAgo(3)), flag(1, hoursAgo(1))], NOW);
+test("longer pauses: repeat Level 1: two flags 2 hours apart = 72 hours from the second; three quick flags: only the one 60+ minutes after the first is a repeat", () => {
+  const r = computeLong([flag(1, hoursAgo(3)), flag(1, hoursAgo(1))], NOW);
   assert.equal(r.repeat, true);
   assert.equal(r.endsAt, new Date(NOW - 1 * H + 72 * H).toISOString());
 
@@ -193,8 +201,8 @@ test("repeat Level 1: two flags 2 hours apart = 72 hours from the second; three 
   const t1 = t2 - 30 * M; // 30 min before the second (90 before the third)
   const flags = [flag(1, new Date(t1).toISOString()), flag(1, new Date(t2).toISOString()), flag(1, new Date(t3).toISOString())];
   // the second is only 30 min after the first = not a repeat; the third is 90 min after the first = a repeat
-  assert.equal(computePause(flags.slice(0, 2), NOW).repeat, false);
-  const all = computePause(flags, NOW);
+  assert.equal(computeLong(flags.slice(0, 2), NOW).repeat, false);
+  const all = computeLong(flags, NOW);
   assert.equal(all.repeat, true);
   assert.equal(all.flaggedAt, new Date(t3).toISOString());
 });
@@ -214,8 +222,8 @@ test("the answer does not depend on the order the flags arrive in, and the input
 // Level 1 and Level 2 together: the LATEST end wins
 // ---------------------------------------------------------------------------
 
-test("Level 1 then Level 2: the Level 2 pause (72 h from the Level 2 flag) wins", () => {
-  const r = computePause([flag(1, hoursAgo(10)), flag(2, hoursAgo(5))], NOW);
+test("longer pauses: Level 1 then Level 2: the Level 2 pause (72 h from the Level 2 flag) wins", () => {
+  const r = computeLong([flag(1, hoursAgo(10)), flag(2, hoursAgo(5))], NOW);
   assert.equal(r.paused, true);
   assert.equal(r.level, 2);
   assert.equal(r.repeat, false);
@@ -223,12 +231,12 @@ test("Level 1 then Level 2: the Level 2 pause (72 h from the Level 2 flag) wins"
   assert.equal(r.endsAt, new Date(NOW - 5 * H + 72 * H).toISOString());
 });
 
-test("Level 2 then a later Level 1: the Level 2 pause is still the one that ends last", () => {
-  const r = computePause([flag(2, hoursAgo(30)), flag(1, hoursAgo(1))], NOW);
+test("longer pauses: Level 2 then a later Level 1: the Level 2 pause is still the one that ends last", () => {
+  const r = computeLong([flag(2, hoursAgo(30)), flag(1, hoursAgo(1))], NOW);
   assert.equal(r.level, 2);
   assert.equal(r.endsAt, new Date(NOW - 30 * H + 72 * H).toISOString()); // 42 h left, not the Level 1 flag's 23 h
   // when the Level 2 pause is over but the later Level 1 flag is still inside its 24 h, the Level 1 pause takes over
-  const later = computePause([flag(2, hoursAgo(73)), flag(1, hoursAgo(2))], NOW);
+  const later = computeLong([flag(2, hoursAgo(73)), flag(1, hoursAgo(2))], NOW);
   assert.equal(later.level, 1);
   assert.equal(later.endsAt, new Date(NOW - 2 * H + 24 * H).toISOString());
 });
@@ -252,8 +260,8 @@ test("a contact-form Level 1 flag starts a normal 24 h pause on its own", () => 
   assert.equal(computePause([flag(1, hoursAgo(25), true)], NOW).paused, false);
 });
 
-test("a contact-form Level 2 flag is a normal Level 2 pause (72 h)", () => {
-  const r = computePause([flag(2, hoursAgo(71), true)], NOW);
+test("longer pauses: a contact-form Level 2 flag is a normal Level 2 pause (72 h)", () => {
+  const r = computeLong([flag(2, hoursAgo(71), true)], NOW);
   assert.equal(r.paused, true);
   assert.equal(r.level, 2);
 });
@@ -307,35 +315,90 @@ test("softNudge: starts at the flag, lasts through the pause, and ends 3 days AF
   assert.equal(computePause([flag(1, hoursAgo(80))], NOW).softNudge, true);
 });
 
-test("softNudge: a Level 2 or a repeat Level 1 (72 h pause) is soft for 72 h + 3 days = 144 h from the flag", () => {
-  assert.equal(computePause([flag(2, hoursAgo(143))], NOW).softNudge, true);
-  assert.equal(computePause([flag(2, hoursAgo(145))], NOW).softNudge, false);
-  assert.equal(computePause([flag(2, hoursAgo(144))], NOW).softNudge, false);
-  assert.equal(computePause([flag(2, hoursAgo(100))], NOW).softUntil, new Date(NOW - 100 * H + 144 * H).toISOString());
+test("longer pauses: softNudge: a Level 2 or a repeat Level 1 (72 h pause) is soft for 72 h + 3 days = 144 h from the flag", () => {
+  assert.equal(computeLong([flag(2, hoursAgo(143))], NOW).softNudge, true);
+  assert.equal(computeLong([flag(2, hoursAgo(145))], NOW).softNudge, false);
+  assert.equal(computeLong([flag(2, hoursAgo(144))], NOW).softNudge, false);
+  assert.equal(computeLong([flag(2, hoursAgo(100))], NOW).softUntil, new Date(NOW - 100 * H + 144 * H).toISOString());
 
   // repeat: the second flag is 100 h old, the first was 70 h before it (170 h old). The repeat pause (72 h) ended
   // 28 h ago and the soft window runs to second flag + 144 h = 44 h from now ...
-  const repeat = computePause([flag(1, hoursAgo(170)), flag(1, hoursAgo(100))], NOW);
+  const repeat = computeLong([flag(1, hoursAgo(170)), flag(1, hoursAgo(100))], NOW);
   assert.equal(repeat.paused, false);
   assert.equal(repeat.softNudge, true);
   assert.equal(repeat.softUntil, new Date(NOW - 100 * H + 144 * H).toISOString());
   // ... while the same second flag on its own (a plain 24 h pause) is already past its 96 h
-  assert.equal(computePause([flag(1, hoursAgo(100))], NOW).softNudge, false);
+  assert.equal(computeLong([flag(1, hoursAgo(100))], NOW).softNudge, false);
 });
 
-test("softNudge: contact-form flags count (they start a pause); several flags use the LATEST pause end; no flags = never soft", () => {
-  assert.equal(computePause([flag(1, hoursAgo(90), true)], NOW).softNudge, true);
-  assert.equal(computePause([flag(1, hoursAgo(97), true)], NOW).softNudge, false);
+test("longer pauses: softNudge: contact-form flags count (they start a pause); several flags use the LATEST pause end; no flags = never soft", () => {
+  assert.equal(computeLong([flag(1, hoursAgo(90), true)], NOW).softNudge, true);
+  assert.equal(computeLong([flag(1, hoursAgo(97), true)], NOW).softNudge, false);
   // an old Level 2 (soft long over) followed by a recent Level 1: the Level 1's window is the one that counts
-  const mixed = computePause([flag(2, hoursAgo(200)), flag(1, hoursAgo(10))], NOW);
+  const mixed = computeLong([flag(2, hoursAgo(200)), flag(1, hoursAgo(10))], NOW);
   assert.equal(mixed.softUntil, new Date(NOW - 10 * H + 96 * H).toISOString());
   // a recent Level 2 followed by an older-ending Level 1: the later end wins
-  const l2 = computePause([flag(2, hoursAgo(60)), flag(1, hoursAgo(50))], NOW);
+  const l2 = computeLong([flag(2, hoursAgo(60)), flag(1, hoursAgo(50))], NOW);
   assert.equal(l2.softUntil, new Date(NOW - 60 * H + 144 * H).toISOString());
-  const none = computePause([], NOW);
+  const none = computeLong([], NOW);
   assert.equal(none.softNudge, false);
   assert.equal(none.softUntil, null);
-  assert.equal(computePause([flag(1, hoursAgo(200))], NOW).softUntil, null);
+  assert.equal(computeLong([flag(1, hoursAgo(200))], NOW).softUntil, null);
+});
+
+test("every pause is 24 hours: Level 1, Level 2 and a repeat Level 1 (decision: a longer pause would hurt retention)", () => {
+  for (const level of [1, 2]) {
+    const at23 = computePause([flag(level, hoursAgo(23))], NOW);
+    assert.equal(at23.paused, true, `level ${level} at 23 h`);
+    assert.equal(at23.level, level);
+    assert.equal(minutesLeft(at23, NOW), 60);
+    assert.equal(computePause([flag(level, hoursAgo(24))], NOW).paused, false, `level ${level}: open at exactly 24 h`);
+    assert.equal(computePause([flag(level, hoursAgo(25))], NOW).paused, false, `level ${level} at 25 h`);
+    assert.equal(computePause([flag(level, hoursAgo(71))], NOW).paused, false, `level ${level} at 71 h (was paused when Level 2 was 72 h)`);
+  }
+});
+
+test("a repeat Level 1 is still DETECTED, but its pause is 24 hours from the second flag, never 3 days", () => {
+  // a real user: first flag, the 24 h pause ends, comes back 26 h later and says it again
+  const comeback = computePause([flag(1, hoursAgo(27)), flag(1, hoursAgo(1))], NOW);
+  assert.equal(comeback.paused, true);
+  assert.equal(comeback.repeat, true);
+  assert.equal(comeback.endsAt, new Date(NOW - 1 * H + 24 * H).toISOString());
+  assert.equal(minutesLeft(comeback, NOW), 23 * 60);
+  // two flags 2 hours apart: same, 24 h from the second one
+  const close = computePause([flag(1, hoursAgo(3)), flag(1, hoursAgo(1))], NOW);
+  assert.equal(close.repeat, true);
+  assert.equal(minutesLeft(close, NOW), 23 * 60);
+  // the repeat rule's edges are unchanged: 59 minutes apart is not a repeat, 73 hours apart is not
+  assert.equal(computePause([flag(1, new Date(NOW - 10 * M - 59 * M).toISOString()), flag(1, minutesAgo(10))], NOW).repeat, false);
+  assert.equal(computePause([flag(1, new Date(NOW - 1 * H - 73 * H).toISOString()), flag(1, hoursAgo(1))], NOW).repeat, false);
+  // a Level 1 after a Level 2: the later end wins
+  const mixed = computePause([flag(2, hoursAgo(5)), flag(1, hoursAgo(1))], NOW);
+  assert.equal(mixed.level, 1);
+  assert.equal(minutesLeft(mixed, NOW), 23 * 60);
+  const l2later = computePause([flag(1, hoursAgo(10)), flag(2, hoursAgo(5))], NOW);
+  assert.equal(l2later.level, 2);
+  assert.equal(minutesLeft(l2later, NOW), 19 * 60);
+});
+
+test("nudges stay soft for 3 days after the 24 hour pause = 96 hours from the flag, for Level 1, Level 2, a repeat and the contact form", () => {
+  for (const flags of [
+    [flag(1, hoursAgo(95))],
+    [flag(2, hoursAgo(95))],
+    [flag(1, hoursAgo(120)), flag(1, hoursAgo(95))],
+    [flag(1, hoursAgo(95), true)],
+  ]) {
+    assert.equal(computePause(flags, NOW).softNudge, true);
+  }
+  for (const flags of [
+    [flag(1, hoursAgo(97))],
+    [flag(2, hoursAgo(97))],
+    [flag(1, hoursAgo(130)), flag(1, hoursAgo(97))],
+    [flag(1, hoursAgo(97), true)],
+  ]) {
+    assert.equal(computePause(flags, NOW).softNudge, false);
+  }
+  assert.equal(computePause([flag(2, hoursAgo(30))], NOW).softUntil, new Date(NOW - 30 * H + 96 * H).toISOString());
 });
 
 test("minutesLeft rounds UP to a whole minute and never goes negative", () => {
@@ -520,38 +583,37 @@ test("getGentleState: Level 1 at 23 hours = paused (60 minutes left); at 25 hour
   assert.equal(at25.softNudge, true);
 });
 
-test("getGentleState: two Level 1 flags 2 hours apart = the 72 hour pause, counted from the second", async () => {
+test("getGentleState: two Level 1 flags 2 hours apart = still a 24 hour pause, counted from the second flag (the repeat is detected, it does not lengthen anything)", async () => {
   const s = await getGentleState(fakeDb({ rows: [row("u1", 1, hoursAgo(3)), row("u1", 1, hoursAgo(1))] }).client, "u1", NOW);
   assert.equal(s.active, true);
   assert.equal(s.repeat, true);
   assert.equal(s.level, 1);
-  assert.equal(s.minutesLeft, 71 * 60);
-  assert.equal(s.until, new Date(NOW - 1 * H + 72 * H).toISOString());
+  assert.equal(s.minutesLeft, 23 * 60);
+  assert.equal(s.until, new Date(NOW - 1 * H + 24 * H).toISOString());
 });
 
-test("getGentleState: a repeat flag finds its earlier flag even when that one is 170 hours old (look-back is 216 hours), and the soft window follows", async () => {
-  // second flag 70 h ago, first flag 140 h ago (70 h earlier): a repeat, paused, 2 hours left
-  const s = await getGentleState(fakeDb({ rows: [row("u1", 1, hoursAgo(140)), row("u1", 1, hoursAgo(70))] }).client, "u1", NOW);
-  assert.equal(s.active, true);
-  assert.equal(s.repeat, true);
-  assert.equal(s.minutesLeft, 2 * 60);
-  // second flag 100 h ago, first flag 170 h ago: the 72 h pause is over, but the soft window (to 144 h) still runs.
-  // That needs the 170-hour-old flag to be read: a 144-hour look-back would have missed it and said "not soft".
-  const soft = await getGentleState(fakeDb({ rows: [row("u1", 1, hoursAgo(170)), row("u1", 1, hoursAgo(100))] }).client, "u1", NOW);
-  assert.equal(soft.active, false);
-  assert.equal(soft.softNudge, true);
-  // the same second flag alone: soft is over (96 h)
-  const alone = await getGentleState(fakeDb({ rows: [row("u1", 1, hoursAgo(100))] }).client, "u1", NOW);
-  assert.equal(alone.softNudge, false);
+test("getGentleState: nudges stay soft until 96 hours after a flag, and a flag older than that is just history", async () => {
+  const at95 = await getGentleState(fakeDb({ rows: [row("u1", 1, hoursAgo(95))] }).client, "u1", NOW);
+  assert.equal(at95.active, false);
+  assert.equal(at95.softNudge, true);
+  const at100 = await getGentleState(fakeDb({ rows: [row("u1", 1, hoursAgo(100))] }).client, "u1", NOW);
+  assert.equal(at100.softNudge, false);
+  // a repeat is still found when the earlier flag is 70 h before the second one (the second flag 2 h ago)
+  const repeat = await getGentleState(fakeDb({ rows: [row("u1", 1, hoursAgo(72)), row("u1", 1, hoursAgo(2))] }).client, "u1", NOW);
+  assert.equal(repeat.repeat, true);
+  assert.equal(repeat.minutesLeft, 22 * 60);
 });
 
-test("getGentleState: Level 2 at 71 hours = paused; at 73 hours = open", async () => {
-  const at71 = await getGentleState(fakeDb({ rows: [row("u1", 2, hoursAgo(71))] }).client, "u1", NOW);
-  assert.equal(at71.active, true);
-  assert.equal(at71.level, 2);
-  assert.equal(at71.minutesLeft, 60);
-  const at73 = await getGentleState(fakeDb({ rows: [row("u1", 2, hoursAgo(73))] }).client, "u1", NOW);
-  assert.equal(at73.active, false);
+test("getGentleState: Level 2 at 23 hours = paused (60 minutes left); at 25 hours = open (nudges still soft)", async () => {
+  const at23 = await getGentleState(fakeDb({ rows: [row("u1", 2, hoursAgo(23))] }).client, "u1", NOW);
+  assert.equal(at23.active, true);
+  assert.equal(at23.level, 2);
+  assert.equal(at23.minutesLeft, 60);
+  const at25 = await getGentleState(fakeDb({ rows: [row("u1", 2, hoursAgo(25))] }).client, "u1", NOW);
+  assert.equal(at25.active, false);
+  assert.equal(at25.softNudge, true);
+  // the old 72 h Level 2 pause is gone: 71 hours after a Level 2 the user is not paused
+  assert.equal((await getGentleState(fakeDb({ rows: [row("u1", 2, hoursAgo(71))] }).client, "u1", NOW)).active, false);
 });
 
 test("getGentleState: a contact-form flag pauses, but two of them (or one plus a check-in flag) are not a repeat", async () => {
@@ -648,7 +710,7 @@ test("recordFlag: before migration 030 a contact flag is still saved (without th
 // recordFlagAndReadPause: what the Level 1 page is told
 // ---------------------------------------------------------------------------
 
-test("recordFlagAndReadPause: a first Level 1 flag = 24 hours (1440 minutes); a second one 2 hours later = 3 days (4320 minutes)", async () => {
+test("recordFlagAndReadPause: a first Level 1 flag = 24 hours (1440 minutes); a second one 2 hours later is ALSO 24 hours (no 3 day pause)", async () => {
   const first = fakeDb();
   const a = await recordFlagAndReadPause(first.client, "u1", 1);
   assert.equal(a.saved, true);
@@ -657,23 +719,24 @@ test("recordFlagAndReadPause: a first Level 1 flag = 24 hours (1440 minutes); a 
   const second = fakeDb({ rows: [row("u1", 1, realHoursAgo(2))] });
   const b = await recordFlagAndReadPause(second.client, "u1", 1);
   assert.equal(b.saved, true);
-  assert.equal(b.minutesLeft, 72 * 60);
+  assert.equal(b.minutesLeft, 24 * 60);
+  // the page for a Level 2 flag is read back the same way
+  const l2 = await recordFlagAndReadPause(fakeDb().client, "u1", 2);
+  assert.equal(l2.minutesLeft, 24 * 60);
 });
 
-test("recordFlagAndReadPause: a quick retype (second Level 1 under 60 minutes later) is still 24 hours", async () => {
+test("recordFlagAndReadPause: a retype 30 minutes or 61 minutes after the first flag is a 24 hour pause either way", async () => {
   const db = fakeDb({ rows: [row("u1", 1, realMinutesAgo(30))] });
   assert.equal((await recordFlagAndReadPause(db.client, "u1", 1)).minutesLeft, 24 * 60);
-  // ... while the same flag 61 minutes earlier IS a repeat (proves the seed is inside the look-back and the rule is live)
   const later = fakeDb({ rows: [row("u1", 1, realMinutesAgo(61))] });
-  assert.equal((await recordFlagAndReadPause(later.client, "u1", 1)).minutesLeft, 72 * 60);
+  assert.equal((await recordFlagAndReadPause(later.client, "u1", 1)).minutesLeft, 24 * 60);
 });
 
-test("recordFlagAndReadPause: a contact-form Level 1 after a check-in Level 1 is 24 hours, not 72", async () => {
+test("recordFlagAndReadPause: a contact-form Level 1 after a check-in Level 1 is 24 hours, and so is the same pair without the contact marker", async () => {
   const db = fakeDb({ rows: [row("u1", 1, realHoursAgo(2))] });
   assert.equal((await recordFlagAndReadPause(db.client, "u1", 1, { fromContact: true })).minutesLeft, 24 * 60);
-  // ... and the same two flags WITHOUT the contact marker are a repeat
   const plain = fakeDb({ rows: [row("u1", 1, realHoursAgo(2))] });
-  assert.equal((await recordFlagAndReadPause(plain.client, "u1", 1)).minutesLeft, 72 * 60);
+  assert.equal((await recordFlagAndReadPause(plain.client, "u1", 1)).minutesLeft, 24 * 60);
 });
 
 test("recordFlagAndReadPause: if the flag was NOT saved the page is told nothing about time, and no read is made", async () => {
@@ -698,17 +761,17 @@ test("getPauseSummaries: paused users and users inside the 3 soft days are liste
     rows: [
       row("paused-l1", 1, hoursAgo(5)),
       row("open-but-soft", 1, hoursAgo(30)),
-      row("paused-l2", 2, hoursAgo(70)),
-      row("repeat", 1, hoursAgo(100)),
-      row("repeat", 1, hoursAgo(50)),
-      row("soft-after-l2", 2, hoursAgo(100)),
+      row("paused-l2", 2, hoursAgo(20)),
+      row("repeat", 1, hoursAgo(3)),
+      row("repeat", 1, hoursAgo(1)),
+      row("soft-after-l2", 2, hoursAgo(80)),
       row("soft-after-l1", 1, hoursAgo(80)),
       row("old", 1, hoursAgo(100)),
-      row("old-l2", 2, hoursAgo(150)),
+      row("old-l2", 2, hoursAgo(100)),
     ],
   });
   const summaries = await getPauseSummaries(db.client, NOW);
-  // "old" (Level 1, 100 h ago) is past 24 h + 3 days; "old-l2" (Level 2, 150 h ago) is past 72 h + 3 days
+  // "old" and "old-l2" are past their 24 h pause + 3 days (96 h)
   assert.deepEqual([...summaries.keys()].sort(), ["open-but-soft", "paused-l1", "paused-l2", "repeat", "soft-after-l1", "soft-after-l2"]);
   assert.deepEqual(summaries.get("soft-after-l2"), { paused: false, until: null, softNudge: true });
   assert.equal(summaries.get("soft-after-l1")!.softNudge, true);
@@ -718,6 +781,7 @@ test("getPauseSummaries: paused users and users inside the 3 soft days are liste
   assert.equal(summaries.get("paused-l2")!.paused, true);
   assert.equal(summaries.get("repeat")!.paused, true);
   assert.equal(summaries.has("old"), false);
+  assert.equal(summaries.has("old-l2"), false);
 
   const ids = await getGentleUserIds(db.client, NOW);
   assert.deepEqual([...ids].sort(), ["paused-l1", "paused-l2", "repeat"]);

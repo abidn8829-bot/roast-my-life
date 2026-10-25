@@ -82,7 +82,7 @@ async function handlePost(request: Request, slot: { release: () => void }) {
   let body: Record<string, unknown>;
   try { body = await request.json() as Record<string, unknown>; } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  // Gentle mode (72 hours after a safety flag): no check-in questions, no grading, no roasts.
+  // Pause (24 hours after a safety flag): no check-in questions, no grading, no roasts.
   // Enforced here, before any AI call, whatever the browser shows.
   const gentle = await gentleGate(supabase, user.id);
   if (gentle) return gentle;

@@ -58,8 +58,8 @@ export const GENTLE_TEXT = {
   back: "Back to dashboard",
 } as const;
 
-// How long the pause lasts is decided by src/lib/safety-pause.ts (24 hours for Level 1, 72 hours for
-// Level 2 or a repeat Level 1). The words below turn "minutes left" into plain language.
+// How long the pause lasts is decided by src/lib/safety-pause.ts (24 hours for every flag today). The words
+// below turn "minutes left" into plain language (they can also say "in 3 days" if a longer pause is ever set).
 
 /**
  * "in 5 hours" / "in 24 hours" / "in 3 days". Always rounds UP, so the user is never told a shorter wait

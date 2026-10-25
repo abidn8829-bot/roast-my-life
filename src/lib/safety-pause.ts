@@ -2,23 +2,28 @@
 // recent flags and "now", and returns the answer. No database, no clock of its own, no I/O, no text.
 // (No "@/" imports on purpose: src/lib/*.test.ts and scripts/safety-eval.mjs import this with Node.)
 //
-// The rule:
+// The rule (decision: EVERY pause is 24 hours; a longer pause would hurt retention):
 //   Level 1 flag               closed for 24 hours from that flag
-//   Level 2 flag               closed for 72 hours from that flag
-//   a "repeat" Level 1 flag    closed for 72 hours from that (second) flag. A Level 1 flag is a repeat when
+//   Level 2 flag               closed for 24 hours from that flag
+//   a "repeat" Level 1 flag    closed for 24 hours from that (second) flag. A Level 1 flag is a repeat when
 //                              an EARLIER Level 1 flag exists that is at least 60 minutes before it and no
 //                              more than 72 hours before it. Flags from the contact form never count as
 //                              either of the two Level 1 flags (they still start a normal pause on their own).
 //   The pause ends at the LATEST of all of those ends. Not paused once that moment has passed.
-//   Nudges stay SOFT for 3 days AFTER that end: a Level 1 flag = 24 h pause + 3 days, a repeat Level 1 or a
-//   Level 2 = 72 h pause + 3 days. (The same "latest end" as above, so there is only one copy of the rule.)
+//   Nudges stay SOFT for 3 days AFTER that end (24 h pause + 3 days = 96 h from the flag).
+//
+// The three lengths are separate numbers on purpose. Today they are all 24, so a repeat does not lengthen the
+// pause, but the repeat detection stays in place: raising LEVEL2_PAUSE_HOURS or REPEAT_PAUSE_HOURS brings back
+// a longer pause with no other change. computePause takes the lengths as an optional last argument (default =
+// the numbers below) so the tests can keep proving that the longer-pause logic still works.
 
 import type { FlagLevel } from "./safety.ts";
 
 export const LEVEL1_PAUSE_HOURS = 24;
-export const LEVEL2_PAUSE_HOURS = 72;
-/** The longer pause a repeat Level 1 flag earns, counted from the second flag. */
-export const REPEAT_PAUSE_HOURS = 72;
+/** Was 72 in the first version of stage 2. All pauses are 24 hours now (retention). */
+export const LEVEL2_PAUSE_HOURS = 24;
+/** The pause a repeat Level 1 flag earns, counted from the second flag. Was 72; now the same 24 as a first flag. */
+export const REPEAT_PAUSE_HOURS = 24;
 /** A second Level 1 flag only counts as a repeat if the first one is at most this far before it. */
 export const REPEAT_WINDOW_HOURS = 72;
 /** ... and at least this far before it (a quick retype in the same sitting is not a repeat). */
@@ -29,10 +34,18 @@ export const SOFT_NUDGE_HOURS = 72;
 const HOUR_MS = 3_600_000;
 const MINUTE_MS = 60_000;
 
+/** The three pause lengths (hours). The live values are the constants above. */
+export type PauseRules = { level1Hours: number; level2Hours: number; repeatHours: number };
+export const DEFAULT_PAUSE_RULES: PauseRules = {
+  level1Hours: LEVEL1_PAUSE_HOURS,
+  level2Hours: LEVEL2_PAUSE_HOURS,
+  repeatHours: REPEAT_PAUSE_HOURS,
+};
+
 /**
  * How far back the database must be read so the answer is right. The latest a flag can still matter is the end of
- * its longest pause (72 h) plus the soft window (3 days) = 144 h after the flag, and a repeat flag needs its
- * earlier Level 1 flag up to 72 h before it. (216 hours = 9 days today. Derived from the constants above, so
+ * its longest pause plus the soft window (3 days) after the flag, and a repeat flag needs its earlier Level 1
+ * flag up to 72 h before it. (24 + 72 + 72 = 168 hours = 7 days today. Derived from the constants above, so
  * changing one changes this.)
  */
 export const PAUSE_LOOKBACK_HOURS =
@@ -102,7 +115,7 @@ function isRepeat(flag: Parsed, all: readonly Parsed[]): boolean {
  * The pause for one user. `now` is epoch ms (pass Date.now() or a fixed number in tests).
  * Never throws; flags it cannot read are ignored; the input is not changed.
  */
-export function computePause(flags: readonly PauseFlag[], now: number): PauseResult {
+export function computePause(flags: readonly PauseFlag[], now: number, rules: PauseRules = DEFAULT_PAUSE_RULES): PauseResult {
   if (!Number.isFinite(now)) return NOT_PAUSED;
   const parsed = parseFlags(flags);
   if (parsed.length === 0) return NOT_PAUSED;
@@ -123,12 +136,12 @@ export function computePause(flags: readonly PauseFlag[], now: number): PauseRes
 
   for (const flag of parsed) {
     if (flag.level === 2) {
-      consider(flag.ms + LEVEL2_PAUSE_HOURS * HOUR_MS, 2, false, flag.ms);
+      consider(flag.ms + rules.level2Hours * HOUR_MS, 2, false, flag.ms);
       continue;
     }
-    consider(flag.ms + LEVEL1_PAUSE_HOURS * HOUR_MS, 1, false, flag.ms);
+    consider(flag.ms + rules.level1Hours * HOUR_MS, 1, false, flag.ms);
     // The repeat pause is measured from THIS (second) flag, never from the first.
-    if (isRepeat(flag, parsed)) consider(flag.ms + REPEAT_PAUSE_HOURS * HOUR_MS, 1, true, flag.ms);
+    if (isRepeat(flag, parsed)) consider(flag.ms + rules.repeatHours * HOUR_MS, 1, true, flag.ms);
   }
 
   const newest = parsed[parsed.length - 1]!.ms;

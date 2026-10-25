@@ -43,7 +43,7 @@ export async function GET(request: Request) {
   }
 
   const userIds = Array.from(new Set(subs.map((s) => s.user_id as string)));
-  // Users who are paused (24 or 72 hours after a safety flag, see lib/safety-pause.ts) get no nudges at all.
+  // Users who are paused (24 hours after a safety flag, see lib/safety-pause.ts) get no nudges at all.
   // For 3 days after a pause ends the nudge is a soft, plain line instead of the usual roast / streak copy.
   const pauseSummaries = await getPauseSummaries(supabase);
   let notified = 0;

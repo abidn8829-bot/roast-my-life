@@ -35,7 +35,7 @@ export type PushNudgeInput = {
   latestScores: CategoryScores | null;
   hasRunningJoke: boolean;
   /**
-   * True for 3 days AFTER a safety pause ends (24 h pause + 3 days, or 72 h pause + 3 days). Gives a warm, plain
+   * True for 3 days AFTER a safety pause ends (24 h pause + 3 days = 96 h after the flag). Gives a warm, plain
    * line with no roast voice, no streak, no grades and no question about habits. (Users who are paused get no
    * nudge at all: the cron skips them before this.)
    */

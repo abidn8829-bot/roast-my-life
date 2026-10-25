@@ -286,7 +286,7 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Gentle mode (72 hours after a safety flag): no roasts. Enforced here, before any AI call.
+  // Pause (24 hours after a safety flag): no roasts. Enforced here, before any AI call.
   const gentle = await gentleGate(supabase, user.id);
   if (gentle) return gentle;
 
