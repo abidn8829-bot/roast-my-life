@@ -10,7 +10,6 @@ import type Groq from "groq-sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { logGroqError } from "./groq-error.ts";
 import {
-  GENTLE_WINDOW_MS,
   clip,
   combineSignals,
   isCheckInChipAnswer,
@@ -19,6 +18,7 @@ import {
   type FlagLevel,
   type SafetyLevel,
 } from "./safety.ts";
+import { PAUSE_LOOKBACK_MS, computePause, minutesLeft as pauseMinutesLeft, type PauseFlag } from "./safety-pause.ts";
 
 export const SAFETY_MODEL = "openai/gpt-oss-120b";
 
@@ -357,7 +357,11 @@ export async function generateSupportLines(groq: Groq, model: string, texts: str
 }
 
 // ---------------------------------------------------------------------------
-// Flags and gentle mode (table: public.safety_flags, migration 029)
+// Flags and the pause (table: public.safety_flags, migrations 029 and 030)
+//
+// How long Ember stays quiet is decided by ONE pure function, computePause (src/lib/safety-pause.ts).
+// Everything below only fetches flag rows and hands them to it, so the roast route, the check-in
+// route, the push-nudge cron, the weekly email and the dashboard can never disagree.
 // ---------------------------------------------------------------------------
 
 function errorCode(error: unknown): string {
@@ -366,17 +370,45 @@ function errorCode(error: unknown): string {
 }
 
 /**
- * Stores ONE flag row: user id, level, date. No text anywhere. `service` must be the
- * service-role client (browsers cannot insert). A failed insert is logged by code only and
- * must never stop the support page from being shown.
+ * True when the error means the from_contact column (migration 030) is not there yet: Postgres 42703
+ * "undefined column", or PostgREST PGRST204 "column not found in the schema cache". Used so that the code
+ * works whether it is deployed before or after that migration. The error text itself is never logged.
+ */
+function isMissingFromContact(error: unknown): boolean {
+  const code = errorCode(error);
+  if (code === "42703" || code === "PGRST204") return true;
+  const message = (error as { message?: unknown } | null)?.message;
+  return typeof message === "string" && /from_contact/i.test(message) && /(does not exist|schema cache|could not find)/i.test(message);
+}
+
+/**
+ * Stores ONE flag row: user id, level, date (and, for the contact form only, from_contact = true). No text
+ * anywhere. `service` must be the service-role client (browsers cannot insert). A failed insert is logged by
+ * code only and must never stop the support page from being shown.
  *
  * The write is VERIFIED: the inserted row is read back (`.select("id")`) and exactly one row
  * must come back. An error, no row, or any other count is a failure (logged by code only,
  * `code=no-row` for the "nothing was written" case), never a silent success.
+ *
+ * roast / check-in flags are written EXACTLY as before this stage (user_id + level only), so they work with
+ * or without migration 030. A contact flag is written with from_contact = true; if that column does not exist
+ * yet, it is written without it (and counts like any other flag until the migration is applied).
  */
-export async function recordFlag(service: SupabaseClient, userId: string, level: FlagLevel): Promise<boolean> {
+export async function recordFlag(
+  service: SupabaseClient,
+  userId: string,
+  level: FlagLevel,
+  options: { fromContact?: boolean } = {},
+): Promise<boolean> {
   try {
-    const { data, error } = await service.from("safety_flags").insert({ user_id: userId, level }).select("id");
+    const row: Record<string, unknown> = { user_id: userId, level };
+    if (options.fromContact) row.from_contact = true;
+    let result = await service.from("safety_flags").insert(row).select("id");
+    if (result.error && options.fromContact && isMissingFromContact(result.error)) {
+      console.warn("[safety] flag write: from_contact column missing (migration 030 not applied), writing without it");
+      result = await service.from("safety_flags").insert({ user_id: userId, level }).select("id");
+    }
+    const { data, error } = result;
     if (error) {
       console.error(`[safety] flag write failed code=${errorCode(error)}`);
       return false;
@@ -392,53 +424,164 @@ export async function recordFlag(service: SupabaseClient, userId: string, level:
   }
 }
 
-export type GentleState = { active: boolean; level: FlagLevel | null; flaggedAt: string | null };
+/** What the gates and pages need to know about one user's pause. `active` is the only thing the old callers read. */
+export type GentleState = {
+  active: boolean;
+  /** The level of the flag that sets the end of the pause. */
+  level: FlagLevel | null;
+  flaggedAt: string | null;
+  /** When the pause ends (ISO). */
+  until: string | null;
+  /** True when the deciding flag is a repeat Level 1 (today a repeat has the same 24 h pause; see safety-pause.ts). */
+  repeat: boolean;
+  /** Whole minutes left (rounded up), or null when not paused. */
+  minutesLeft: number | null;
+  /** True while paused and for 3 days AFTER the pause ends: nudge copy must be soft. */
+  softNudge: boolean;
+};
 
-const NOT_GENTLE: GentleState = { active: false, level: null, flaggedAt: null };
+const NOT_GENTLE: GentleState = { active: false, level: null, flaggedAt: null, until: null, repeat: false, minutesLeft: null, softNudge: false };
 
-function gentleCutoffIso(now = Date.now()): string {
-  return new Date(now - GENTLE_WINDOW_MS).toISOString();
+/** The most flag rows one user's pause read will look at (newest first). A normal user has 0 to 3 in six days. */
+const USER_FLAG_READ_LIMIT = 200;
+
+type FlagRowRecord = Record<string, unknown>;
+
+function rowToPauseFlag(row: FlagRowRecord): PauseFlag {
+  return { level: Number(row.level), createdAt: String(row.created_at), fromContact: row.from_contact === true };
 }
 
 /**
- * Is this user inside the 72-hour gentle window after their latest flag? Reads with the
- * user's own client (RLS: own rows only). If the table is missing or the read fails, the
- * user is treated as not gentle and only the error code is logged.
+ * The user's flags from the last PAUSE_LOOKBACK_HOURS, newest first, or null if the read failed (the caller then
+ * fails OPEN). Reads with whichever client it is given: the user's own client (row level security: own rows only)
+ * in the routes, the service client right after a flag was written. READ ONLY: this never writes.
  */
-export async function getGentleState(supabase: SupabaseClient, userId: string): Promise<GentleState> {
-  try {
-    const { data, error } = await supabase
+async function readUserFlags(supabase: SupabaseClient, userId: string, now: number): Promise<PauseFlag[] | null> {
+  const since = new Date(now - PAUSE_LOOKBACK_MS).toISOString();
+  const run = (columns: string) =>
+    supabase
       .from("safety_flags")
-      .select("level, created_at")
+      .select(columns)
       .eq("user_id", userId)
-      .gte("created_at", gentleCutoffIso())
+      .gte("created_at", since)
       .order("created_at", { ascending: false })
-      .limit(1);
-    if (error) {
-      console.error(`[safety] gentle read failed code=${errorCode(error)}`);
-      return NOT_GENTLE;
-    }
-    const row = data?.[0] as { level?: unknown; created_at?: unknown } | undefined;
-    if (!row) return NOT_GENTLE;
-    const level = row.level === 2 ? 2 : 1;
-    return { active: true, level, flaggedAt: typeof row.created_at === "string" ? row.created_at : null };
+      .limit(USER_FLAG_READ_LIMIT);
+  let result = await run("level, created_at, from_contact");
+  if (result.error && isMissingFromContact(result.error)) {
+    console.warn("[safety] pause read: from_contact column missing (migration 030 not applied), reading without it");
+    result = await run("level, created_at");
+  }
+  if (result.error) {
+    console.error(`[safety] gentle read failed code=${errorCode(result.error)}`);
+    return null;
+  }
+  const rows = (result.data ?? []) as unknown as FlagRowRecord[];
+  if (rows.length >= USER_FLAG_READ_LIMIT) console.error("[safety] gentle read hit the row limit");
+  return rows.map(rowToPauseFlag);
+}
+
+/**
+ * Is this user paused right now, and for how long? Uses the pure rule in safety-pause.ts. If the table is missing
+ * or the read fails, the user is treated as not paused (fails OPEN, unchanged from stage 1) and only the error
+ * code is logged. `now` is for tests.
+ */
+export async function getGentleState(supabase: SupabaseClient, userId: string, now: number = Date.now()): Promise<GentleState> {
+  try {
+    const flags = await readUserFlags(supabase, userId, now);
+    if (flags === null) return NOT_GENTLE;
+    const pause = computePause(flags, now);
+    return {
+      active: pause.paused,
+      level: pause.level,
+      flaggedAt: pause.flaggedAt,
+      until: pause.endsAt,
+      repeat: pause.repeat,
+      minutesLeft: pauseMinutesLeft(pause, now),
+      softNudge: pause.softNudge,
+    };
   } catch {
     console.error("[safety] gentle read failed code=exception");
     return NOT_GENTLE;
   }
 }
 
-/** Every user id flagged inside the gentle window (service-role client; used by the crons). */
-export async function getGentleUserIds(service: SupabaseClient): Promise<Set<string>> {
+/**
+ * Saves the flag (verified), then reads the pause back so the Level 1 support page can say how long Ember will be
+ * away. `minutesLeft` is null unless BOTH the write and the read worked: the page never promises a pause it could
+ * not confirm. Use the service client.
+ */
+export async function recordFlagAndReadPause(
+  service: SupabaseClient,
+  userId: string,
+  level: FlagLevel,
+  options: { fromContact?: boolean } = {},
+): Promise<{ saved: boolean; minutesLeft: number | null }> {
+  const saved = await recordFlag(service, userId, level, options);
+  if (!saved) return { saved, minutesLeft: null };
+  const state = await getGentleState(service, userId);
+  return { saved, minutesLeft: state.active ? state.minutesLeft : null };
+}
+
+/** One user's flag summary for the crons. */
+export type PauseSummary = { paused: boolean; until: string | null; softNudge: boolean };
+
+const CRON_PAGE_SIZE = 1000;
+const CRON_MAX_PAGES = 50;
+
+/**
+ * Everyone who is paused right now OR inside the 3 soft days after a pause (service-role client; used by the crons).
+ * Users with neither are simply not in the map. One read of every flag from the look-back window, in pages of
+ * 1000 (the API returns at most 1000 rows per call, so a single call could silently cut the list). READ ONLY.
+ * If a page fails, whatever was read so far is used and only the error code is logged (fails OPEN, as before).
+ */
+export async function getPauseSummaries(service: SupabaseClient, now: number = Date.now()): Promise<Map<string, PauseSummary>> {
+  const byUser = new Map<string, PauseFlag[]>();
   try {
-    const { data, error } = await service.from("safety_flags").select("user_id").gte("created_at", gentleCutoffIso());
-    if (error) {
-      console.error(`[safety] gentle list failed code=${errorCode(error)}`);
-      return new Set();
+    const since = new Date(now - PAUSE_LOOKBACK_MS).toISOString();
+    let columns = "user_id, level, created_at, from_contact";
+    for (let page = 0; page < CRON_MAX_PAGES; page++) {
+      const from = page * CRON_PAGE_SIZE;
+      const run = (cols: string) =>
+        service
+          .from("safety_flags")
+          .select(cols)
+          .gte("created_at", since)
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, from + CRON_PAGE_SIZE - 1);
+      let result = await run(columns);
+      if (result.error && columns.includes("from_contact") && isMissingFromContact(result.error)) {
+        console.warn("[safety] pause list: from_contact column missing (migration 030 not applied), reading without it");
+        columns = "user_id, level, created_at";
+        result = await run(columns);
+      }
+      if (result.error) {
+        console.error(`[safety] gentle list failed code=${errorCode(result.error)}`);
+        break;
+      }
+      const rows = (result.data ?? []) as unknown as FlagRowRecord[];
+      for (const row of rows) {
+        const id = String(row.user_id);
+        const list = byUser.get(id);
+        if (list) list.push(rowToPauseFlag(row));
+        else byUser.set(id, [rowToPauseFlag(row)]);
+      }
+      if (rows.length < CRON_PAGE_SIZE) break;
+      if (page === CRON_MAX_PAGES - 1) console.error("[safety] gentle list hit the page limit");
     }
-    return new Set((data ?? []).map((r) => String((r as { user_id: unknown }).user_id)));
   } catch {
     console.error("[safety] gentle list failed code=exception");
-    return new Set();
   }
+  const summaries = new Map<string, PauseSummary>();
+  for (const [userId, flags] of byUser) {
+    const pause = computePause(flags, now);
+    if (pause.paused || pause.softNudge) summaries.set(userId, { paused: pause.paused, until: pause.endsAt, softNudge: pause.softNudge });
+  }
+  return summaries;
+}
+
+/** Every user id that is paused right now (service-role client; used by the weekly email). */
+export async function getGentleUserIds(service: SupabaseClient, now: number = Date.now()): Promise<Set<string>> {
+  const summaries = await getPauseSummaries(service, now);
+  return new Set([...summaries].filter(([, s]) => s.paused).map(([id]) => id));
 }

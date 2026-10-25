@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
     }
 
-    // Users inside the 72-hour gentle window after a safety flag get no "get roasted" email.
+    // Users inside the 24-hour pause after a safety flag get no "get roasted" email.
     let gentleUserIds = new Set<string>();
     try {
       gentleUserIds = await getGentleUserIds(createSupabaseServiceClient());

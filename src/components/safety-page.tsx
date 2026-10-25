@@ -9,6 +9,8 @@ import {
   LEVEL1_TEXT,
   LEVEL2_TEXT,
   UNAVAILABLE_TEXT,
+  gentleNoticeText,
+  level1PauseLine,
   type SafetyPagePayload,
 } from "@/lib/safety";
 
@@ -82,8 +84,10 @@ function Level2Page({ inPakistan }: { inPakistan: boolean }) {
   );
 }
 
-function Level1Page({ lines }: { lines: string[] }) {
+function Level1Page({ lines, pauseMinutes }: { lines: string[]; pauseMinutes?: number | null }) {
   const t = LEVEL1_TEXT;
+  // "Ember will be back in 24 hours." Only shown when the server confirmed a pause (flag saved and read back).
+  const pauseLine = level1PauseLine(pauseMinutes);
   return (
     <div className={shell}>
       <div className={card}>
@@ -93,7 +97,8 @@ function Level1Page({ lines }: { lines: string[] }) {
             {line}
           </p>
         ))}
-        <p className="mb-6 mt-4 text-base leading-relaxed text-text-muted">{t.aiNote}</p>
+        <p className={`mt-4 text-base leading-relaxed text-text-muted ${pauseLine ? "mb-3" : "mb-6"}`}>{t.aiNote}</p>
+        {pauseLine ? <p className="mb-6 text-base leading-relaxed text-text">{pauseLine}</p> : null}
 
         <h2 className="mb-3 text-lg font-semibold text-text">{t.smallThingsHeading}</h2>
         <ul className="mb-6 list-disc space-y-2 pl-5 text-base leading-relaxed text-text">
@@ -119,7 +124,11 @@ function Level1Page({ lines }: { lines: string[] }) {
 
 export function SafetyPage({ payload }: { payload: SafetyPagePayload }) {
   usePrivateScreen();
-  return payload.level === 2 ? <Level2Page inPakistan={payload.inPakistan} /> : <Level1Page lines={payload.lines} />;
+  return payload.level === 2 ? (
+    <Level2Page inPakistan={payload.inPakistan} />
+  ) : (
+    <Level1Page lines={payload.lines} pauseMinutes={payload.pauseMinutes} />
+  );
 }
 
 /** The safety check could not run (and nothing in the text matched a rule). Nothing was saved. */
@@ -141,12 +150,12 @@ export function SafetyUnavailable({ onDismiss }: { onDismiss: () => void }) {
   );
 }
 
-/** Gentle mode: the server refused to roast. Short, kind, one way out. */
-export function GentleNotice() {
+/** The pause is on: the server refused to roast or check in. Short, kind, says how long, one way out. */
+export function GentleNotice({ minutesLeft }: { minutesLeft?: number | null }) {
   return (
-    <div className={shell}>
+    <div data-break-notice className={shell}>
       <div className={card}>
-        <p className="mb-8 text-lg leading-relaxed text-text">{GENTLE_TEXT.message}</p>
+        <p className="mb-8 text-lg leading-relaxed text-text">{gentleNoticeText(minutesLeft)}</p>
         <Link href="/dashboard" className={primaryBtn}>
           {GENTLE_TEXT.back}
         </Link>

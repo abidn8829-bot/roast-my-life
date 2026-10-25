@@ -9,6 +9,7 @@ import { parseAchievements, unlockAchievements } from "@/lib/achievements";
 import { getDisplayName } from "@/lib/display-name";
 import { parseCategoryScores } from "@/lib/parse-category-scores";
 import { PENDING_ACHIEVEMENT_COOKIE, decodePendingAchievements } from "@/lib/pending-achievement-cookie";
+import { getGentleState } from "@/lib/safety-server";
 import { calculateStreak } from "@/lib/streak";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -41,20 +42,28 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  let newlyUnlockedAchievements: string[] = [];
-  try {
-    newlyUnlockedAchievements = (await unlockAchievements(supabase, user.id)).newlyUnlocked;
-  } catch (error) {
-    console.error("[dashboard] achievement evaluation failed:", error);
-  }
+  // Is Ember paused after a safety flag (24 hours, see lib/safety-pause.ts)? READ ONLY. If the read fails the
+  // answer is "not paused" (fails open, as everywhere else).
+  const paused = (await getGentleState(supabase, user.id)).active;
 
-  // Achievements unlocked during the roast/check-in that redirected here were already
-  // consumed by that API call, so unlockAchievements() above won't report them again —
-  // pick them up from the handoff cookie instead (cleared in middleware after this read).
-  const cookieStore = await cookies();
-  const pendingAchievements = decodePendingAchievements(cookieStore.get(PENDING_ACHIEVEMENT_COOKIE)?.value);
-  if (pendingAchievements.length > 0) {
-    newlyUnlockedAchievements = Array.from(new Set([...newlyUnlockedAchievements, ...pendingAchievements]));
+  // While paused the dashboard stays calm: no achievement is evaluated or celebrated now. Nothing is lost: an
+  // achievement that is due is unlocked and shown on the first dashboard load after the pause.
+  let newlyUnlockedAchievements: string[] = [];
+  if (!paused) {
+    try {
+      newlyUnlockedAchievements = (await unlockAchievements(supabase, user.id)).newlyUnlocked;
+    } catch (error) {
+      console.error("[dashboard] achievement evaluation failed:", error);
+    }
+
+    // Achievements unlocked during the roast/check-in that redirected here were already
+    // consumed by that API call, so unlockAchievements() above won't report them again —
+    // pick them up from the handoff cookie instead (cleared in middleware after this read).
+    const cookieStore = await cookies();
+    const pendingAchievements = decodePendingAchievements(cookieStore.get(PENDING_ACHIEVEMENT_COOKIE)?.value);
+    if (pendingAchievements.length > 0) {
+      newlyUnlockedAchievements = Array.from(new Set([...newlyUnlockedAchievements, ...pendingAchievements]));
+    }
   }
 
   const { data: userData, error: userDataError } = await supabase
@@ -139,6 +148,7 @@ export default async function DashboardPage() {
           newlyUnlockedAchievements={newlyUnlockedAchievements}
           isPro={subscriptionTier === "pro"}
           userEmail={user.email ?? undefined}
+          paused={paused}
         />
       </div>
     </main>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { isPakistan, ruleFloorLevel, safetyLog, supportLinesOrFallback } from "@/lib/safety";
 import { safetyJson } from "@/lib/safety-response";
-import { recordFlag } from "@/lib/safety-server";
+import { recordFlag, recordFlagAndReadPause } from "@/lib/safety-server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -25,18 +25,30 @@ export async function POST(request: Request) {
 
   // Safety rule filter (no AI call on this route). If the message shows sadness or risk it is
   // NOT emailed anywhere: the support page is shown instead. A flag is stored only when the
-  // sender is logged in. Nothing from the message is logged.
+  // sender is logged in, and it is marked from_contact so it can never count as the "second Level 1"
+  // of the repeat rule (it still starts a normal pause). Nothing from the message is logged.
   const ruleLevel = ruleFloorLevel(name, message);
   if (ruleLevel !== 0) {
     safetyLog(ruleLevel, "contact");
+    let pauseMinutes: number | null = null;
     try {
       const supabase = await createSupabaseServerClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) await recordFlag(createSupabaseServiceClient(), user.id, ruleLevel);
+      if (user) {
+        const service = createSupabaseServiceClient();
+        if (ruleLevel === 1) pauseMinutes = (await recordFlagAndReadPause(service, user.id, ruleLevel, { fromContact: true })).minutesLeft;
+        else await recordFlag(service, user.id, ruleLevel, { fromContact: true });
+      }
     } catch {
       console.error("[safety] flag write failed code=contact");
     }
-    return safetyJson({ kind: "page", level: ruleLevel, lines: ruleLevel === 1 ? supportLinesOrFallback(null) : [], inPakistan: isPakistan(request.headers) });
+    return safetyJson({
+      kind: "page",
+      level: ruleLevel,
+      lines: ruleLevel === 1 ? supportLinesOrFallback(null) : [],
+      inPakistan: isPakistan(request.headers),
+      ...(ruleLevel === 1 ? { pauseMinutes } : {}),
+    });
   }
 
   const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
