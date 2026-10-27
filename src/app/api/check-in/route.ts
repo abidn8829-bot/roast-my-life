@@ -316,7 +316,8 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     return respondOutputBlocked(request, "check-in");
   }
 
-  const { data: created, error: roastError } = await insertRoastRow(supabase, {
+  // The server saves the check-in roast (service role); user.id comes from the verified session.
+  const { data: created, error: roastError } = await insertRoastRow(user.id, {
     user_id: user.id, roast_text: newRoastText, report_card: previous.report_card, week_start_date: getWeekStartDate(), model_used: MODEL, share_slug: generateShareSlug(),
     answers: previous.answers as OnboardingAnswers, life_score: lifeScore, funny_title: funnyTitle, top_5_roasts: [], card_punchline: cardPunchline, category_scores: updatedCategoryScores, suggestion_line: suggestionLine,
     tone: resolvedTone, mode: (previous.mode ?? "roast") as RoastMode, persona: resolvedPersona, continuity_memory: nextMemory, plan_steps: plan,

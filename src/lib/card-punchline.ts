@@ -2,6 +2,8 @@ import Groq from "groq-sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
 import { OUTPUT_GUARDRAIL } from "@/lib/safety-server";
+import { insertRoastRowWith, saveBackfilledPunchlineWith, type RoastInsertResult } from "@/lib/roast-insert";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 import type { CategoryScores, OnboardingAnswers, RoastMode } from "@/lib/roast-types";
 
 export const PUNCHLINE_MODEL = "openai/gpt-oss-120b";
@@ -125,14 +127,18 @@ export async function backfillCardPunchline(
     category_scores?: CategoryScores;
     mode?: RoastMode;
   },
+  /** The viewing user's id from the verified session (auth.getUser()). Must own the roast. */
+  userId: string,
 ): Promise<void> {
   const { answers, category_scores, life_score } = roast;
   if (!answers || !category_scores || life_score === undefined) return;
 
+  // Read with the user's own session (RLS) AND an explicit owner check.
   const { data, error } = await supabase
     .from("roasts")
     .select("card_punchline")
     .eq("id", roast.id)
+    .eq("user_id", userId)
     .maybeSingle();
   if (error || !data || data.card_punchline) return; // column missing, no row, or already set
 
@@ -148,30 +154,20 @@ export async function backfillCardPunchline(
   });
   if (!punchline) return;
 
-  const { error: updateError } = await supabase
-    .from("roasts")
-    .update({ card_punchline: punchline })
-    .eq("id", roast.id);
-  if (updateError) console.error("[card-punchline] backfill save failed:", updateError.message);
+  // The write goes through the service-role client (users cannot write roasts directly), only for
+  // this roast id + this user id, and only while the punchline is still empty. Failures log a code.
+  await saveBackfilledPunchlineWith(createSupabaseServiceClient, roast.id, userId, punchline);
 }
 
 /**
- * Inserts a roast row. If the card_punchline column doesn't exist yet (code
- * deployed before migration 019 ran), retries without it instead of failing the
- * user's whole roast.
+ * Inserts a roast row with the SERVICE-ROLE client. `userId` must come from the verified session
+ * (auth.getUser()); it is written over any user_id in `row`. The saved id is read back; an error or a
+ * missing row comes back as `error: { code }` (never message text). If the card_punchline column
+ * doesn't exist yet (code deployed before migration 019 ran), it retries once without it.
  */
 export async function insertRoastRow(
-  supabase: SupabaseClient,
+  userId: string,
   row: Record<string, unknown> & { card_punchline?: string | null },
-) {
-  const first = await supabase.from("roasts").insert(row).select("id").single();
-  const missingColumn =
-    first.error &&
-    (first.error.code === "42703" || first.error.code === "PGRST204" || /card_punchline/.test(first.error.message));
-  if (!missingColumn) return first;
-
-  console.warn("[insertRoastRow] card_punchline column missing — run migration 019. Retrying without it.");
-  const withoutPunchline = { ...row };
-  delete withoutPunchline.card_punchline;
-  return supabase.from("roasts").insert(withoutPunchline).select("id").single();
+): Promise<RoastInsertResult> {
+  return insertRoastRowWith(createSupabaseServiceClient, userId, row);
 }

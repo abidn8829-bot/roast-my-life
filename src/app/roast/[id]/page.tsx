@@ -42,7 +42,7 @@ export default async function RoastDetailPage({
     }
 
     // Make sure the share card has a real punchline before the share sheet asks for the image.
-    await backfillCardPunchline(supabase, roast);
+    await backfillCardPunchline(supabase, roast, user.id);
 
     // Fetch week count
     const { data: weekData } = await supabase
