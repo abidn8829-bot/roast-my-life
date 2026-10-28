@@ -545,7 +545,8 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     continuity_memory: newContinuityMemory,
   };
 
-  const { data, error } = await insertRoastRow(supabase, baseRow);
+  // The server saves the roast (service role); user.id comes from the verified session above.
+  const { data, error } = await insertRoastRow(user.id, baseRow);
 
   if (error) {
     // Code only: Postgres "details" can echo the failing row, which holds the user's text.

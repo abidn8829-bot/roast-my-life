@@ -1330,7 +1330,7 @@ test("check-in route: the safety decision runs before any plan, memory, roast, p
   };
   const decision = at("await runCheckInSafety(");
   assert.ok(at("checkDailyLimit(supabase, user.id, subscriptionTier);") < decision, "the daily-limit check stays before the AI calls");
-  for (const later of ["const planCompletion", "const memoryCompletion", "const roastCompletion", "generateCardPunchline(groq", "insertRoastRow(supabase", 'from("score_history").insert']) {
+  for (const later of ["const planCompletion", "const memoryCompletion", "const roastCompletion", "generateCardPunchline(groq", "insertRoastRow(user.id", 'from("score_history").insert']) {
     assert.ok(decision < at(later), `the safety decision must come before: ${later}`);
   }
   // flagged and unavailable results go through the same helpers /api/roast uses (flag write, pages, gentle mode)
