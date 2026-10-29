@@ -17,8 +17,8 @@ export const PRO_FEATURES = [
     desc: `Free gets ${FREE_DAILY_LIMIT} a day. Pro gets ${PRO_DAILY_LIMIT}.`,
   },
   {
-    title: "All 6 personas + every tone",
-    desc: "Gordon Ramsay, Drill Sergeant, Destroy Me mode — the full arsenal.",
+    title: "All 6 personas",
+    desc: "Chef Overcooked, Drill Sergeant — the full arsenal.",
   },
   {
     title: "Your Arc",

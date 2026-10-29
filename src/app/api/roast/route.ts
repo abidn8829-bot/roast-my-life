@@ -8,7 +8,7 @@ import { checkDailyLimit } from "@/lib/daily-limit";
 import { buildReportCard, calculateCategoryScores, calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
 import { PENDING_ACHIEVEMENT_COOKIE, encodePendingAchievements } from "@/lib/pending-achievement-cookie";
-import type { OnboardingAnswers, RoastTone, RoastMode, RoastPersona } from "@/lib/roast-types";
+import { isRoastPersona, type OnboardingAnswers, type RoastMode, type RoastPersona } from "@/lib/roast-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
@@ -56,58 +56,6 @@ Example format:
   "updatedAt": "2026-07-22T12:00:00Z"
 }`;
 
-const SYSTEM_PROMPTS: Record<RoastTone, string> = {
-  normal: `You are a savage roast comedian with zero filter who remembers everything. Use their exact numbers to destroy them. Connect every bad habit to real consequences. Heavy Gen Z slang. No softening, no "I'm not judging", no encouragement. Just brutal facts. End with a devastating one liner. 150-200 words.
-
-IMPORTANT: You must respond with valid JSON in this exact format:
-{
-  "roast_text": "your full roast paragraph here"
-}
-
-No markdown, no extra text, just the JSON.
-
-CONTINUITY INSTRUCTIONS:
-- Reference previous sessions naturally using the continuity memory
-- Continue the running joke if appropriate (e.g., "Still the CEO of procrastination?")
-- Never repeat the exact same joke from previous roasts
-- Never assume improvement - be skeptical of their answers
-- If they show actual progress, acknowledge it humorously but briefly
-- Focus on patterns and persistent failures
-- Use the activeTopic and runningJoke from continuity memory to build on previous sessions`,
-  no_mercy: `You are a ruthless roast comedian with absolutely zero filter who remembers everything. Use their exact numbers to expose their failures. Connect every habit to catastrophic life outcomes. Heavy Gen Z slang. No encouragement, no softening language, no "maybe" or "could be". Just brutal facts and consequences. End with the most devastating one liner possible. 150-200 words.
-
-IMPORTANT: You must respond with valid JSON in this exact format:
-{
-  "roast_text": "your full roast paragraph here"
-}
-
-No markdown, no extra text, just the JSON.
-
-CONTINUITY INSTRUCTIONS:
-- Reference previous sessions naturally using the continuity memory
-- Continue the running joke if appropriate
-- Never repeat the exact same joke from previous roasts
-- Never assume improvement - be skeptical of their answers
-- Focus on patterns and persistent failures
-- Use the activeTopic and runningJoke from continuity memory to build on previous sessions`,
-  destroy_me: `You are the most brutal roast AI ever created who remembers everything. Take their numbers and absolutely eviscerate them. Connect every bad habit to the worst possible life outcome. Be so specific it hurts. Heavy Gen Z slang. No softening whatsoever - no "I'm no doctor", no "not to judge", no encouragement. Just pure devastation. Make them question every life choice. End with the most savage one liner ever written. This person asked to be destroyed — deliver. 150-200 words.
-
-IMPORTANT: You must respond with valid JSON in this exact format:
-{
-  "roast_text": "your full roast paragraph here"
-}
-
-No markdown, no extra text, just the JSON.
-
-CONTINUITY INSTRUCTIONS:
-- Reference previous sessions naturally using the continuity memory
-- Continue the running joke if appropriate
-- Never repeat the exact same joke from previous roasts
-- Never assume improvement - be skeptical of their answers
-- Focus on patterns and persistent failures
-- Use the activeTopic and runningJoke from continuity memory to build on previous sessions`,
-};
-
 const COACH_SYSTEM_PROMPT = `You are a supportive life coach who gives constructive, actionable advice. Use their exact numbers to provide specific, practical recommendations. Instead of judging, focus on realistic improvements. Give concrete steps they can take this week. Be encouraging but honest about areas for growth. End with 3 specific, actionable improvements for this week. 150-200 words.
 
 IMPORTANT: You must respond with valid JSON in this exact format:
@@ -119,7 +67,7 @@ No markdown, no extra text, just the JSON.`;
 
 const PERSONA_PROMPTS: Record<RoastPersona, string> = {
   default: DEFAULT_PERSONA_PROMPT,
-  gordon_ramsay: `You are Gordon Ramsay, the screaming chef who remembers everything. Use their exact numbers to destroy them with food metaphors and kitchen rage. Compare their habits to raw chicken, burnt dishes, and kitchen disasters. Use your signature shouting style, "WAKE UP!", "IT'S RAW!", "DISASTER!" No softening, just pure chef fury. End with a devastating food-related insult. 150-200 words.
+  gordon_ramsay: `You are Chef Overcooked, the screaming chef who remembers everything. Use their exact numbers to destroy them with food metaphors and kitchen rage. Compare their habits to raw chicken, burnt dishes, and kitchen disasters. Use your signature shouting style, "WAKE UP!", "IT'S RAW!", "DISASTER!" No softening, just pure chef fury. End with a devastating food-related insult. 150-200 words.
 
 IMPORTANT: You must respond with valid JSON in this exact format:
 {
@@ -201,7 +149,9 @@ CONTINUITY INSTRUCTIONS:
 - Use the activeTopic and runningJoke from continuity memory to build on previous sessions`,
 };
 
-function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastTone; mode: RoastMode; persona: RoastPersona; followUpAnswer?: string } | null {
+// Any "tone" field in the body is deliberately not read: tone no longer exists, and a cached older
+// browser may still send one. It is ignored, never rejected, and never stored.
+function parseAnswers(body: unknown): { answers: OnboardingAnswers; mode: RoastMode; persona: RoastPersona; followUpAnswer?: string } | null {
   if (!body || typeof body !== "object") return null;
   const b = body as Record<string, unknown>;
   const phoneHours = Number(b.phoneHours);
@@ -213,15 +163,10 @@ function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastT
   const socialMediaHours = b.socialMediaHours ? Number(b.socialMediaHours) : undefined;
   const workoutFrequency = b.workoutFrequency ? Number(b.workoutFrequency) : undefined;
   const followUpAnswer = typeof b.followUpAnswer === "string" ? b.followUpAnswer.trim() : undefined;
-  const tone = (typeof b.tone === "string" && ["normal", "no_mercy", "destroy_me"].includes(b.tone))
-    ? b.tone as RoastTone
-    : "normal";
   const mode = (typeof b.mode === "string" && ["roast", "coach"].includes(b.mode))
     ? b.mode as RoastMode
     : "roast";
-  const persona = (typeof b.persona === "string" && ["default", "gordon_ramsay", "drill_sergeant", "toxic_friend", "corporate_manager", "savage_grandma"].includes(b.persona))
-    ? b.persona as RoastPersona
-    : "default";
+  const persona = isRoastPersona(b.persona) ? b.persona : "default";
 
   if (
     !Number.isFinite(phoneHours) ||
@@ -248,7 +193,6 @@ function parseAnswers(body: unknown): { answers: OnboardingAnswers; tone: RoastT
       socialMediaHours,
       workoutFrequency,
     },
-    tone,
     mode,
     persona,
     followUpAnswer,
@@ -323,7 +267,7 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     return NextResponse.json({ error: "Invalid answers" }, { status: 400 });
   }
 
-  const { answers, tone, mode, persona, followUpAnswer } = parsed;
+  const { answers, mode, persona, followUpAnswer } = parsed;
 
   // Safety rule filter: needs no AI. A Level 2 match is final (fixed page, no AI call at all).
   // neverDoThing is only READ here; its question, validation and storage are unchanged.
@@ -331,11 +275,11 @@ async function handlePost(request: Request, slot: { release: () => void }) {
   const userTexts = [answers.worstApp, answers.neverDoThing, followUpAnswer ?? ""];
   if (ruleLevel === 2) return respondFlagged({ request, route: "roast", level: 2, userId: user.id });
 
-  // Free tier only gets the default persona and normal tone — everything else is Pro-gated.
+  // Free tier only gets the default persona — everything else is Pro-gated.
   // (Client UI already disables these for free users; this is the server-side enforcement.)
-  if (subscriptionTier === "free" && (tone !== "normal" || persona !== "default")) {
+  if (subscriptionTier === "free" && persona !== "default") {
     return NextResponse.json(
-      { error: "Custom personas and roast tones are Pro features. Upgrade to Pro to unlock them 🔥" },
+      { error: "Custom personas are a Pro feature. Upgrade to Pro to unlock them 🔥" },
       { status: 403 },
     );
   }
@@ -539,7 +483,6 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     top_5_roasts: [],
     card_punchline: cardPunchline,
     category_scores,
-    tone,
     mode,
     persona,
     continuity_memory: newContinuityMemory,

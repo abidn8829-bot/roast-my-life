@@ -126,17 +126,11 @@ const CAPABILITIES = [
 
 const PERSONAS: { name: string; emoji: string; desc: string; free?: boolean }[] = [
   { name: "Default", emoji: "🔥", desc: "Savage roast comedian", free: true },
-  { name: "Gordon Ramsay", emoji: "👨‍🍳", desc: "Screaming chef energy" },
+  { name: "Chef Overcooked", emoji: "👨‍🍳", desc: "Screaming chef energy" },
   { name: "Drill Sergeant", emoji: "🎖️", desc: "Brutal discipline" },
   { name: "Toxic Best Friend", emoji: "💅", desc: "Savage but loving" },
   { name: "Corporate Manager", emoji: "💼", desc: "Performance review style" },
   { name: "Savage Grandma", emoji: "👵", desc: "Disappointed but funny" },
-];
-
-const TONES: { name: string; emoji: string; desc: string; free?: boolean }[] = [
-  { name: "Normal", emoji: "🔥", desc: "Honest and funny", free: true },
-  { name: "No Mercy", emoji: "💀", desc: "Extremely brutal, no filter" },
-  { name: "Destroy Me", emoji: "☠️", desc: "Absolutely savage, existential crisis level" },
 ];
 
 const STEPS = [
@@ -175,7 +169,7 @@ const FAQS = [
   },
   {
     q: "What happens after my free roast today?",
-    a: `Come back tomorrow for your next free roast, or upgrade to Pro for ${PRO_DAILY_LIMIT} roasts a day, every tone, every persona.`,
+    a: `Come back tomorrow for your next free roast, or upgrade to Pro for ${PRO_DAILY_LIMIT} roasts a day, every persona.`,
   },
   {
     q: "What's \"Your Arc\"?",
@@ -338,30 +332,6 @@ export function HomePage() {
                 <div className="mb-2 text-3xl">{p.emoji}</div>
                 <div className="text-sm font-bold">{p.name}</div>
                 <div className="mt-1 text-xs text-text-faint">{p.desc}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-14 max-w-lg">
-            <h3 className="mb-3 text-2xl font-black tracking-tight">Pick Your Intensity</h3>
-            <p className="text-sm text-text-muted">Normal is free. The rest, you have to earn.</p>
-          </div>
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {TONES.map((t) => (
-              <div
-                key={t.name}
-                className={`relative rounded-2xl border-2 p-6 text-left ${
-                  t.free ? "border-ember bg-ember-soft" : "border-border bg-surface"
-                }`}
-              >
-                {!t.free && (
-                  <span className="absolute top-4 right-4 rounded-full bg-ember px-2 py-0.5 text-[10px] font-bold text-white">
-                    PRO
-                  </span>
-                )}
-                <div className="mb-3 text-3xl">{t.emoji}</div>
-                <div className="mb-1 font-bold">{t.name}</div>
-                <p className="text-sm text-text-muted">{t.desc}</p>
               </div>
             ))}
           </div>
