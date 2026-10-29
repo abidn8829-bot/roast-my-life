@@ -2,9 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import type { OnboardingAnswers, RoastTone, RoastMode, RoastPersona } from "@/lib/roast-types";
+import type { OnboardingAnswers, RoastMode, RoastPersona } from "@/lib/roast-types";
 import posthog from "posthog-js";
-import { ToneSelector } from "@/components/tone-selector";
 import { PersonaSelector } from "@/components/persona-selector";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { GentleNotice, SafetyPage, SafetyUnavailable } from "@/components/safety-page";
@@ -84,7 +83,7 @@ const PRO_QUESTIONS = [
   },
 ];
 
-type Step = number | "persona" | "tone" | "loading" | "followup" | "checkin-persona" | "checkin";
+type Step = number | "persona" | "loading" | "followup" | "checkin-persona" | "checkin";
 
 const inputClass =
   "w-full rounded-xl border-2 border-border bg-surface px-5 py-4 text-xl text-text outline-none ring-ember focus:ring-2 transition-all";
@@ -98,7 +97,6 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isPro, setIsPro] = useState(false);
-  const [selectedTone, setSelectedTone] = useState<RoastTone>("normal");
   const [selectedPersona, setSelectedPersona] = useState<RoastPersona>("default");
   const [upgradeReason, setUpgradeReason] = useState<"daily_limit" | "pro_feature" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -167,7 +165,6 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
           setPreviousAnswers(answersData.answers);
           setContinuityMemory(answersData.continuityMemory);
           setPreviousRoastText(answersData.previousRoastText);
-          if (answersData.tone) setSelectedTone(answersData.tone);
           if (answersData.persona) setSelectedPersona(answersData.persona);
           if (userIsPro && answersData.dailyLimitReached) {
             // Pro user who has used today's check-ins: say so right away. No persona picker,
@@ -279,7 +276,9 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
     return answers;
   }
 
-  const generateRoast = useCallback(async () => {
+  // The persona is passed in (not read from state) so the request carries the one just picked:
+  // a state update made in the same click handler is not visible to this closure yet.
+  const generateRoast = useCallback(async (persona: RoastPersona) => {
     setError(null);
     setIsGenerating(true);
 
@@ -294,9 +293,8 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...buildAnswers(),
-        tone: selectedTone,
         mode: "roast",
-        persona: selectedPersona,
+        persona,
         followUpAnswer: followUpAnswer || undefined,
       }),
     });
@@ -338,7 +336,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
     }
     router.push(`/roast/${encodeURIComponent(roastId)}?share=1`);
     router.refresh();
-  }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, selectedTone, selectedPersona, isPro, router, allQuestions]);
+  }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, isPro, router, allQuestions]);
 
   useEffect(() => {
     if (step !== "loading") return;
@@ -370,7 +368,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
 
   function onPersonaSelect(persona: RoastPersona) {
     setSelectedPersona(persona);
-    setStep("tone");
+    void generateRoast(persona);
   }
 
   function onCheckInPersonaSelect(persona: RoastPersona) {
@@ -378,14 +376,9 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
     setStep("checkin");
   }
 
-  function onToneSelect(tone: RoastTone) {
-    setSelectedTone(tone);
-    void generateRoast();
-  }
-
   function onFollowUpSubmit() {
     if (!followUpAnswer.trim()) return;
-    void generateRoast();
+    void generateRoast(selectedPersona);
   }
 
   async function onCheckInSubmit() {
@@ -400,7 +393,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
       const res = await fetch("/api/check-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "submit", category: checkInCategory, answer: followUpAnswer.trim(), activeTheme: checkInTheme, question: followUpQuestion, tone: selectedTone, persona: selectedPersona }),
+        body: JSON.stringify({ action: "submit", category: checkInCategory, answer: followUpAnswer.trim(), activeTheme: checkInTheme, question: followUpQuestion, persona: selectedPersona }),
       });
       const data = await res.json() as { id?: string; error?: string; code?: string; tier?: string; newlyUnlockedAchievements?: string[]; safety?: SafetyPayload; gentle?: boolean; minutesLeft?: number | null };
       if (handleSafetyResponse(data)) return;
@@ -623,24 +616,6 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
       <>
         <PersonaSelector
           onSelect={onPersonaSelect}
-          isPro={isPro}
-          onUpgradeRequest={() => setUpgradeReason("pro_feature")}
-        />
-        <UpgradeModal
-          isOpen={upgradeReason !== null}
-          onClose={() => setUpgradeReason(null)}
-          reason={upgradeReason ?? undefined}
-          userEmail={userEmail}
-        />
-      </>
-    );
-  }
-
-  if (step === "tone") {
-    return (
-      <>
-        <ToneSelector
-          onSelect={onToneSelect}
           isPro={isPro}
           onUpgradeRequest={() => setUpgradeReason("pro_feature")}
         />

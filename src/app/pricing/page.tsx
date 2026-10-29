@@ -5,7 +5,7 @@ import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
   title: "Pricing — Free & Pro Plans",
-  description: `Start free with one AI roast a day, or go Pro at ${PRO_PRICE}/month for ${PRO_DAILY_LIMIT} roasts a day, every persona and tone, and Your Arc progress tracking.`,
+  description: `Start free with one AI roast a day, or go Pro at ${PRO_PRICE}/month for ${PRO_DAILY_LIMIT} roasts a day, every persona, and Your Arc progress tracking.`,
   path: "/pricing",
 });
 

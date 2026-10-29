@@ -10,7 +10,7 @@ type Props = {
 
 const PERSONAS: { id: RoastPersona; name: string; emoji: string; description: string }[] = [
   { id: "default", name: "Default", emoji: "🔥", description: "Savage roast comedian" },
-  { id: "gordon_ramsay", name: "Gordon Ramsay", emoji: "👨‍🍳", description: "Screaming chef energy" },
+  { id: "gordon_ramsay", name: "Chef Overcooked", emoji: "👨‍🍳", description: "Screaming chef energy" },
   { id: "drill_sergeant", name: "Drill Sergeant", emoji: "🎖️", description: "Brutal discipline" },
   { id: "toxic_friend", name: "Toxic Best Friend", emoji: "💅", description: "Savage but loving" },
   { id: "corporate_manager", name: "Corporate Manager", emoji: "💼", description: "Performance review style" },
