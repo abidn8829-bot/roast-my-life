@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { PRO_DAILY_LIMIT } from "@/lib/daily-limit";
 import { FREE_FEATURES, PRO_FEATURES, PRO_PRICE } from "@/lib/plans";
+import { FREE_PERSONA, ROAST_PERSONAS, ROAST_PERSONA_LIST } from "@/lib/roast-personas";
 import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 import { useUserEmail } from "@/lib/use-user-email";
 
@@ -124,14 +125,13 @@ const CAPABILITIES = [
   },
 ];
 
-const PERSONAS: { name: string; emoji: string; desc: string; free?: boolean }[] = [
-  { name: "Default", emoji: "🔥", desc: "Savage roast comedian", free: true },
-  { name: "Chef Overcooked", emoji: "👨‍🍳", desc: "Screaming chef energy" },
-  { name: "Drill Sergeant", emoji: "🎖️", desc: "Brutal discipline" },
-  { name: "Toxic Best Friend", emoji: "💅", desc: "Savage but loving" },
-  { name: "Corporate Manager", emoji: "💼", desc: "Performance review style" },
-  { name: "Savage Grandma", emoji: "👵", desc: "Disappointed but funny" },
-];
+// Names, icons and blurbs come from src/lib/roast-personas.ts (the only place they are written).
+const PERSONAS: { name: string; emoji: string; desc: string; free?: boolean }[] = ROAST_PERSONA_LIST.map((p) => ({
+  name: p.label,
+  emoji: p.emoji,
+  desc: p.blurb,
+  free: p.id === FREE_PERSONA,
+}));
 
 const STEPS = [
   {
@@ -564,7 +564,7 @@ export function HomePage() {
                 Sample Roast
               </p>
               <h3 id="sample-roast-title" className="text-xl font-black">
-                💅 Toxic Best Friend
+                {ROAST_PERSONAS.toxic_friend.emoji} {ROAST_PERSONAS.toxic_friend.label}
               </h3>
             </div>
             <button

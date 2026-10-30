@@ -8,7 +8,8 @@ import { checkDailyLimit } from "@/lib/daily-limit";
 import { calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
 import { PENDING_ACHIEVEMENT_COOKIE, encodePendingAchievements } from "@/lib/pending-achievement-cookie";
-import { isRoastPersona, type CategoryScores, type Grade, type OnboardingAnswers, type RoastMode, type RoastPersona } from "@/lib/roast-types";
+import { buildPersonaPrompt, resolveCheckInPersona } from "@/lib/roast-personas";
+import type { CategoryScores, Grade, OnboardingAnswers, RoastMode } from "@/lib/roast-types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { generateShareSlug } from "@/lib/share-slug";
 import { getWeekStartDate } from "@/lib/week-start";
@@ -26,10 +27,6 @@ const GRADE_SCORES: Record<Grade, number> = { A: 100, B: 75, C: 60, D: 40, F: 0 
 
 function isCategory(value: unknown): value is Category { return typeof value === "string" && CATEGORIES.includes(value as Category); }
 function isGrade(value: unknown): value is Grade { return typeof value === "string" && GRADES.includes(value as Grade); }
-
-// Check-in roast voice. NOTE: `resolvedPersona` below is captured and persisted (so it's ready to use),
-// but this generation prompt doesn't vary by persona yet.
-const CHECKIN_SYSTEM_PROMPT = "You are a gen z brutally honest roast comedian with zero filter. You roast people based on their exact habits and numbers. Rules: use their specific numbers, name the exact apps they mentioned, connect their bad habits to real life consequences, no sugarcoating, no encouragement. End with one devastatingly accurate one-liner. 100 words max. If the overall check-in shows improvement, stay funny but noticeably lighter and less brutal; if nothing improved or something got worse, keep it at full brutal intensity. Only cite a specific category's numeric score if it appears in \"Categories graded this check-in\" below, always as its exact was-to-now change — never invent, approximate, or reference a score for a category not listed there. The life score is a separate overall 0-100 average across all 5 categories — never present it as if it were a single category's score. Output plain text only, no markdown: no asterisks, bold, italics, headings, bullets or hashtags, and no \"One-liner:\" label. Just write the roast, and end with the one-liner as a normal final sentence.";
 
 function getAvailableCategories(coveredCategories: Category[], lastAskedCategory: unknown): { available: Category[]; resetCovered: Category[] } {
   let available = CATEGORIES.filter((c) => !coveredCategories.includes(c) && c !== lastAskedCategory);
@@ -89,13 +86,11 @@ async function handlePost(request: Request, slot: { release: () => void }) {
   if (userRowError) console.error("[api/check-in] subscription tier read failed (treating as free):", userRowError.message);
   const subscriptionTier = userRow?.subscription_tier || "free";
 
-  // Persona gating: free tier keeps whatever they already have (always "default" in practice),
-  // Pro users can pick a different roaster per check-in. A "tone" field in the body is not read:
-  // tone no longer exists, and a cached older browser may still send one (ignored, never an error).
-  const requestedPersona = isRoastPersona(body.persona) ? body.persona : undefined;
-  const resolvedPersona: RoastPersona = subscriptionTier === "pro" && requestedPersona
-    ? requestedPersona
-    : ((previous.persona as RoastPersona) ?? "default");
+  // Persona: free accounts always get the default voice; Pro accounts get the persona sent with the request (checked
+  // against the six stored ids), else the one on their last roast. It is only resolved here: the persona prompt is
+  // built at the roast call below, after every safety exit. A "tone" field in the body is not read: tone no longer
+  // exists, and a cached older browser may still send one (ignored, never an error).
+  const resolvedPersona = resolveCheckInPersona(subscriptionTier, body.persona, previous.persona);
 
   const groq = new Groq({ apiKey });
   if (body.action === "question") {
@@ -269,7 +264,7 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     const roastCompletion = await groq.chat.completions.create({
       model: MODEL, max_tokens: 350, reasoning_effort: "low",
       messages: [
-        { role: "system", content: `${CHECKIN_SYSTEM_PROMPT}\n\n${OUTPUT_GUARDRAIL}` },
+        { role: "system", content: `${buildPersonaPrompt(resolvedPersona, "checkin")}\n\n${OUTPUT_GUARDRAIL}` },
         { role: "user", content: `Categories graded this check-in (score is 0-100 for that category only, separate from life score): ${JSON.stringify(changedCategoryScores)}\nCategory directions this check-in, all 5 (qualitative only, no numbers): ${JSON.stringify(categoryDirections)}\nOverall life score (0-100 average across all categories): was ${previousLifeScore}, now ${lifeScore} (${overallDirection})\nCheck-in answer: ${answer}\nContinuity memory: ${JSON.stringify(nextMemory)}` },
       ],
     });

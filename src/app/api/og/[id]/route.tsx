@@ -44,6 +44,12 @@ function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 
+// The card font has no emoji glyphs, so next/og would fetch every emoji from a third-party CDN while drawing the image.
+// The title and the punchline are the only free text on the card: strip emojis from both so that fetch never happens.
+function stripEmoji(text: string): string {
+  return text.replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}\u200d\ufe0f\u20e3]/gu, "").replace(/\s+/g, " ").trim();
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -60,7 +66,9 @@ export async function GET(
       return new Response(`Database error: ${result.message}`, { status: 500 });
     }
 
-    const { lifeScore, funnyTitle, punchline, categoryScores } = result.card;
+    const { lifeScore, categoryScores } = result.card;
+    const funnyTitle = stripEmoji(result.card.funnyTitle) || "Your Life";
+    const punchline = stripEmoji(result.card.punchline) || "Your life choices spoke for themselves.";
 
     const rows = categoryScores
       ? CATEGORY_ROWS.map(({ key, label }) => {
