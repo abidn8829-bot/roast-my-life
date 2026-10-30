@@ -158,7 +158,7 @@ test("(c) the old harsh wording is gone from the prompts it lived in", () => {
     read("app/api/roast/route.ts"),
     read("app/api/check-in/route.ts"),
   ].join("\n");
-  for (const phrase of ["No softening", "Just brutal facts", "Never assume improvement", "persistent failures", "full brutal intensity", "less brutal", "devastating", "Match the intensity", "under 40 = savage", "zero filter", "I raised you better", "MAGGOT"]) {
+  for (const phrase of ["No softening", "Just brutal facts", "Never assume improvement", "persistent failures", "full brutal intensity", "less brutal", "devastating", "Match the intensity", "under 40 = savage", "zero filter", "I raised you better", "MAGGOT", "Tone example", "repeats are fine", "100 words max", "performance improvement plan"]) {
     assert.equal(all.includes(phrase), false, phrase);
   }
 });
@@ -178,7 +178,7 @@ const graphemes = (s: string) => [...new Intl.Segmenter("en", { granularity: "gr
 test("(d) every persona has a palette of real, distinct emojis that includes its own icon", () => {
   for (const id of IDS) {
     const { palette, emoji } = ROAST_PERSONAS[id];
-    assert.ok(palette.length >= 6, `${id} palette too small`);
+    assert.ok(palette.length >= 8, `${id} palette too small for "8 to 12 emojis, never repeat one"`);
     assert.equal(new Set(palette).size, palette.length, `${id} palette has a repeat`);
     for (const e of palette) {
       assert.equal(graphemes(e).length, 1, `${id}: "${e}" is not a single emoji`);
@@ -188,14 +188,14 @@ test("(d) every persona has a palette of real, distinct emojis that includes its
   }
 });
 
-test("(d) the emoji rules are in every built prompt: the counts, the two-in-a-row cap, no emoji in place of a word, the palette", () => {
+test("(d) the emoji rules are in every built prompt: the counts, the two-next-to-each-other cap, no emoji in place of a word, the palette", () => {
   for (const id of IDS) {
     const roast = buildPersonaPrompt(id, "roast");
     const checkin = buildPersonaPrompt(id, "checkin");
     assert.equal(count(roast, "8 to 12 emojis"), 1, id);
     assert.equal(count(checkin, "4 to 6 emojis"), 1, id);
     for (const built of [roast, checkin]) {
-      assert.ok(built.includes("Never put more than two emojis in a row."), id);
+      assert.ok(built.includes("Never put more than two emojis next to each other."), id);
       assert.ok(built.includes("Never use an emoji in place of a word."), id);
       assert.equal(count(built, `Emoji palette: ${ROAST_PERSONAS[id].palette.join(" ")}`), 1, id);
     }
@@ -207,7 +207,7 @@ test("(d) the emoji rules are in every built prompt: the counts, the two-in-a-ro
 // Death-themed emojis: the output guardrail says never to joke about death, and an emoji is invisible to the word-based
 // output filter, so none may be offered to the model in any persona's palette (or anywhere else a built prompt carries one).
 const DEATH_EMOJIS = ["💀", "☠", "⚰", "⚱", "🪦"]; // skull, skull and crossbones, coffin, funeral urn, headstone
-const withoutVariationSelectors = (s: string) => s.replace(/️/g, "");
+const withoutVariationSelectors = (s: string) => s.replace(/\p{Variation_Selector}/gu, "");
 const deathEmojisIn = (text: string) => DEATH_EMOJIS.filter((e) => withoutVariationSelectors(text).includes(e));
 
 test("(d) the death-emoji check catches every emoji on the list, with or without a variation selector", () => {
@@ -243,10 +243,10 @@ test("(e) the check-in prompt has no harsh intensity wording and no intensity sw
   }
 });
 
-test("(e) the check-in keeps its format: plain text, 100 words max, no JSON", () => {
+test("(e) the check-in keeps its format: plain text, 80 to 95 words (hard maximum 100), no JSON", () => {
   for (const id of IDS) {
     const built = buildPersonaPrompt(id, "checkin");
-    assert.ok(built.includes("100 words max."));
+    assert.ok(built.includes("Write 80 to 95 words, hard maximum 100."));
     assert.ok(built.includes("Output plain text only, no markdown: no asterisks, bold, italics, headings, bullets or hashtags"));
     assert.ok(built.includes('no "One-liner:" label'));
     assert.ok(!built.includes("roast_text") && !/valid JSON/i.test(built), "the check-in roast is not JSON");
@@ -479,4 +479,210 @@ test("the preview script exists, is read-only (no database), and never prints th
   for (const line of script.split("\n").filter((l) => /console\.(log|error|warn)/.test(l))) {
     assert.doesNotMatch(line, /apiKey|process\.env/, `a log line can print the key: ${line.trim()}`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// (j) reliability rules, added after the real-model preview: emoji placement, tone cues, numbers, length
+// ---------------------------------------------------------------------------
+
+const EMOJI_PLACEMENT_RULES = [
+  "Put an emoji at the end of a sentence, roughly one every second sentence, spread across the whole text from the first sentences to the last.",
+  "Never put more than two emojis next to each other.",
+  "Never put all of them at the end.",
+  "Never repeat the same emoji (so never use more emojis than your palette has).",
+  "Never use number or keycap emojis.",
+  "Never use an emoji in place of a word.",
+];
+
+for (const surface of SURFACES) {
+  test(`(j) ${surface}: every concrete emoji rule is in the built prompt of every persona, exactly once`, () => {
+    for (const id of IDS) {
+      const built = buildPersonaPrompt(id, surface);
+      for (const rule of EMOJI_PLACEMENT_RULES) assert.equal(count(built, rule), 1, `${id}: ${rule}`);
+      assert.ok(!built.includes("repeats are fine"), `${id}: the old "repeats are fine" contradicts "never repeat"`);
+      assert.ok(!/in a row/.test(built), `${id}: the old "in a row" wording is gone`);
+    }
+  });
+}
+
+test('(j) "never repeat the same emoji" can be obeyed: every palette has at least as many distinct emojis as the roast minimum', () => {
+  const roastRange = EMOJI_RULES_ROAST.match(/Use (\d+) to (\d+) emojis/);
+  const checkinRange = EMOJI_RULES_CHECKIN.match(/Use (\d+) to (\d+) emojis/);
+  assert.ok(roastRange && checkinRange);
+  assert.deepEqual([Number(roastRange[1]), Number(roastRange[2]), Number(checkinRange[1]), Number(checkinRange[2])], [8, 12, 4, 6]);
+  for (const id of IDS) {
+    const distinct = new Set(ROAST_PERSONAS[id].palette.map(withoutVariationSelectors));
+    assert.equal(distinct.size, ROAST_PERSONAS[id].palette.length, `${id} palette repeats an emoji`);
+    assert.ok(distinct.size >= Number(roastRange[1]), `${id}: ${distinct.size} emojis cannot give a roast of ${roastRange[1]} without repeating one`);
+  }
+});
+
+test("(j) no palette contains a number or keycap emoji", () => {
+  for (const id of IDS) {
+    for (const e of ROAST_PERSONAS[id].palette) {
+      assert.doesNotMatch(e, /\p{Me}|🔟|🔢|\d/u, `${id} palette has a number/keycap emoji: ${e}`);
+    }
+  }
+});
+
+const OLD_TONE_EXAMPLES = [
+  "Seven hours on TikTok is a full-time job with no salary.",
+  "Right. Five hours of sleep is an undercooked night, and the oven was never even on.",
+  "Reveille was 0600; you reported for duty at noon.",
+  "Babe, not you ordering delivery three nights a week and calling it meal prep.",
+  "Let's circle back on the 2 a.m. scrolling cadence.",
+  "Sweetheart, in my day the phone stayed on the wall, and we all slept just fine.",
+];
+const CUES_INTRO = "Tone cues, fragments only (riff on them in your own words, never copy them): ";
+const cuesOf = (voice: string) => {
+  const at = voice.indexOf(CUES_INTRO);
+  assert.ok(at !== -1, "the voice has no tone cues");
+  return [...voice.slice(at + CUES_INTRO.length).matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
+};
+
+test("(j) every voice ends with tone cues: short fragments, no full sentence, no numbers, and no old example", () => {
+  for (const id of IDS) {
+    const { voice } = ROAST_PERSONAS[id];
+    assert.ok(!/Tone example/i.test(voice), `${id}: still has a tone example`);
+    assert.ok(voice.endsWith(".") && voice.slice(voice.indexOf(CUES_INTRO)).split('"').length >= 5, `${id}: the cues are the last thing in the voice`);
+    const cues = cuesOf(voice);
+    assert.ok(cues.length >= 2, `${id}: needs at least two cues`);
+    for (const cue of cues) {
+      assert.ok(cue.split(/\s+/).length <= 6, `${id}: "${cue}" is longer than a fragment`);
+      assert.match(cue, /^[a-z]/, `${id}: "${cue}" starts like a sentence (capital letter)`);
+      assert.doesNotMatch(cue, /[.!?;:,\d]/, `${id}: "${cue}" has sentence punctuation, a comma or a digit`);
+    }
+  }
+});
+
+test("(j) none of the six old tone-example sentences survives anywhere in a built prompt", () => {
+  const all = IDS.flatMap((id) => SURFACES.map((s) => buildPersonaPrompt(id, s))).join("\n");
+  for (const old of OLD_TONE_EXAMPLES) assert.equal(all.includes(old), false, old);
+});
+
+test("(j) the 'performance improvement plan' line is neither an instruction nor a quote anywhere, and Corporate keeps a varied dry closing line", () => {
+  for (const id of IDS) {
+    for (const surface of SURFACES) assert.doesNotMatch(buildPersonaPrompt(id, surface), /performance improvement plan/i, `${id}/${surface}`);
+    const { voice, blurb, label } = ROAST_PERSONAS[id];
+    assert.doesNotMatch(`${voice} ${blurb} ${label}`, /performance improvement plan/i, id);
+  }
+  assert.match(ROAST_PERSONAS.corporate_manager.voice, /End with a dry, reassuring line in manager-speak that this is nothing formal, worded differently every time\./);
+});
+
+for (const surface of SURFACES) {
+  test(`(j) ${surface}: only numbers the user gave; never compute ratios, percentages or scores`, () => {
+    for (const id of IDS) {
+      const built = buildPersonaPrompt(id, surface);
+      assert.equal(count(built, "Use only numbers the user gave you"), 1, id);
+      assert.equal(count(built, "do not compute new ratios, percentages or scores."), 1, id);
+      assert.equal(built.includes("plus the was-to-now scores listed below"), surface === "checkin", `${id}: the check-in (only) may also cite the listed was-to-now scores`);
+    }
+  });
+}
+
+test("(j) length rules: the roast aims for about 170 words and never under 150; the check-in is 80 to 95, hard maximum 100", () => {
+  for (const id of IDS) {
+    const roast = buildPersonaPrompt(id, "roast");
+    const checkin = buildPersonaPrompt(id, "checkin");
+    assert.equal(count(roast, "Write 150-200 words: aim for about 170 words, never under 150."), 1, id);
+    assert.equal(count(checkin, "Write 80 to 95 words, hard maximum 100."), 1, id);
+    assert.ok(!checkin.includes("100 words max") && !checkin.includes("150-200"), `${id}: the check-in must not carry the old or the roast limit`);
+    assert.ok(!roast.includes("hard maximum 100") && !roast.includes("80 to 95"), `${id}: the roast must not carry the check-in limit`);
+  }
+});
+
+// ---- the preview script's rule checks: the real block from scripts/persona-preview.mjs, run on crafted texts ----
+
+type RuleResult = { rule: string; ok: boolean; detail: string };
+function loadPreviewRules(): { evaluate: (text: string, kind: "roast" | "checkin", input: string) => RuleResult[] } {
+  const src = readRoot("scripts/persona-preview.mjs");
+  const a = src.indexOf("// ---- rules:start");
+  const b = src.indexOf("// ---- rules:end");
+  assert.ok(a !== -1 && b > a, "the rules block markers are missing from the preview script");
+  return new Function(`${src.slice(a, b)}\nreturn { evaluate };`)() as ReturnType<typeof loadPreviewRules>;
+}
+const { evaluate } = loadPreviewRules();
+
+const INPUT = "Phone screen time: 7 hours per day\nAverage sleep: 5 hours per night\nWeekly food delivery spending: $60";
+const SENTENCE = "Your phone keeps a steady schedule and the habits agree with it."; // 12 words, no digits
+const EMOJIS = ["🔥", "😴", "📱", "🏋️", "🍕", "🌙", "😬", "🙃", "🥩", "🧂", "🍽️", "📋", "🚨", "📢"];
+const text = (sentences: number, after: Record<number, string> = {}, sentence = SENTENCE) =>
+  Array.from({ length: sentences }, (_, i) => (after[i] ? `${sentence} ${after[i]}` : sentence)).join(" ");
+const spreadAfter = (indexes: number[]): Record<number, string> => Object.fromEntries(indexes.map((at, i) => [at, EMOJIS[i]!]));
+const failing = (rs: RuleResult[]) => rs.filter((r) => !r.ok).map((r) => r.rule);
+const RULE_NAMES = ["words", "emojis", "run", "keycap", "repeat", "spread", "sentence-end", "numbers"];
+
+const GOOD_ROAST = text(14, spreadAfter([0, 1, 3, 4, 6, 7, 9, 11, 13])); // 168 words, 9 distinct emojis, spread out
+const GOOD_CHECKIN = text(7, spreadAfter([0, 2, 3, 5, 6])); // 84 words, 5 distinct emojis
+
+test("(j) preview script: a compliant roast and a compliant check-in pass every rule, and every rule is reported", () => {
+  const roast = evaluate(GOOD_ROAST, "roast", INPUT);
+  assert.deepEqual(roast.map((r) => r.rule), RULE_NAMES);
+  assert.deepEqual(failing(roast), [], JSON.stringify(roast.filter((r) => !r.ok)));
+  const checkin = evaluate(GOOD_CHECKIN, "checkin", INPUT);
+  assert.deepEqual(failing(checkin), [], JSON.stringify(checkin.filter((r) => !r.ok)));
+});
+
+test("(j) preview script: word count ranges (roast 150-200, check-in 80-100)", () => {
+  assert.deepEqual(failing(evaluate(text(12, spreadAfter([0, 1, 3, 4, 6, 7, 9, 11])), "roast", INPUT)), ["words"], "144 words is under 150");
+  assert.deepEqual(failing(evaluate(text(17, spreadAfter([0, 1, 3, 5, 7, 9, 11, 13, 15])), "roast", INPUT)), ["words"], "204 words is over 200");
+  assert.deepEqual(failing(evaluate(text(13, spreadAfter([0, 1, 3, 4, 6, 7, 9, 12])), "roast", INPUT)), [], "156 words is fine");
+  assert.deepEqual(failing(evaluate(text(9, spreadAfter([0, 2, 4, 6, 8])), "checkin", INPUT)), ["words"], "108 words is over the check-in maximum of 100");
+  assert.deepEqual(failing(evaluate(text(6, spreadAfter([0, 1, 3, 4, 5])), "checkin", INPUT)), ["words"], "72 words is under 80");
+});
+
+test("(j) preview script: emoji count ranges (roast 8-12, check-in 4-6)", () => {
+  assert.deepEqual(failing(evaluate(text(14, spreadAfter([0, 2, 4, 6, 8, 10, 12])), "roast", INPUT)), ["emojis"], "7 emojis is under 8");
+  assert.deepEqual(failing(evaluate(text(7, spreadAfter([0, 3, 6])), "checkin", INPUT)), ["emojis"], "3 emojis is under 4");
+  assert.deepEqual(failing(evaluate(text(7, spreadAfter([0, 1, 2, 3, 4, 5, 6])), "checkin", INPUT)), ["emojis"], "7 emojis is over 6");
+});
+
+test("(j) preview script: flags more than two emojis in a row, even with spaces between them", () => {
+  const dumped = text(14, spreadAfter([0, 1, 3, 4, 6, 7, 9, 11, 12])).replace(/$/, ` ${EMOJIS.slice(9).join(" ")}`);
+  assert.ok(failing(evaluate(dumped, "roast", INPUT)).includes("run"), "a block of emojis at the end");
+  const three = text(14, { ...spreadAfter([0, 1, 3, 4, 6, 7, 9, 11, 13]), 5: "📋 🚨 📢" });
+  const r = evaluate(three, "roast", INPUT);
+  assert.ok(failing(r).includes("run") && /run 3/.test(r.find((x) => x.rule === "run")!.detail), "three next to each other in the middle");
+  assert.ok(!failing(evaluate(text(14, { ...spreadAfter([0, 1, 3, 4, 6, 7, 9, 11, 13]), 5: "📋 🚨" }), "roast", INPUT)).includes("run"), "two next to each other is allowed");
+});
+
+test("(j) preview script: flags keycap digit emojis (7 in a box, and the 10 / 1234 emojis)", () => {
+  const keycap = String.fromCodePoint(0x37, 0xfe0f, 0x20e3);
+  for (const bad of [keycap, "🔟", "🔢"]) {
+    const r = evaluate(text(14, { ...spreadAfter([0, 1, 3, 4, 6, 7, 9, 11]), 13: bad }), "roast", INPUT);
+    assert.ok(failing(r).includes("keycap"), `${bad.length} chars: ${JSON.stringify(r.filter((x) => !x.ok))}`);
+  }
+  assert.ok(!failing(evaluate(GOOD_ROAST, "roast", INPUT)).includes("keycap"));
+});
+
+test("(j) preview script: flags a repeated emoji, with or without its variation selector", () => {
+  assert.ok(failing(evaluate(text(14, { ...spreadAfter([0, 1, 3, 4, 6, 7, 9, 11]), 13: "🔥" }), "roast", INPUT)).includes("repeat"));
+  const bare = String.fromCodePoint(0x1f3cb); // the weight lifter without its variation selector
+  assert.ok(failing(evaluate(text(14, { ...spreadAfter([0, 1, 3, 4, 6, 7, 9, 11]), 13: bare }), "roast", INPUT)).includes("repeat"), "🏋️ and 🏋 are the same emoji");
+});
+
+test("(j) preview script: flags emojis dumped at the end instead of spread across the text", () => {
+  const lateOnly = text(14, { 9: "🔥 😴", 10: "📱 🏋️", 11: "🍕 🌙", 12: "😬 🙃", 13: "🥩 🧂" });
+  const r = evaluate(lateOnly, "roast", INPUT);
+  assert.ok(failing(r).includes("spread"), JSON.stringify(r.find((x) => x.rule === "spread")));
+  assert.ok(!failing(evaluate(GOOD_ROAST, "roast", INPUT)).includes("spread"));
+});
+
+test("(j) preview script: flags an emoji inside a sentence (a lowercase word right after it can mean it replaces a word)", () => {
+  const poweredRobot = text(14, spreadAfter([0, 1, 3, 4, 6, 7, 9, 11])).replace("keeps a steady", "keeps a 🧂-powered steady");
+  assert.ok(failing(evaluate(poweredRobot, "roast", INPUT)).includes("sentence-end"), "emoji followed by -powered");
+  const replacesWord = text(14, spreadAfter([0, 1, 3, 4, 6, 7, 9, 11])).replace("the habits", "the 🧂 habits");
+  assert.ok(failing(evaluate(replacesWord, "roast", INPUT)).includes("sentence-end"), "emoji followed by a lowercase word");
+  assert.ok(!failing(evaluate(GOOD_ROAST, "roast", INPUT)).includes("sentence-end"), "an emoji after a full stop followed by a capital is fine");
+});
+
+test("(j) preview script: flags numbers that are not in the input (ratios, percentages, computed totals)", () => {
+  const withInvented = `${GOOD_ROAST} That is 49 hours a week at a 0.71 ratio, or 30% of your life.`;
+  const r = evaluate(withInvented, "roast", INPUT).find((x) => x.rule === "numbers")!;
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /49/);
+  assert.match(r.detail, /0\.71/);
+  assert.match(r.detail, /30/);
+  const given = `${GOOD_ROAST} You gave 7 hours, 5 hours of sleep and $60 of delivery.`;
+  assert.equal(evaluate(given, "roast", INPUT).find((x) => x.rule === "numbers")!.ok, true, "numbers from the input are allowed, with or without a $ or a full stop");
 });
