@@ -4,13 +4,16 @@
 // Gordon Ramsay persona has a new PUBLIC name but keeps its stored id, and the persona the user picked is
 // the one the request carries. Everything here is plain Node: pure functions are imported, and the routes
 // and components are checked by reading their source (the same approach as roast-insert.test.ts).
+// (Part 2 moved the persona prompts, names and the check-in prompt into src/lib/roast-personas.ts; the
+// "gates come before the persona prompt" and check-in prompt checks now live in roast-personas.test.ts.)
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import * as nodeModule from "node:module";
 import { join, relative } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { ROAST_PERSONA_IDS, isRoastPersona } from "./roast-types.ts";
+import { ROAST_PERSONAS, buildPersonaPrompt, personaLabel } from "./roast-personas.ts";
+import { ROAST_PERSONA_IDS, isRoastPersona, type RoastPersona } from "./roast-types.ts";
 
 const SRC = fileURLToPath(new URL("../", import.meta.url));
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
@@ -77,17 +80,22 @@ test("(a) /api/roast: all six ids are accepted as sent; an unknown or missing id
 test("(a) /api/check-in: persona is checked against the same shared list, no second hard-coded list", () => {
   const checkIn = read("app/api/check-in/route.ts");
   const roast = read("app/api/roast/route.ts");
-  assert.match(checkIn, /const requestedPersona = isRoastPersona\(body\.persona\) \? body\.persona : undefined;/);
+  // The check-in resolves its persona with the shared helper, which validates with isRoastPersona.
+  assert.match(checkIn, /const resolvedPersona = resolveCheckInPersona\(subscriptionTier, body\.persona, previous\.persona\);/);
+  assert.match(read("lib/roast-personas.ts"), /if \(isRoastPersona\(requested\)\) return requested;/);
   assert.match(roast, /const persona = isRoastPersona\(b\.persona\) \? b\.persona : "default";/);
   for (const [name, text] of [["check-in", checkIn], ["roast", roast]] as const) {
     assert.doesNotMatch(text, /["']drill_sergeant["']\s*,\s*["']toxic_friend["']/, `${name} route must not carry its own persona list`);
   }
 });
 
-test("(a) the roast route still has a prompt for every one of the six ids", () => {
-  const roast = read("app/api/roast/route.ts");
-  const block = roast.slice(roast.indexOf("const PERSONA_PROMPTS"));
-  for (const id of SIX_IDS) assert.match(block, new RegExp(`^  ${id}:`, "m"), `PERSONA_PROMPTS has no ${id}`);
+test("(a) every one of the six ids has a persona entry, so every id has a prompt", () => {
+  assert.deepEqual(Object.keys(ROAST_PERSONAS), SIX_IDS);
+  for (const id of SIX_IDS) {
+    assert.equal(ROAST_PERSONAS[id as RoastPersona].id, id);
+    assert.ok(buildPersonaPrompt(id as RoastPersona, "roast").includes(ROAST_PERSONAS[id as RoastPersona].voice), `${id} has no voice in its prompt`);
+  }
+  assert.match(read("app/api/roast/route.ts"), /systemPrompt = buildPersonaPrompt\(persona, "roast"\);/);
 });
 
 // ---------------------------------------------------------------------------
@@ -143,15 +151,18 @@ test("(b) old rows keep working: the legacy column and type are still there, as 
 // (c) the public label changed, the stored id did not
 // ---------------------------------------------------------------------------
 
-test("(c) the picker shows Chef Overcooked and still stores gordon_ramsay, with the same icon", () => {
-  assert.match(read("components/persona-selector.tsx"), /\{ id: "gordon_ramsay", name: "Chef Overcooked", emoji: "👨‍🍳"/);
-  assert.match(read("components/home-page.tsx"), /\{ name: "Chef Overcooked", emoji: "👨‍🍳"/);
-  assert.match(read("lib/plans.ts"), /Chef Overcooked/);
+test("(c) the persona is called Chef Overcooked with the same icon, and its stored id is still gordon_ramsay", () => {
+  assert.equal(ROAST_PERSONAS.gordon_ramsay.label, "Chef Overcooked");
+  assert.equal(ROAST_PERSONAS.gordon_ramsay.emoji, "👨‍🍳");
+  assert.equal(personaLabel("gordon_ramsay"), "Chef Overcooked");
+  // The picker, the landing page and the plans copy all read the name from that one place.
+  assert.match(read("components/persona-selector.tsx"), /ROAST_PERSONA_LIST\.map\(\(p\) => \(\{ id: p\.id, name: p\.label, emoji: p\.emoji, description: p\.blurb \}\)\)/);
+  assert.match(read("components/home-page.tsx"), /ROAST_PERSONA_LIST\.map\(\(p\) => \(\{\s*name: p\.label,\s*emoji: p\.emoji,\s*desc: p\.blurb,/);
+  assert.match(read("lib/plans.ts"), /personaLabel\("gordon_ramsay"\)/);
 });
 
 test("(c) the persona prompt no longer names a real person", () => {
-  const roast = read("app/api/roast/route.ts");
-  assert.match(roast, /^  gordon_ramsay: `You are Chef Overcooked, the screaming chef who remembers everything\./m);
+  assert.match(ROAST_PERSONAS.gordon_ramsay.voice, /^You are Chef Overcooked, the screaming chef who remembers everything/);
 });
 
 test("(c) no file outside the id token mentions the old name (Gordon Ramsay or any ramsay)", () => {
@@ -173,8 +184,8 @@ test("(c) no file outside the id token mentions the old name (Gordon Ramsay or a
 test("(c) the id gordon_ramsay is still the stored value everywhere it is used", () => {
   assert.equal(SIX_IDS.includes("gordon_ramsay"), true);
   assert.match(read("lib/roast-types.ts"), /"gordon_ramsay"/);
-  assert.match(read("components/persona-selector.tsx"), /id: "gordon_ramsay"/);
-  assert.match(read("app/api/roast/route.ts"), /^  gordon_ramsay: `/m);
+  assert.match(read("lib/roast-personas.ts"), /^  gordon_ramsay: \{\n    id: "gordon_ramsay",/m);
+  assert.match(read("components/persona-selector.tsx"), /id: p\.id/, "the picker sends the stored id, not the label");
 });
 
 // ---------------------------------------------------------------------------
@@ -203,7 +214,8 @@ test("(d) the wizard has no tone step, no tone state and sends no tone in either
 test("(d) no tone copy is left on the landing page, pricing page, FAQ or plans", () => {
   const copy = ["components/home-page.tsx", "components/pricing-page.tsx", "components/upgrade-modal.tsx", "app/pricing/page.tsx", "lib/plans.ts"].map(read).join("\n");
   assert.doesNotMatch(copy, /\bevery tone\b|\band tone\b|\broast tones?\b|\bNo Mercy\b|\bDestroy Me\b|Pick Your Intensity|\bTONES\b/);
-  assert.match(read("lib/plans.ts"), /title: "All 6 personas"/);
+  assert.match(read("lib/plans.ts"), /title: `All \$\{ROAST_PERSONA_IDS\.length\} personas`/);
+  assert.equal(ROAST_PERSONA_IDS.length, 6, "the plans title therefore reads \"All 6 personas\"");
 });
 
 test("(d) the persona picker bug: the roast request carries the persona it was handed, not stale state", () => {
@@ -218,42 +230,4 @@ test("(d) the persona picker bug: the roast request carries the persona it was h
   assert.match(wizard, /function onFollowUpSubmit\(\) \{[\s\S]*?void generateRoast\(selectedPersona\);/);
   assert.equal(wizard.match(/generateRoast\(/g)?.length, 2, "every call site passes a persona");
   assert.doesNotMatch(wizard, /setStep\("tone"\)/);
-});
-
-// ---------------------------------------------------------------------------
-// (e) the safety gates still come before any persona is read or chosen
-// ---------------------------------------------------------------------------
-
-test("(e) /api/roast: pause, phrase filter, classifier and fail-closed exits all come before persona is read or chosen", () => {
-  const route = read("app/api/roast/route.ts");
-  const readsPersona = route.indexOf("= parseAnswers(body)");
-  const choosesPersona = route.indexOf("PERSONA_PROMPTS[persona]");
-  assert.ok(readsPersona !== -1 && choosesPersona !== -1);
-  assert.equal(route.match(/PERSONA_PROMPTS\[/g)?.length, 1, "the persona prompt is picked in exactly one place");
-  assert.ok(route.indexOf("gentleGate(") !== -1 && route.indexOf("gentleGate(") < readsPersona, "gentleGate must run before the persona is read from the request");
-  for (const needle of ["gentleGate(", "ruleFloorLevel(", "runSafetyClassify(", "respondFlagged(", "respondUnavailable("]) {
-    const first = route.indexOf(needle);
-    assert.ok(first !== -1, `route no longer contains ${needle}`);
-    assert.ok(first < choosesPersona, `${needle} must come before the persona prompt is chosen`);
-  }
-});
-
-test("(e) /api/check-in: pause and safety come before persona is read; no persona text is ever in a prompt", () => {
-  const route = read("app/api/check-in/route.ts");
-  const readsPersona = route.indexOf("isRoastPersona(body.persona)");
-  assert.ok(readsPersona !== -1);
-  assert.ok(route.indexOf("gentleGate(") !== -1 && route.indexOf("gentleGate(") < readsPersona, "gentleGate must run before the persona is read");
-  const rollsOut = route.indexOf("${CHECKIN_SYSTEM_PROMPT}");
-  assert.ok(rollsOut !== -1);
-  for (const needle of ["runCheckInSafety(", "respondFlagged(", "respondUnavailable("]) {
-    assert.ok(route.indexOf(needle) !== -1 && route.indexOf(needle) < rollsOut, `${needle} must come before the check-in roast prompt`);
-  }
-  assert.doesNotMatch(route, /PERSONA_PROMPTS/, "the check-in prompt does not use persona voices (that is Part 2)");
-});
-
-test("(e) the check-in roast prompt is the one fixed string, unchanged by tone removal", () => {
-  const route = read("app/api/check-in/route.ts");
-  assert.equal(route.match(/const CHECKIN_SYSTEM_PROMPT = "/g)?.length, 1);
-  assert.match(route, /keep it at full brutal intensity/, "wording is untouched in Part 1; the intensity rewrite is Part 2");
-  assert.doesNotMatch(route, /CHECKIN_SYSTEM_PROMPTS|CHECKIN_SYSTEM_PROMPT_NORMAL/);
 });

@@ -17,7 +17,7 @@ Rules:
 - One line, max 12 words.
 - Call them out with ONE specific detail from their data: a number, the app they named, or the thing they keep promising themselves. Never generic ("you need to do better").
 - Aim at their worst category.
-- Match the intensity to their life score: under 40 = savage; 40-70 = playful jab; over 70 = backhanded compliment ("suspiciously fine") that still calls out their single worst category.
+- Same medium intensity at every score; only the angle changes: under 40 = name their worst category plainly; 40-70 = playful jab; over 70 = backhanded compliment ("suspiciously fine") that still calls out their single worst category.
 - Say something new — do not restate a line from the long roast.
 - No hashtags, no emojis, no quotation marks, no slurs, no mention of "roast" or "AI".
 
@@ -35,12 +35,17 @@ type Input = {
   checkIn?: { category: string; answer: string; direction: string };
 };
 
-/** Model output -> a safe single line, or null if it isn't usable. */
+/**
+ * Model output -> a safe single line, or null if it isn't usable. Emojis are removed: the prompt bans them, but roasts
+ * now use emojis (and the roast is part of this call's input), and the share image font has no emoji glyphs, so
+ * next/og would fetch each one from a third-party CDN while drawing the card.
+ */
 export function cleanPunchline(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const line = raw
     .replace(/[\r\n]+/g, " ")
     .replace(/["“”]/g, "")
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}\p{Regional_Indicator}\u200d\ufe0f\u20e3]/gu, "")
     .replace(/\s+/g, " ")
     .trim();
   if (line.length < 8 || line.length > MAX_CHARS) return null;
