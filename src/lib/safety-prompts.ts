@@ -1,34 +1,24 @@
 // Prompt builders and response parsers for the two roast-route AI calls that carry the safety
 // level (the first-time / follow-up-answer roast, and the returning-user follow-up question).
 //
-// PURE MOVE out of src/app/api/roast/route.ts so that scripts/safety-eval.mjs can run the REAL
-// prompts and the REAL parsing instead of copies. The text and logic below are unchanged; the
-// route imports them. No "@/" imports on purpose (the script imports this file with Node).
+// Moved out of src/app/api/roast/route.ts so that scripts/safety-eval.mjs can run the REAL
+// prompts and the REAL parsing instead of copies; the route imports them. The parsers, the call
+// settings and the message builders are exactly as they were. Only wording changed since the move:
+// the follow-up question prompt is medium (not "savage"/"brutal"), and the default roast prompt is
+// now built from src/lib/roast-personas.ts. No "@/" imports on purpose (the script imports this
+// file with Node).
 
+import { buildPersonaPrompt } from "./roast-personas.ts";
 import type { OnboardingAnswers } from "./roast-types.ts";
 import { parseLevel, type SafetyLevel } from "./safety.ts";
 import { FOLLOWUP_FORMAT_OVERRIDE, ROAST_FORMAT_OVERRIDE, withSafety } from "./safety-server.ts";
 
-export const FOLLOW_UP_SYSTEM_PROMPT = `You are a savage roast comedian who remembers everything. Based on the user's previous roast and their current habits, ask ONE intelligent follow-up question to dig deeper into their failures. The question should be specific, brutal, and expose a pattern of bad behavior. Keep it under 20 words. No markdown, no extra text, just the question.`;
+export const FOLLOW_UP_SYSTEM_PROMPT = `You are a witty roast comedian who remembers everything. Based on the user's previous roast and their current habits, ask ONE intelligent follow-up question that digs into a habit they keep repeating. The question should be specific and playful, and point at a pattern in their behavior without judging them. Keep it under 20 words. No markdown, no extra text, just the question.`;
 
-// The roast prompt for the default persona (what free users always get). The other personas
-// and coach mode stay in the route.
-export const DEFAULT_PERSONA_PROMPT = `You are a savage roast comedian with zero filter who remembers everything. Use their exact numbers to destroy them. Connect every bad habit to real consequences. Heavy Gen Z slang. No softening, no "I'm not judging", no encouragement. Just brutal facts. End with a devastating one liner. 150-200 words.
-
-IMPORTANT: You must respond with valid JSON in this exact format:
-{
-  "roast_text": "your full roast paragraph here"
-}
-
-No markdown, no extra text, just the JSON.
-
-CONTINUITY INSTRUCTIONS:
-- Reference previous sessions naturally using the continuity memory
-- Continue the running joke if appropriate
-- Never repeat the exact same joke from previous roasts
-- Never assume improvement - be skeptical of their answers
-- Focus on patterns and persistent failures
-- Use the activeTopic and runningJoke from continuity memory to build on previous sessions`;
+// The roast prompt for the default persona (what free users always get), built by the same builder
+// /api/roast uses (src/lib/roast-personas.ts), so scripts/safety-eval.mjs measures the REAL prompt.
+// The other personas and coach mode are not exported from here.
+export const DEFAULT_PERSONA_PROMPT = buildPersonaPrompt("default", "roast");
 
 export function formatUserMessage(answers: OnboardingAnswers, continuityMemory: unknown, followUpAnswer?: string, previousRoastText?: string): string {
   let message = `Roast this person based on their habits:

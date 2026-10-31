@@ -1,6 +1,8 @@
 // Plan feature lists, shared by the landing page, /pricing and the upgrade modal
 // so they can't drift apart.
 import { FREE_DAILY_LIMIT, PRO_DAILY_LIMIT } from "@/lib/daily-limit";
+import { personaLabel } from "@/lib/roast-personas";
+import { ROAST_PERSONA_IDS } from "@/lib/roast-types";
 
 export const PRO_PRICE = "$6.99";
 
@@ -17,8 +19,8 @@ export const PRO_FEATURES = [
     desc: `Free gets ${FREE_DAILY_LIMIT} a day. Pro gets ${PRO_DAILY_LIMIT}.`,
   },
   {
-    title: "All 6 personas",
-    desc: "Chef Overcooked, Drill Sergeant — the full arsenal.",
+    title: `All ${ROAST_PERSONA_IDS.length} personas`,
+    desc: `${personaLabel("gordon_ramsay")}, ${personaLabel("drill_sergeant")} — the full arsenal.`,
   },
   {
     title: "Your Arc",

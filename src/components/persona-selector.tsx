@@ -1,5 +1,6 @@
 "use client";
 
+import { FREE_PERSONA, ROAST_PERSONA_LIST } from "@/lib/roast-personas";
 import type { RoastPersona } from "@/lib/roast-types";
 
 type Props = {
@@ -8,14 +9,8 @@ type Props = {
   onUpgradeRequest: () => void;
 };
 
-const PERSONAS: { id: RoastPersona; name: string; emoji: string; description: string }[] = [
-  { id: "default", name: "Default", emoji: "🔥", description: "Savage roast comedian" },
-  { id: "gordon_ramsay", name: "Chef Overcooked", emoji: "👨‍🍳", description: "Screaming chef energy" },
-  { id: "drill_sergeant", name: "Drill Sergeant", emoji: "🎖️", description: "Brutal discipline" },
-  { id: "toxic_friend", name: "Toxic Best Friend", emoji: "💅", description: "Savage but loving" },
-  { id: "corporate_manager", name: "Corporate Manager", emoji: "💼", description: "Performance review style" },
-  { id: "savage_grandma", name: "Savage Grandma", emoji: "👵", description: "Disappointed but funny" },
-];
+// Names, icons and blurbs come from src/lib/roast-personas.ts (the only place they are written).
+const PERSONAS = ROAST_PERSONA_LIST.map((p) => ({ id: p.id, name: p.label, emoji: p.emoji, description: p.blurb }));
 
 export function PersonaSelector({ onSelect, isPro, onUpgradeRequest }: Props) {
   return (
@@ -26,10 +21,10 @@ export function PersonaSelector({ onSelect, isPro, onUpgradeRequest }: Props) {
           <button
             key={persona.id}
             type="button"
-            onClick={() => (isPro || persona.id === "default" ? onSelect(persona.id) : onUpgradeRequest())}
-            disabled={!isPro && persona.id !== "default"}
+            onClick={() => (isPro || persona.id === FREE_PERSONA ? onSelect(persona.id) : onUpgradeRequest())}
+            disabled={!isPro && persona.id !== FREE_PERSONA}
             className={`rounded-xl border-2 px-4 py-4 text-center transition ${
-              isPro || persona.id === "default"
+              isPro || persona.id === FREE_PERSONA
                 ? "border-[#FF3D00] bg-[#FF3D00]/10 hover:bg-[#FF3D00]/20"
                 : "border-neutral-800 bg-neutral-900 opacity-50 cursor-not-allowed"
             }`}
@@ -37,7 +32,7 @@ export function PersonaSelector({ onSelect, isPro, onUpgradeRequest }: Props) {
             <div className="text-4xl mb-2">{persona.emoji}</div>
             <div className="text-sm font-bold text-[#FAFAFA]">{persona.name}</div>
             <div className="text-xs text-neutral-400 mt-1">
-              {isPro || persona.id === "default" ? persona.description : "Pro only 🔒"}
+              {isPro || persona.id === FREE_PERSONA ? persona.description : "Pro only 🔒"}
             </div>
           </button>
         ))}
