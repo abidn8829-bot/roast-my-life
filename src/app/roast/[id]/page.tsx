@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { RoastView } from "@/components/roast-view";
 import { backfillCardPunchline } from "@/lib/card-punchline";
@@ -62,6 +63,17 @@ export default async function RoastDetailPage({
 
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 py-12 text-text">
+        {/* Owner-only: this branch is only reached by the logged-in owner of the roast (see the guards above), so
+            the link can never send a logged-out or other viewer to the login page. */}
+        <div className="mb-6 w-full max-w-2xl">
+          <Link
+            href="/dashboard"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-4 text-sm font-medium text-text transition hover:border-ember/40"
+          >
+            <span aria-hidden>←</span>
+            Back to dashboard
+          </Link>
+        </div>
         <RoastView
           roastId={roast.id}
           roastText={roast.roast_text}
