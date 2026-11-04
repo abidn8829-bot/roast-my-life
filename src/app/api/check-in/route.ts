@@ -5,6 +5,7 @@ import { sendAchievementPush } from "@/lib/achievement-push";
 import { unlockAchievements, type AchievementId } from "@/lib/achievements";
 import { cleanRoastText } from "@/lib/clean-roast-text";
 import { checkDailyLimit } from "@/lib/daily-limit";
+import { changedScoresForPrompt, formatChangedScores } from "@/lib/changed-scores";
 import { calculateLifeScore, getFunnyTitle } from "@/lib/grades";
 import { getGroqApiKey, logGroqError } from "@/lib/groq-error";
 import { PENDING_ACHIEVEMENT_COOKIE, encodePendingAchievements } from "@/lib/pending-achievement-cookie";
@@ -196,12 +197,11 @@ async function handlePost(request: Request, slot: { release: () => void }) {
     return acc;
   }, {} as Record<Category, "improved" | "same" | "worsened">);
   const overallDirection = lifeScore > previousLifeScore ? "improved" : "not improved";
-  const changedCategoryScores: Partial<Record<Category, { was: number; now: number }>> = {};
-  for (const key of CATEGORIES) {
-    if (filteredGradeUpdates[key]) {
-      changedCategoryScores[key] = { was: GRADE_SCORES[categoryScores[key].grade], now: GRADE_SCORES[updatedCategoryScores[key].grade] };
-    }
-  }
+  // Text for the roast prompt ONLY (it is read once, at the roast call below): a graded category whose number did not
+  // move is left out, so the model is never handed 100 to 100 as a change. Saved scores come from updatedCategoryScores.
+  const changedCategoryScores = changedScoresForPrompt(
+    CATEGORIES.filter((key) => filteredGradeUpdates[key]).map((key) => ({ key, was: GRADE_SCORES[categoryScores[key].grade], now: GRADE_SCORES[updatedCategoryScores[key].grade] })),
+  );
   const newGradeForCategory = filteredGradeUpdates[category] ?? previousGrade;
   const result = {
     new_grade: newGradeForCategory,
@@ -265,7 +265,7 @@ async function handlePost(request: Request, slot: { release: () => void }) {
       model: MODEL, max_tokens: 350, reasoning_effort: "low",
       messages: [
         { role: "system", content: `${buildPersonaPrompt(resolvedPersona, "checkin")}\n\n${OUTPUT_GUARDRAIL}` },
-        { role: "user", content: `Categories graded this check-in (score is 0-100 for that category only, separate from life score): ${JSON.stringify(changedCategoryScores)}\nCategory directions this check-in, all 5 (qualitative only, no numbers): ${JSON.stringify(categoryDirections)}\nOverall life score (0-100 average across all categories): was ${previousLifeScore}, now ${lifeScore} (${overallDirection})\nCheck-in answer: ${answer}\nContinuity memory: ${JSON.stringify(nextMemory)}` },
+        { role: "user", content: `Categories graded this check-in (score is 0-100 for that category only, separate from life score): ${formatChangedScores(changedCategoryScores)}\nCategory directions this check-in, all 5 (qualitative only, no numbers): ${JSON.stringify(categoryDirections)}\nOverall life score (0-100 average across all categories): was ${previousLifeScore}, now ${lifeScore} (${overallDirection})\nCheck-in answer: ${answer}\nContinuity memory: ${JSON.stringify(nextMemory)}` },
       ],
     });
     const generatedRoast = roastCompletion.choices[0]?.message?.content?.trim() ?? "";
