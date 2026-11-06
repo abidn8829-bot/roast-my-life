@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { GoogleAuthButton } from "@/components/google-auth-button";
+import { track } from "@/lib/track";
 
 export function SignupForm() {
   const router = useRouter();
@@ -16,6 +17,10 @@ export function SignupForm() {
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
 
+  useEffect(() => {
+    track("signup_viewed");
+  }, []);
+
   const urlError = searchParams.get("error");
   const displayError =
     error ??
@@ -23,6 +28,7 @@ export function SignupForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    track("signup_started", { method: "email" });
     setError(null);
     setInfo(null);
     setLoading(true);
@@ -114,7 +120,7 @@ export function SignupForm() {
         <span className="absolute inset-x-0 top-1/2 z-0 h-px -translate-y-1/2 bg-line-subtle-legacy" />
       </div>
 
-      <GoogleAuthButton errorReturnPath="/signup" />
+      <GoogleAuthButton errorReturnPath="/signup" onStart={() => track("signup_started", { method: "google" })} />
 
       <p className="text-center text-sm text-text-secondary-legacy">
         Already have an account?{" "}

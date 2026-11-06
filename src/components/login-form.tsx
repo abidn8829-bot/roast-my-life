@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { GoogleAuthButton } from "@/components/google-auth-button";
+import { track } from "@/lib/track";
 
 function safeNext(path: string | null) {
   if (!path || !path.startsWith("/") || path.startsWith("//")) {
@@ -22,6 +23,10 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    track("login_viewed");
+  }, []);
 
   const urlError = searchParams.get("error");
   const displayError =
@@ -46,6 +51,7 @@ export function LoginForm() {
       setError(signError.message);
       return;
     }
+    track("login_completed", { method: "email" });
     router.push(next.startsWith("/") ? next : "/dashboard");
     router.refresh();
   }

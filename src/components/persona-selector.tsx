@@ -7,12 +7,14 @@ type Props = {
   onSelect: (persona: RoastPersona) => void;
   isPro: boolean;
   onUpgradeRequest: () => void;
+  /** True while a roast request is running: every card ignores taps. */
+  disabled?: boolean;
 };
 
 // Names, icons and blurbs come from src/lib/roast-personas.ts (the only place they are written).
 const PERSONAS = ROAST_PERSONA_LIST.map((p) => ({ id: p.id, name: p.label, emoji: p.emoji, description: p.blurb }));
 
-export function PersonaSelector({ onSelect, isPro, onUpgradeRequest }: Props) {
+export function PersonaSelector({ onSelect, isPro, onUpgradeRequest, disabled = false }: Props) {
   return (
     <div className="w-full max-w-md">
       <h2 className="mb-6 text-center text-2xl font-bold text-text-legacy">Choose your persona</h2>
@@ -22,7 +24,7 @@ export function PersonaSelector({ onSelect, isPro, onUpgradeRequest }: Props) {
             key={persona.id}
             type="button"
             onClick={() => (isPro || persona.id === FREE_PERSONA ? onSelect(persona.id) : onUpgradeRequest())}
-            disabled={!isPro && persona.id !== FREE_PERSONA}
+            disabled={disabled || (!isPro && persona.id !== FREE_PERSONA)}
             className={`rounded-xl border-2 px-4 py-4 text-center transition ${
               isPro || persona.id === FREE_PERSONA
                 ? "border-ember-legacy bg-ember-legacy/10 hover:bg-ember-legacy/20"

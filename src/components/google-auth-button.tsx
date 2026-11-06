@@ -7,16 +7,20 @@ type Props = {
   label?: string;
   /** Path for ?error= when OAuth fails (e.g. "/signup" on the signup page). */
   errorReturnPath?: string;
+  /** Called when the button is clicked, before the redirect to Google (analytics hook). */
+  onStart?: () => void;
 };
 
 export function GoogleAuthButton({
   label = "Continue with Google",
   errorReturnPath = "/login",
+  onStart,
 }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function signInWithGoogle() {
     setLoading(true);
+    onStart?.();
     
     try {
       const supabase = createSupabaseBrowserClient();
