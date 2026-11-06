@@ -22,7 +22,7 @@ export function LogoutButton() {
       type="button"
       onClick={() => void logout()}
       disabled={loading}
-      className="rounded-md border border-neutral-700 bg-transparent px-4 py-2 text-sm font-medium text-[#FAFAFA] transition hover:bg-neutral-900 disabled:opacity-50"
+      className="rounded-md border border-border-strong-legacy bg-transparent px-4 py-2 text-sm font-medium text-text-legacy transition hover:bg-surface-sunken-legacy disabled:opacity-50"
     >
       {loading ? "Signing out…" : "Log out"}
     </button>

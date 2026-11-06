@@ -32,7 +32,7 @@ function usePrivateScreen() {
 const shell = "ph-no-capture flex min-h-screen w-full flex-col items-center justify-center px-4 py-10";
 const card = "w-full max-w-md text-left";
 const primaryBtn =
-  "flex min-h-12 w-full items-center justify-center rounded-xl bg-ember px-6 py-3 text-center text-base font-semibold text-white transition hover:brightness-110";
+  "flex min-h-12 w-full items-center justify-center rounded-xl bg-ember px-6 py-3 text-center text-base font-semibold text-on-accent transition hover:brightness-110";
 const outlineBtn =
   "flex min-h-12 w-full items-center justify-center rounded-xl border border-border px-6 py-3 text-center text-base font-semibold text-text transition hover:border-text-faint";
 const quietBtn =

@@ -11,10 +11,10 @@ export const metadata = pageMetadata({
 
 export default function SignupPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[#0A0A0A] px-4 py-12 text-[#FAFAFA]">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 py-12 text-text-legacy">
       <Suspense
         fallback={
-          <p className="text-sm text-neutral-400">Loading…</p>
+          <p className="text-sm text-text-secondary-legacy">Loading…</p>
         }
       >
         <SignupForm />

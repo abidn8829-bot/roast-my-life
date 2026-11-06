@@ -52,29 +52,29 @@ export function ContactPage() {
   if (safetyPage) return <SafetyPage payload={safetyPage} />;
 
   return (
-    <main className="min-h-screen bg-[#0A0A0A] px-4 py-10 text-[#FAFAFA]">
+    <main className="min-h-screen bg-bg px-4 py-10 text-text-legacy">
       <div className="mx-auto w-full max-w-sm flex flex-col gap-6">
         <div className="text-center mb-4">
-          <h1 className="text-3xl font-black tracking-tight text-[#FF3D00] mb-2">
+          <h1 className="text-3xl font-black tracking-tight text-ember-legacy mb-2">
             EMBER
           </h1>
-          <p className="text-sm text-neutral-400">Got something to say?</p>
+          <p className="text-sm text-text-secondary-legacy">Got something to say?</p>
         </div>
 
         {sent ? (
-          <p className="rounded-md border border-neutral-700 bg-neutral-900/60 px-3 py-2 text-sm text-neutral-200 text-center">
+          <p className="rounded-md border border-border-strong-legacy bg-surface-sunken-legacy/60 px-3 py-2 text-sm text-text-emphasis-legacy text-center">
             Message sent. We&apos;ll get back to you.
           </p>
         ) : (
           <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-4">
             {error ? (
-              <p className="rounded-md border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+              <p className="rounded-md border border-error-border/60 bg-error-bg/40 px-3 py-2 text-sm text-error-text">
                 {error}
               </p>
             ) : null}
 
             <label className="flex flex-col gap-1.5 text-sm">
-              <span className="text-neutral-300">Name</span>
+              <span className="text-text-body-legacy">Name</span>
               <input
                 name="name"
                 type="text"
@@ -82,12 +82,12 @@ export function ContactPage() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="rounded-md border border-neutral-800 bg-[#141414] px-3 py-2 text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2"
+                className="rounded-md border border-line-subtle-legacy bg-surface px-3 py-2 text-text-legacy outline-none ring-ember-legacy focus:ring-2"
               />
             </label>
 
             <label className="flex flex-col gap-1.5 text-sm">
-              <span className="text-neutral-300">Email</span>
+              <span className="text-text-body-legacy">Email</span>
               <input
                 name="email"
                 type="email"
@@ -95,34 +95,34 @@ export function ContactPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-md border border-neutral-800 bg-[#141414] px-3 py-2 text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2"
+                className="rounded-md border border-line-subtle-legacy bg-surface px-3 py-2 text-text-legacy outline-none ring-ember-legacy focus:ring-2"
               />
             </label>
 
             <label className="flex flex-col gap-1.5 text-sm">
-              <span className="text-neutral-300">Message</span>
+              <span className="text-text-body-legacy">Message</span>
               <textarea
                 name="message"
                 required
                 rows={5}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                className="ph-no-capture resize-none rounded-md border border-neutral-800 bg-[#141414] px-3 py-2 text-[#FAFAFA] outline-none ring-[#FF3D00] focus:ring-2"
+                className="ph-no-capture resize-none rounded-md border border-line-subtle-legacy bg-surface px-3 py-2 text-text-legacy outline-none ring-ember-legacy focus:ring-2"
               />
             </label>
 
             <button
               type="submit"
               disabled={loading}
-              className="mt-1 rounded-md bg-[#FF3D00] px-4 py-2.5 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-50"
+              className="mt-1 rounded-md bg-ember-legacy px-4 py-2.5 text-sm font-medium text-on-accent transition hover:brightness-110 disabled:opacity-50"
             >
               {loading ? "Sending…" : "Send message"}
             </button>
           </form>
         )}
 
-        <p className="text-center text-sm text-neutral-400">
-          <Link href="/" className="font-medium text-[#FF3D00] hover:underline">
+        <p className="text-center text-sm text-text-secondary-legacy">
+          <Link href="/" className="font-medium text-ember-legacy hover:underline">
             Back to home
           </Link>
         </p>

@@ -87,7 +87,7 @@ function LockedMission({ compact, userEmail }: { compact: boolean; userEmail?: s
           href={getUpgradeUrl(userEmail)}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-1 inline-block rounded-lg bg-ember px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+          className="mt-1 inline-block rounded-lg bg-ember px-4 py-2 text-sm font-semibold text-on-accent transition hover:brightness-110"
         >
           Upgrade to Pro 🔥
         </a>
@@ -163,7 +163,7 @@ export function MissionCard({ isPro, variant, userEmail }: Props) {
       type="button"
       onClick={() => act("start")}
       disabled={busy !== null}
-      className="rounded-lg bg-ember px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+      className="rounded-lg bg-ember px-4 py-2 text-sm font-semibold text-on-accent transition hover:brightness-110 disabled:opacity-60"
     >
       {busy === "start" ? "Finding your leak…" : label}
     </button>
@@ -191,7 +191,7 @@ export function MissionCard({ isPro, variant, userEmail }: Props) {
                   type="button"
                   onClick={() => act("done")}
                   disabled={busy !== null}
-                  className="rounded-lg bg-ember px-3 py-1.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+                  className="rounded-lg bg-ember px-3 py-1.5 text-sm font-semibold text-on-accent transition hover:brightness-110 disabled:opacity-60"
                 >
                   {busy === "done" ? "Saving…" : "Done ✅"}
                 </button>
@@ -294,7 +294,7 @@ export function MissionCard({ isPro, variant, userEmail }: Props) {
             type="button"
             onClick={() => act("done")}
             disabled={busy !== null}
-            className="rounded-lg bg-ember px-4 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-60"
+            className="rounded-lg bg-ember px-4 py-2.5 text-sm font-semibold text-on-accent transition hover:brightness-110 disabled:opacity-60"
           >
             {busy === "done" ? "Saving…" : "Done ✅"}
           </button>

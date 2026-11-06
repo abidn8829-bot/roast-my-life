@@ -139,8 +139,8 @@ function ScoreTrend({ scores }: { scores: number[] }) {
       >
         <defs>
           <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ff5a36" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#ff5a36" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--ember)" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="var(--ember)" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path
@@ -150,19 +150,19 @@ function ScoreTrend({ scores }: { scores: number[] }) {
         <path
           d={pathD}
           fill="none"
-          stroke="#ff5a36"
+          stroke="var(--ember)"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
         {points.map((p, i) => (
           <g key={i}>
-            <circle cx={p.x} cy={p.y} r="5" fill="#1c1c1f" stroke="#ff5a36" strokeWidth="2" />
+            <circle cx={p.x} cy={p.y} r="5" fill="var(--surface-2)" stroke="var(--ember)" strokeWidth="2" />
             <text
               x={p.x}
               y={p.y - 10}
               textAnchor="middle"
-              fill="#98979c"
+              fill="var(--text-muted)"
               fontSize="10"
               fontWeight="600"
             >
@@ -474,7 +474,7 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
             href={getUpgradeUrl(userEmail)}
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full rounded-xl bg-ember px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
+            className="block w-full rounded-xl bg-ember px-4 py-4 text-center text-base font-semibold text-on-accent shadow-ember-glow transition hover:brightness-110"
           >
             Upgrade to Pro 🔥
           </a>
@@ -483,7 +483,7 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
       ) : (
         <Link
           href="/onboarding"
-          className="block w-full rounded-xl bg-ember px-4 py-4 text-center text-base font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
+          className="block w-full rounded-xl bg-ember px-4 py-4 text-center text-base font-semibold text-on-accent shadow-ember-glow transition hover:brightness-110"
         >
           Get Roasted This Week
         </Link>

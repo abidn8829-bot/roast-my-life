@@ -251,7 +251,7 @@ export function ArcSection({ variant = "full", userEmail }: Props) {
                     href={getUpgradeUrl(userEmail)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 inline-block rounded-lg bg-ember px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+                    className="mt-1 inline-block rounded-lg bg-ember px-4 py-2 text-sm font-semibold text-on-accent transition hover:brightness-110"
                   >
                     Upgrade to Pro 🔥
                   </a>

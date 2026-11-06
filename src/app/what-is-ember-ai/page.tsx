@@ -12,18 +12,18 @@ export const metadata = pageMetadata({
 
 export default function WhatIsEmberAiPage() {
   return (
-    <main className="min-h-screen bg-[#0A0A0A] px-4 py-10 text-[#FAFAFA]">
+    <main className="min-h-screen bg-bg px-4 py-10 text-text-legacy">
       <div className="mx-auto w-full max-w-2xl">
         <Link
           href="/"
-          className="mb-8 inline-block text-sm font-semibold text-[#FF3D00] hover:underline"
+          className="mb-8 inline-block text-sm font-semibold text-ember-legacy hover:underline"
         >
           ← Back to Home
         </Link>
 
         <h1 className="text-4xl font-black mb-6">What is Ember AI?</h1>
 
-        <p className="mb-8 text-lg leading-relaxed text-neutral-300">
+        <p className="mb-8 text-lg leading-relaxed text-text-body-legacy">
           Ember AI is an AI accountability app. You answer 5 quick questions about your phone
           time, sleep, spending and biggest broken promise. Ember AI roasts your habits using
           your own answers, gives you a Life Score and a report card, and checks in on you every
@@ -32,14 +32,14 @@ export default function WhatIsEmberAiPage() {
 
         <Link
           href="/signup"
-          className="mb-12 inline-block rounded-xl bg-ember px-8 py-4 text-lg font-bold text-white transition hover:brightness-110 hover:scale-[1.02]"
+          className="mb-12 inline-block rounded-xl bg-ember px-8 py-4 text-lg font-bold text-on-accent transition hover:brightness-110 hover:scale-[1.02]"
         >
           Start your arc →
         </Link>
 
-        <div className="space-y-6 text-neutral-300">
+        <div className="space-y-6 text-text-body-legacy">
           <section>
-            <h2 className="text-xl font-bold text-[#FAFAFA] mb-3">What does Ember AI do?</h2>
+            <h2 className="text-xl font-bold text-text-legacy mb-3">What does Ember AI do?</h2>
             <p className="leading-relaxed">
               Ember AI is a web app that holds you accountable for your habits. It asks 5 quick
               questions, writes a funny, honest roast from your answers, grades you in five
@@ -48,7 +48,7 @@ export default function WhatIsEmberAiPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-[#FAFAFA] mb-3">How is the roast different?</h2>
+            <h2 className="text-xl font-bold text-text-legacy mb-3">How is the roast different?</h2>
             <p className="leading-relaxed">
               Every roast is written from your own answers, like your screen time, sleep and
               spending. It&apos;s blunt and funny, with a point: to push you into doing something
@@ -57,7 +57,7 @@ export default function WhatIsEmberAiPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-[#FAFAFA] mb-3">What is the Life Score?</h2>
+            <h2 className="text-xl font-bold text-text-legacy mb-3">What is the Life Score?</h2>
             <p className="leading-relaxed">
               Your Life Score is an overall score from 0 to 100 based on your answers. Ember AI
               also grades you from A to F in five categories: Sleep, Fitness, Discipline, Focus
@@ -66,7 +66,7 @@ export default function WhatIsEmberAiPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-[#FAFAFA] mb-3">Is Ember AI free?</h2>
+            <h2 className="text-xl font-bold text-text-legacy mb-3">Is Ember AI free?</h2>
             <p className="leading-relaxed">
               Yes. You can start for free, with no credit card. There is also a paid plan, Ember
               AI Pro, at {PRO_PRICE}/month for people who want more.
@@ -74,12 +74,12 @@ export default function WhatIsEmberAiPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-[#FAFAFA] mb-3">Who makes Ember AI?</h2>
+            <h2 className="text-xl font-bold text-text-legacy mb-3">Who makes Ember AI?</h2>
             <p className="leading-relaxed">Ember AI is built and run by a solo founder.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-[#FAFAFA] mb-3">
+            <h2 className="text-xl font-bold text-text-legacy mb-3">
               Is Ember AI related to other products called Ember?
             </h2>
             <p className="leading-relaxed">
@@ -89,10 +89,10 @@ export default function WhatIsEmberAiPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-[#FAFAFA] mb-3">How do I log in?</h2>
+            <h2 className="text-xl font-bold text-text-legacy mb-3">How do I log in?</h2>
             <p className="leading-relaxed">
               Go to the{" "}
-              <Link href="/login" className="font-semibold text-[#FF3D00] hover:underline">
+              <Link href="/login" className="font-semibold text-ember-legacy hover:underline">
                 login page
               </Link>{" "}
               and sign in with your email and password, or with Google.

@@ -266,7 +266,7 @@ export function RoastView({
             href={getUpgradeUrl(userEmail)}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-2 inline-block rounded-lg bg-ember px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
+            className="mt-2 inline-block rounded-lg bg-ember px-5 py-2.5 text-sm font-semibold text-on-accent transition hover:brightness-110"
           >
             Unlock My Full Read →
           </a>

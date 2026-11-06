@@ -17,6 +17,30 @@
   --grade-d: #f2994a;
   --grade-f: #eb5757;
 
+  /* --- Transitional "-legacy" tokens (phase 0) ---------------------------------
+     Exact copies of colours that older pages hard-coded, so they now come from
+     this file. They are NOT the same as the tokens above (e.g. --ember-legacy
+     #ff3d00 vs --ember #ff5a36). Merge or retire them during the redesign. */
+  --ember-legacy: #ff3d00;
+  --on-accent: #ffffff; /* text on orange buttons */
+  --text-legacy: #fafafa;
+  --text-emphasis-legacy: oklch(92.2% 0 0); /* was neutral-200 */
+  --text-body-legacy: oklch(87% 0 0); /* was neutral-300 */
+  --text-secondary-legacy: oklch(70.8% 0 0); /* was neutral-400 */
+  --text-tertiary-legacy: oklch(55.6% 0 0); /* was neutral-500 */
+  --panel-legacy: #111111;
+  --control-legacy: #1a1a1a;
+  --surface-sunken-legacy: oklch(20.5% 0 0); /* was neutral-900 */
+  --line-subtle-legacy: oklch(26.9% 0 0); /* was neutral-800 (same as #262626 to the pixel) */
+  --border-strong-legacy: oklch(37.1% 0 0); /* was neutral-700 */
+  --border-hover-legacy: oklch(55.6% 0 0); /* was neutral-500 */
+  --line-legacy: #333333;
+  --line-hover-legacy: #4a4a4a;
+  --error-text: oklch(88.5% 0.062 18.334); /* was red-200 */
+  --error-border: oklch(39.6% 0.141 25.723); /* was red-900 */
+  --error-bg: oklch(25.8% 0.092 26.042); /* was red-950 */
+  --overlay: #000000; /* scrim behind modals; opacity set at the use site */
+
   /* legacy aliases kept for anything not yet migrated */
   --background: var(--bg);
   --foreground: var(--text);
@@ -40,6 +64,26 @@
   --color-grade-c: var(--grade-c);
   --color-grade-d: var(--grade-d);
   --color-grade-f: var(--grade-f);
+  --color-ember-legacy: var(--ember-legacy);
+  --color-on-accent: var(--on-accent);
+  --color-text-legacy: var(--text-legacy);
+  --color-text-emphasis-legacy: var(--text-emphasis-legacy);
+  --color-text-body-legacy: var(--text-body-legacy);
+  --color-text-secondary-legacy: var(--text-secondary-legacy);
+  --color-text-tertiary-legacy: var(--text-tertiary-legacy);
+  --color-panel-legacy: var(--panel-legacy);
+  --color-control-legacy: var(--control-legacy);
+  --color-surface-sunken-legacy: var(--surface-sunken-legacy);
+  --color-line-subtle-legacy: var(--line-subtle-legacy);
+  --color-border-strong-legacy: var(--border-strong-legacy);
+  --color-border-hover-legacy: var(--border-hover-legacy);
+  --color-line-legacy: var(--line-legacy);
+  --color-line-hover-legacy: var(--line-hover-legacy);
+  --color-error-text: var(--error-text);
+  --color-error-border: var(--error-border);
+  --color-error-bg: var(--error-bg);
+  --color-overlay: var(--overlay);
+  --shadow-ember-glow: 0 0 24px rgba(255, 90, 54, 0.3);
   --font-sans: var(--font-poppins);
   --font-mono: var(--font-geist-mono);
 }

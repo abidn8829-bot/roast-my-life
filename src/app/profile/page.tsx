@@ -24,7 +24,7 @@ export default async function ProfilePage() {
   const subscriptionTier = userData?.subscription_tier || "free";
 
   return (
-    <main className="min-h-screen bg-[#0A0A0A] px-4 py-10 text-[#FAFAFA]">
+    <main className="min-h-screen bg-bg px-4 py-10 text-text-legacy">
       <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
         <DashboardHeader isPro={subscriptionTier === "pro"} name={user.email || ""} userEmail={user.email ?? undefined} />
         <ProfileContent

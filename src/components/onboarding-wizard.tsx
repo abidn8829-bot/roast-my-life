@@ -449,7 +449,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
           <button
             type="button"
             onClick={() => router.replace("/dashboard")}
-            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
+            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-on-accent shadow-ember-glow transition hover:brightness-110"
           >
             Back to dashboard
           </button>
@@ -539,7 +539,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
               <button
                 onClick={() => void onCheckInSubmit()}
                 disabled={!followUpAnswer.trim() || isGenerating}
-                className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-on-accent shadow-ember-glow transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Continue →
               </button>
@@ -584,7 +584,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
           <button
             onClick={onFollowUpSubmit}
             disabled={!followUpAnswer.trim()}
-            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-on-accent shadow-ember-glow transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Get Roasted →
           </button>
@@ -705,7 +705,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
           <button
             type="button"
             onClick={onNext}
-            className="rounded-xl bg-ember px-8 py-4 text-lg font-medium text-white transition hover:brightness-110 hover:scale-105"
+            className="rounded-xl bg-ember px-8 py-4 text-lg font-medium text-on-accent transition hover:brightness-110 hover:scale-105"
           >
             {slideIndex === allQuestions.length - 1 ? "Choose Your Roaster →" : "Next →"}
           </button>

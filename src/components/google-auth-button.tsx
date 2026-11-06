@@ -40,7 +40,7 @@ export function GoogleAuthButton({
       type="button"
       onClick={() => void signInWithGoogle()}
       disabled={loading}
-      className="w-full rounded-md border-2 border-neutral-700 bg-[#1a1a1a] px-4 py-3 text-sm font-bold text-[#FAFAFA] transition hover:bg-neutral-800 hover:border-neutral-600 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="w-full rounded-md border-2 border-border-strong-legacy bg-control-legacy px-4 py-3 text-sm font-bold text-text-legacy transition hover:bg-line-subtle-legacy hover:border-neutral-600 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {loading ? "Connecting..." : label}
     </button>
