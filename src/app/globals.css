@@ -236,3 +236,64 @@ body {
     animation: none;
   }
 }
+
+/* --- Journal landing: hover / focus mechanics (src/components/journal-home.tsx) ---
+   Copied from the design mockup, scoped with a jl- prefix. Colours come from the
+   journal tokens. Everything is switched off under prefers-reduced-motion. */
+.jl-cell { position: relative; outline: 0; }
+.jl-cell:hover,
+.jl-cell:focus { box-shadow: 0 0 0 1px var(--text); }
+.jl-tip {
+  position: absolute; bottom: calc(100% + 8px); left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--text); color: var(--bg);
+  font-weight: 300; font-size: 12px; line-height: 1.35;
+  padding: 8px 10px; border-radius: 6px; width: max-content; max-width: 170px;
+  opacity: 0; pointer-events: none; transition: opacity 0.15s, transform 0.15s; z-index: 5;
+}
+.jl-cell:hover .jl-tip,
+.jl-cell:focus .jl-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
+.jl-cell.l .jl-tip { left: 0; transform: translateY(4px); }
+.jl-cell.l:hover .jl-tip,
+.jl-cell.l:focus .jl-tip { transform: translateY(0); }
+.jl-cell.r .jl-tip { left: auto; right: 0; transform: translateY(4px); }
+.jl-cell.r:hover .jl-tip,
+.jl-cell.r:focus .jl-tip { transform: translateY(0); }
+
+/* handwritten notes that appear on hover / focus */
+.jl-rev {
+  opacity: 0; transform: translateY(4px) rotate(var(--r, 0deg));
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.jl-hov:hover .jl-rev,
+.jl-hov:focus .jl-rev,
+.jl-hov:focus-within .jl-rev { opacity: 1; transform: rotate(var(--r, 0deg)); }
+
+/* hand-drawn circle that draws itself */
+.jl-draw path { stroke-dasharray: 1500; stroke-dashoffset: 1500; transition: stroke-dashoffset 0.7s ease; }
+.jl-hov:hover .jl-draw path,
+.jl-hov:focus .jl-draw path,
+.jl-hov:focus-within .jl-draw path { stroke-dashoffset: 0; }
+
+.jl-stamp { transition: transform 0.3s ease; }
+.jl-stamp:hover,
+.jl-stamp:focus { transform: rotate(-5deg) scale(1.03); }
+.jl-stamp .jl-mark { opacity: 0; transition: opacity 0.3s ease 0.05s; }
+.jl-stamp:hover .jl-mark,
+.jl-stamp:focus .jl-mark { opacity: 1; }
+
+.jl-wm .jl-spark { transition: transform 0.3s ease; }
+.jl-wm:hover .jl-spark,
+.jl-wm:focus-visible .jl-spark { transform: translateY(-6px) scale(1.3); }
+
+.jl-shoot { position: absolute; opacity: 0; pointer-events: none; }
+.jl-foot:hover .jl-shoot { animation: jl-cross 1.3s ease-out 1 both; }
+@keyframes jl-cross {
+  0% { opacity: 0; transform: translate(0, 0) rotate(-4deg); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(420px, -26px) rotate(-4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jl *, .jl *::before, .jl *::after { animation: none !important; transition: none !important; }
+}

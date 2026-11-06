@@ -21,10 +21,12 @@ export const sora = Sora({
   display: "swap",
 });
 
-// Short handwritten notes only.
+// Short handwritten notes only (400), plus 700 for the one highlighted word in the landing headline.
+// preload: false => the file is fetched when the text is rendered, not via a <link rel="preload">.
 export const gaegu = Gaegu({
-  weight: "400",
+  weight: ["400", "700"],
   subsets: ["latin"],
   variable: "--font-gaegu",
   display: "swap",
+  preload: false,
 });
