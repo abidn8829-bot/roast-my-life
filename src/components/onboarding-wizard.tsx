@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { OnboardingAnswers, RoastMode, RoastPersona } from "@/lib/roast-types";
-import posthog from "posthog-js";
+import { track } from "@/lib/track";
 import { PersonaSelector } from "@/components/persona-selector";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { GentleNotice, SafetyPage, SafetyUnavailable } from "@/components/safety-page";
@@ -100,6 +100,8 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   const [selectedPersona, setSelectedPersona] = useState<RoastPersona>("default");
   const [upgradeReason, setUpgradeReason] = useState<"daily_limit" | "pro_feature" | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  // Set synchronously so a fast double tap cannot start a second roast request (state updates too late for that).
+  const generatingRef = useRef(false);
   const [followUpQuestion, setFollowUpQuestion] = useState<string | null>(null);
   const [followUpAnswer, setFollowUpAnswer] = useState("");
   const [isReturningUser, setIsReturningUser] = useState(false);
@@ -150,7 +152,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   };
 
   useEffect(() => {
-    posthog.capture('onboarding_started');
+    track('onboarding_started');
     // Check if user is pro and if they're a returning user
     Promise.all([
       fetch('/api/user/tier').then(res => res.json()),
@@ -279,63 +281,91 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   // The persona is passed in (not read from state) so the request carries the one just picked:
   // a state update made in the same click handler is not visible to this closure yet.
   const generateRoast = useCallback(async (persona: RoastPersona) => {
-    setError(null);
-    setIsGenerating(true);
+    // A second call while one is running (double tap, Enter held down) is ignored. The ref is reset in the
+    // finally block below, so a failed request can be retried.
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+    // Declared outside the try so the finally block can always stop the delayed loading screen.
+    let loadingTimeout: ReturnType<typeof setTimeout> | undefined;
+    try {
+      setError(null);
+      setIsGenerating(true);
 
-    // Show loading state only after a delay to avoid flash for immediate errors
-    const loadingTimeout = setTimeout(() => {
-      setStep("loading");
-      setLoadingMsgIndex(0);
-    }, 500);
+      // Show loading state only after a delay to avoid flash for immediate errors
+      loadingTimeout = setTimeout(() => {
+        setStep("loading");
+        setLoadingMsgIndex(0);
+      }, 500);
 
-    const res = await fetch("/api/roast", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...buildAnswers(),
-        mode: "roast",
-        persona,
-        followUpAnswer: followUpAnswer || undefined,
-      }),
-    });
-
-    clearTimeout(loadingTimeout);
-
-    const data = (await res.json()) as { id?: string; error?: string; code?: string; tier?: string; followUpQuestion?: string; requiresFollowUp?: boolean; newlyUnlockedAchievements?: string[]; safety?: SafetyPayload; gentle?: boolean; minutesLeft?: number | null };
-    if (handleSafetyResponse(data)) return;
-    const roastId =
-      typeof data.id === "string" ? data.id.trim() : String(data.id ?? "");
-
-    // Check if follow-up question is required
-    if (data.requiresFollowUp && data.followUpQuestion) {
-      setFollowUpQuestion(data.followUpQuestion);
-      setStep("followup");
-      setIsGenerating(false);
-      return;
-    }
-
-    if (!res.ok || !roastId) {
-      console.error("[onboarding] roast API failed:", res.status);
-      setIsGenerating(false);
-
-      // Free users hitting the daily limit get the upgrade modal; Pro users fall through
-      // to the error line below, which shows the server's "come back tomorrow" message.
-      if (res.status === 429 && data.code === "daily_limit" && data.tier === "free") {
-        setUpgradeReason("daily_limit");
+      type RoastReply = { id?: string; error?: string; code?: string; tier?: string; followUpQuestion?: string; requiresFollowUp?: boolean; newlyUnlockedAchievements?: string[]; safety?: SafetyPayload; gentle?: boolean; minutesLeft?: number | null };
+      let res: Response;
+      let data: RoastReply;
+      try {
+        res = await fetch("/api/roast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...buildAnswers(),
+            mode: "roast",
+            persona,
+            followUpAnswer: followUpAnswer || undefined,
+          }),
+        });
+        clearTimeout(loadingTimeout);
+        data = (await res.json()) as RoastReply;
+      } catch {
+        // Offline, dropped connection or a non-JSON reply: back to the last question so it can be retried.
+        clearTimeout(loadingTimeout);
+        track("roast_failed", { reason: "network" });
+        setIsGenerating(false);
+        setError("Couldn't reach Ember. Check your connection and try again.");
+        setStep(allQuestions.length - 1);
         return;
       }
 
-      setError(data.error ?? "Something went wrong. Try again.");
-      setStep(allQuestions.length - 1);
-      return;
-    }
+      if (handleSafetyResponse(data)) {
+        track("roast_failed", { reason: "safety" });
+        return;
+      }
+      const roastId =
+        typeof data.id === "string" ? data.id.trim() : String(data.id ?? "");
 
-    posthog.capture('roast_generated');
-    for (const achievementId of data.newlyUnlockedAchievements ?? []) {
-      posthog.capture("achievement_unlocked", { achievement_id: achievementId });
+      // Check if follow-up question is required
+      if (data.requiresFollowUp && data.followUpQuestion) {
+        setFollowUpQuestion(data.followUpQuestion);
+        setStep("followup");
+        setIsGenerating(false);
+        return;
+      }
+
+      if (!res.ok || !roastId) {
+        console.error("[onboarding] roast API failed:", res.status);
+        setIsGenerating(false);
+
+        // Free users hitting the daily limit get the upgrade modal; Pro users fall through
+        // to the error line below, which shows the server's "come back tomorrow" message.
+        if (res.status === 429 && data.code === "daily_limit" && data.tier === "free") {
+          track("roast_failed", { reason: "limit" });
+          setUpgradeReason("daily_limit");
+          return;
+        }
+
+        track("roast_failed", { reason: res.status === 429 && data.code === "daily_limit" ? "limit" : "error" });
+        setError(data.error ?? "Something went wrong. Try again.");
+        setStep(allQuestions.length - 1);
+        return;
+      }
+
+      track('roast_generated');
+      for (const achievementId of data.newlyUnlockedAchievements ?? []) {
+        track("achievement_unlocked", { achievement_id: achievementId });
+      }
+      router.replace(`/roast/${encodeURIComponent(roastId)}?share=1`);
+      router.refresh();
+    } finally {
+      clearTimeout(loadingTimeout);
+      generatingRef.current = false;
     }
-    router.replace(`/roast/${encodeURIComponent(roastId)}?share=1`);
-    router.refresh();
   }, [phoneHours, worstApp, sleepHours, foodDeliverySpend, neverDoThing, socialMediaHours, workoutFrequency, isPro, router, allQuestions]);
 
   useEffect(() => {
@@ -353,6 +383,8 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
       return;
     }
     setError(null);
+    // Only the fixed question key and position are sent, never what the user typed.
+    track("onboarding_question_answered", { step_index: step, question_key: allQuestions[step].key });
     if (step < allQuestions.length - 1) {
       setStep(step + 1);
     } else {
@@ -372,6 +404,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   }
 
   function onCheckInPersonaSelect(persona: RoastPersona) {
+    track("persona_selected", { persona, context: "checkin" });
     setSelectedPersona(persona);
     setStep("checkin");
   }
@@ -403,7 +436,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
         return;
       }
       for (const achievementId of data.newlyUnlockedAchievements ?? []) {
-        posthog.capture("achievement_unlocked", { achievement_id: achievementId });
+        track("achievement_unlocked", { achievement_id: achievementId });
       }
       router.replace(`/roast/${encodeURIComponent(data.id)}?share=1`);
       router.refresh();
@@ -615,7 +648,13 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
     return (
       <>
         <PersonaSelector
-          onSelect={onPersonaSelect}
+          onSelect={(persona) => {
+            // Ignore a double tap while a roast is already being requested (generateRoast guards itself too).
+            if (generatingRef.current) return;
+            track("persona_selected", { persona, context: "onboarding" });
+            onPersonaSelect(persona);
+          }}
+          disabled={isGenerating}
           isPro={isPro}
           onUpgradeRequest={() => setUpgradeReason("pro_feature")}
         />
