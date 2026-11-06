@@ -41,9 +41,81 @@
   --error-bg: oklch(25.8% 0.092 26.042); /* was red-950 */
   --overlay: #000000; /* scrim behind modals; opacity set at the use site */
 
+  /* --- Journal palette (shared by the journal theme) ---------------------------
+     Sage, powder blue, butter and clay are FILLS and DECORATION only, never text:
+     on #dce6ee they measure 1.1-1.9:1. --progress (deep sage) is for bars/fills
+     (2.7:1), not for text either. */
+  --sage: #aab9a2;
+  --progress: #7a8f7f;
+  --powder: #b9c9d8;
+  --milestone: #e9d99e; /* milestones only */
+  --clay: #c99d85; /* decorative only */
+
+  /* Per-scope switches: the journal theme overrides these (see below). */
+  --glow-ember: 0 0 24px rgba(255, 90, 54, 0.3);
+  --font-body: var(--font-poppins);
+
   /* legacy aliases kept for anything not yet migrated */
   --background: var(--bg);
   --foreground: var(--text);
+}
+
+/* --- Journal theme (light) ------------------------------------------------------
+   Opt-in per page: render <JournalTheme> (src/components/journal-theme.tsx) around
+   the page. The html:has() selector puts the tokens on <html>, so the body, native
+   dialogs and their ::backdrop all follow; [data-theme] alone covers the wrapper.
+   --grade-* are intentionally NOT set here yet. */
+html:has([data-theme="journal"]),
+[data-theme="journal"] {
+  --bg: #dce6ee;
+  --surface: #ecf1f6;
+  --surface-2: #b9c9d8;
+  --surface-3: rgba(41, 58, 53, 0.1);
+  --ember: #293a35;
+  --ember-soft: rgba(170, 185, 162, 0.4);
+  --text: #293a35;
+  --text-muted: #555750;
+  --text-faint: #566563;
+  --border: rgba(41, 58, 53, 0.13);
+  --on-accent: #dce6ee;
+
+  --ember-legacy: #293a35;
+  --text-legacy: #293a35;
+  --text-emphasis-legacy: #293a35;
+  --text-body-legacy: #293a35;
+  --text-secondary-legacy: #555750;
+  --text-tertiary-legacy: #555750;
+  --panel-legacy: #ecf1f6;
+  --control-legacy: rgba(41, 58, 53, 0.06);
+  --surface-sunken-legacy: rgba(41, 58, 53, 0.06);
+  --line-subtle-legacy: rgba(41, 58, 53, 0.13);
+  --border-strong-legacy: rgba(41, 58, 53, 0.28);
+  --border-hover-legacy: rgba(41, 58, 53, 0.45);
+
+  --error-text: #7f2f27;
+  --error-border: rgba(127, 47, 39, 0.35);
+  --error-bg: rgba(127, 47, 39, 0.08);
+  --overlay: #293a35;
+
+  /* "no glow" = a zero shadow (valid inside the box-shadow list, unlike `none`) */
+  --glow-ember: 0 0 #0000;
+}
+
+/* Fonts are resolved on the wrapper itself, because the next/font variables
+   (--font-sora etc.) are only defined on that element, not on <html>. */
+[data-theme="journal"] {
+  --font-body: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Display = Fraunces italic (soft, wonky); note = Gaegu handwriting, short notes only. */
+@utility font-display {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-style: italic;
+  font-variation-settings: "SOFT" 100, "WONK" 1;
+}
+
+@utility font-note {
+  font-family: var(--font-gaegu), "Comic Sans MS", cursive;
 }
 
 @theme inline {
@@ -83,8 +155,13 @@
   --color-error-border: var(--error-border);
   --color-error-bg: var(--error-bg);
   --color-overlay: var(--overlay);
-  --shadow-ember-glow: 0 0 24px rgba(255, 90, 54, 0.3);
-  --font-sans: var(--font-poppins);
+  --color-sage: var(--sage);
+  --color-progress: var(--progress);
+  --color-powder: var(--powder);
+  --color-milestone: var(--milestone);
+  --color-clay: var(--clay);
+  --shadow-ember-glow: var(--glow-ember);
+  --font-sans: var(--font-body);
   --font-mono: var(--font-geist-mono);
 }
 

@@ -1,4 +1,6 @@
+import type { Viewport } from "next";
 import Link from "next/link";
+import { JournalTheme } from "@/components/journal-theme";
 import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
@@ -7,7 +9,18 @@ export const metadata = pageMetadata({
   path: "/terms",
 });
 
+// Light journal theme: browser UI colour matches the page background (this page only).
+export const viewport: Viewport = { themeColor: "#DCE6EE" };
+
 export default function TermsPage() {
+  return (
+    <JournalTheme>
+      <TermsContent />
+    </JournalTheme>
+  );
+}
+
+function TermsContent() {
   return (
     <main className="min-h-screen bg-bg px-4 py-10 text-text-legacy">
       <div className="mx-auto w-full max-w-2xl">
