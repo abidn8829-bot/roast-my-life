@@ -360,7 +360,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
       for (const achievementId of data.newlyUnlockedAchievements ?? []) {
         track("achievement_unlocked", { achievement_id: achievementId });
       }
-      router.push(`/roast/${encodeURIComponent(roastId)}?share=1`);
+      router.replace(`/roast/${encodeURIComponent(roastId)}?share=1`);
       router.refresh();
     } finally {
       clearTimeout(loadingTimeout);
@@ -399,8 +399,6 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   }
 
   function onPersonaSelect(persona: RoastPersona) {
-    if (generatingRef.current) return; // a roast is already being requested
-    track("persona_selected", { persona, context: "onboarding" });
     setSelectedPersona(persona);
     void generateRoast(persona);
   }
@@ -440,7 +438,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
       for (const achievementId of data.newlyUnlockedAchievements ?? []) {
         track("achievement_unlocked", { achievement_id: achievementId });
       }
-      router.push(`/roast/${encodeURIComponent(data.id)}?share=1`);
+      router.replace(`/roast/${encodeURIComponent(data.id)}?share=1`);
       router.refresh();
     } catch {
       setError("Couldn't save your check-in. Try again.");
@@ -483,7 +481,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
           <p className="text-lg text-text-muted mb-8">{limitNotice}</p>
           <button
             type="button"
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.replace("/dashboard")}
             className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
           >
             Back to dashboard
@@ -650,7 +648,12 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
     return (
       <>
         <PersonaSelector
-          onSelect={onPersonaSelect}
+          onSelect={(persona) => {
+            // Ignore a double tap while a roast is already being requested (generateRoast guards itself too).
+            if (generatingRef.current) return;
+            track("persona_selected", { persona, context: "onboarding" });
+            onPersonaSelect(persona);
+          }}
           disabled={isGenerating}
           isPro={isPro}
           onUpgradeRequest={() => setUpgradeReason("pro_feature")}

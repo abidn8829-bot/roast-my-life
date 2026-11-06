@@ -9,6 +9,8 @@
 // Run (PowerShell, from the project folder; the key is read from .env.local, never typed here):
 //   node --env-file=.env.local scripts/persona-preview.mjs             the six first-time roasts (150-200 words, aim about 170)
 //   node --env-file=.env.local scripts/persona-preview.mjs --checkin   the six check-in roasts (80-95 words, hard maximum 100, plain text)
+//   node --env-file=.env.local scripts/persona-preview.mjs --checkin-preset   the six check-in roasts for a BARE preset answer ("I tried", spending, 100 to 100):
+//                                                                              read each roast for habits the answer never gave (the numbers check only catches numbers)
 //   node --env-file=.env.local scripts/persona-preview.mjs --only drill_sergeant,toxic_friend   only these ids
 //   node --env-file=.env.local scripts/persona-preview.mjs --pause 3000   wait this many ms between calls (default 1500)
 //
@@ -31,7 +33,7 @@ function optValue(name) {
   if (i === -1) return undefined;
   return argv[i].includes("=") ? argv[i].slice(name.length + 1) : argv[i + 1];
 }
-const KNOWN = ["--checkin", "--only", "--pause", "--help"];
+const KNOWN = ["--checkin", "--checkin-preset", "--only", "--pause", "--help"];
 for (const a of argv) {
   if (a.startsWith("--") && !KNOWN.some((k) => a === k || a.startsWith(`${k}=`))) {
     console.error(`Unknown option ${a}. Options: ${KNOWN.join("  ")}`);
@@ -39,10 +41,11 @@ for (const a of argv) {
   }
 }
 if (argv.includes("--help")) {
-  console.log("node --env-file=.env.local scripts/persona-preview.mjs [--checkin] [--only id1,id2] [--pause ms]");
+  console.log("node --env-file=.env.local scripts/persona-preview.mjs [--checkin | --checkin-preset] [--only id1,id2] [--pause ms]");
   process.exit(0);
 }
-const checkin = argv.includes("--checkin");
+const checkinPreset = argv.includes("--checkin-preset");
+const checkin = argv.includes("--checkin") || checkinPreset;
 const pauseMs = optValue("--pause") === undefined ? 1500 : Number(optValue("--pause"));
 if (!Number.isFinite(pauseMs) || pauseMs < 0 || pauseMs > 120000) {
   console.error("--pause needs a number of milliseconds between 0 and 120000, for example --pause 3000");
@@ -66,6 +69,7 @@ const { ROAST_PERSONA_LIST, buildPersonaPrompt } = await import("../src/lib/roas
 const P = await import("../src/lib/safety-prompts.ts");
 const { OUTPUT_GUARDRAIL, SAFETY_CALL_OPTIONS, SAFETY_MODEL } = await import("../src/lib/safety-server.ts");
 const { cleanRoastText } = await import("../src/lib/clean-roast-text.ts");
+const { changedScoresForPrompt, formatChangedScores } = await import("../src/lib/changed-scores.ts");
 
 const onlyRaw = optValue("--only");
 const only = onlyRaw ? onlyRaw.split(",").map((s) => s.trim()).filter(Boolean) : null;
@@ -88,6 +92,19 @@ const CHECKIN_USER = [
   "Check-in answer: I went to bed at 11 for three nights, but I still scrolled in bed.",
   `Continuity memory: ${JSON.stringify({ activeTheme: "sleep", followUpQuestion: "Did you sleep earlier?", callbackCount: 1, resolved: false })}`,
 ].join("\n");
+
+// --checkin-preset: a bare preset answer, built the way the route builds it. The grading call "graded" spending, but 100 to 100 is
+// not a change, so the same helper the route uses drops it and the line reads "none". The continuity memory is deliberately
+// habit-flavoured (AI-written theme and challenge, as in production): a roast that repeats those as things the user did is the failure.
+const PRESET_CHANGED = changedScoresForPrompt([{ key: "spending", was: 100, now: 100 }]);
+const CHECKIN_USER_PRESET = [
+  `Categories graded this check-in (score is 0-100 for that category only, separate from life score): ${formatChangedScores(PRESET_CHANGED)}`,
+  `Category directions this check-in, all 5 (qualitative only, no numbers): ${JSON.stringify({ sleep: "same", fitness: "same", discipline: "same", focus: "same", spending: "same" })}`,
+  "Overall life score (0-100 average across all categories): was 52, now 52 (not improved)",
+  "Check-in answer: I tried",
+  `Continuity memory: ${JSON.stringify({ activeTheme: "late-night impulse buys", followUpQuestion: "Did you keep the impulse buys in check this week?", lastResponse: "I tried", callbackCount: 1, resolved: false, challenge: "Skip the daily coffee run for one day", coveredCategories: ["spending"], lastAskedCategory: "spending" })}`,
+].join("\n");
+const CHECKIN_USER_USED = checkinPreset ? CHECKIN_USER_PRESET : CHECKIN_USER;
 
 // ---- rules:start (plain functions only: src/lib/roast-personas.test.ts loads this block and tests it)
 const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
@@ -164,6 +181,7 @@ const groq = new Groq({ apiKey });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const rows = [];
 
+if (checkinPreset) console.log(`The user message every roast gets (fictional):\n${CHECKIN_USER_PRESET}\n`);
 console.log(`${checkin ? "CHECK-IN roasts" : "First-time roasts"} for one fictional input, model ${SAFETY_MODEL}. Not saved anywhere.\n`);
 
 for (const [i, persona] of personas.entries()) {
@@ -179,7 +197,7 @@ for (const [i, persona] of personas.entries()) {
           reasoning_effort: "low",
           messages: [
             { role: "system", content: `${buildPersonaPrompt(persona.id, "checkin")}\n\n${OUTPUT_GUARDRAIL}` },
-            { role: "user", content: CHECKIN_USER },
+            { role: "user", content: CHECKIN_USER_USED },
           ],
         },
         SAFETY_CALL_OPTIONS,
@@ -205,7 +223,7 @@ for (const [i, persona] of personas.entries()) {
     rows.push({ persona, failed: true });
     continue;
   }
-  const results = evaluate(text, checkin ? "checkin" : "roast", checkin ? CHECKIN_USER : roastInput);
+  const results = evaluate(text, checkin ? "checkin" : "roast", checkin ? CHECKIN_USER_USED : roastInput);
   rows.push({ persona, results });
   console.log(`=== ${persona.emoji} ${persona.label} (${persona.id}) ===${note}`);
   for (const r of results) console.log(`  ${r.rule.padEnd(13)}${r.ok ? "ok   " : "CHECK"}  ${r.detail}`);
@@ -227,3 +245,4 @@ for (const row of rows) {
   console.log(`  ${row.persona.label.padEnd(18)}${row.results.map((r) => (r.ok ? "ok" : "CHECK").padEnd(13)).join("")}`);
 }
 console.log(toCheck === 0 ? "\nAll rules ok for every roast." : `\n${toCheck} rule(s) marked CHECK: read those roasts above.`);
+if (checkinPreset) console.log("Also read each roast yourself: it must not claim the user bought, drank or did anything (impulse buys, coffee, a shuffle...) and must not quote 100 as a change.");
