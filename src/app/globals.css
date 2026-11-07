@@ -313,3 +313,50 @@ body {
   transition: background-color 600000s 0s;
 }
 
+/* --- Journal auth doodle (src/components/journal-auth-art.tsx) ---------------------
+   Gentle looping motion for the login / signup illustration. All of it is switched off
+   by the .jl prefers-reduced-motion rule above, which leaves the static pose. */
+.jl-art [class*="jl-a-"] { transform-box: fill-box; transform-origin: center; }
+.jl-art .jl-a-wave { transform-origin: 100% 100%; }
+.jl-art .jl-a-bob { animation: jl-a-bob 3.2s ease-in-out infinite; }
+.jl-art .jl-a-wave { animation: jl-a-wave 5s ease-in-out infinite; }
+.jl-art .jl-a-type { animation: jl-a-type 0.45s ease-in-out infinite alternate; }
+.jl-art .jl-a-cell { animation: jl-a-cell 8s ease-in-out infinite; }
+.jl-art .jl-a-float { animation: jl-a-float 4s ease-in-out infinite; }
+.jl-art .jl-a-twinkle { animation: jl-a-twinkle 2.6s ease-in-out infinite; }
+.jl-art .jl-a-steam { animation: jl-a-steam 3s ease-out infinite; }
+.jl-art .jl-a-check { animation: jl-a-check 6s ease-in-out infinite; }
+
+@keyframes jl-a-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes jl-a-wave {
+  0%, 50%, 100% { transform: rotate(0deg); }
+  58% { transform: rotate(-14deg); }
+  66% { transform: rotate(8deg); }
+  74% { transform: rotate(-12deg); }
+  82% { transform: rotate(0deg); }
+}
+@keyframes jl-a-type { 0% { transform: translateY(0); } 100% { transform: translateY(-4px); } }
+@keyframes jl-a-cell {
+  0%, 4% { opacity: 0; transform: scale(0.3); }
+  10%, 82% { opacity: 1; transform: scale(1); }
+  92%, 100% { opacity: 0; transform: scale(0.3); }
+}
+@keyframes jl-a-float {
+  0%, 100% { transform: translateY(0) rotate(-4deg); }
+  50% { transform: translateY(-10px) rotate(4deg); }
+}
+@keyframes jl-a-twinkle {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.55); opacity: 0.55; }
+}
+@keyframes jl-a-steam {
+  0% { transform: translateY(6px); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translateY(-14px); opacity: 0; }
+}
+@keyframes jl-a-check {
+  0%, 8% { stroke-dasharray: 60; stroke-dashoffset: 60; opacity: 1; }
+  28%, 78% { stroke-dasharray: 60; stroke-dashoffset: 0; opacity: 1; }
+  92%, 100% { stroke-dasharray: 60; stroke-dashoffset: 0; opacity: 0; }
+}
+

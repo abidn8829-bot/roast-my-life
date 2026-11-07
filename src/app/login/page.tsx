@@ -1,6 +1,6 @@
 import type { Viewport } from "next";
 import { Suspense } from "react";
-import { AuthFrame } from "@/components/journal-auth-ui";
+import { AuthFrame } from "@/components/journal-auth-frame";
 import { JournalTheme } from "@/components/journal-theme";
 import { LoginForm } from "@/components/login-form";
 import { pageMetadata } from "@/lib/seo";

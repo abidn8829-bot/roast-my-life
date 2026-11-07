@@ -44,15 +44,3 @@ export function JournalWordmark() {
     </Link>
   );
 }
-
-/** Page frame: wordmark top-left, one left-aligned column (max 28rem), no card. */
-export function AuthFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="jl mx-auto flex w-full max-w-[1280px] flex-col px-4 pb-16 pt-6 sm:px-10 xl:px-24 xl:pt-8">
-      <header>
-        <JournalWordmark />
-      </header>
-      <main className="mt-14 w-full max-w-[28rem] sm:mt-20 xl:mt-24">{children}</main>
-    </div>
-  );
-}
