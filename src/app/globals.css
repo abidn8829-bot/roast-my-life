@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
-:root {
+/* The dark values. [data-theme="dark"] re-applies them to one subtree: used for the upgrade modal during
+   onboarding, which must keep its dark look even while a journal screen is on the page (the journal tokens
+   are set on <html>, so being outside the journal wrapper is not enough). No value here is different. */
+:root,
+[data-theme="dark"] {
   --bg: #0a0a0b;
   --surface: #141416;
   --surface-2: #1c1c1f;
@@ -358,5 +362,12 @@ body {
   0%, 8% { stroke-dasharray: 60; stroke-dashoffset: 60; opacity: 1; }
   28%, 78% { stroke-dasharray: 60; stroke-dashoffset: 0; opacity: 1; }
   92%, 100% { stroke-dasharray: 60; stroke-dashoffset: 0; opacity: 0; }
+}
+
+/* Loading screen: the wavy line drifts slowly. Held still by the .jl reduced-motion rule. */
+.jl-slow-wave { animation: jl-slow-wave 4s ease-in-out infinite alternate; }
+@keyframes jl-slow-wave {
+  from { transform: translateX(-8px); }
+  to { transform: translateX(8px); }
 }
 

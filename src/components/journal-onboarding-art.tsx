@@ -102,8 +102,8 @@ const ART: Record<string, () => ReactNode> = {
   workoutFrequency: Tally,
 };
 
-export function QuestionArt({ questionKey }: { questionKey: string }) {
-  const Object_ = ART[questionKey] ?? Dial;
+// Blob + (optional object) + star + wavy line. `slowWave` lets the wavy line drift (loading screen).
+function ArtFrame({ object, slowWave = false }: { object?: ReactNode; slowWave?: boolean }) {
   return (
     <div className="relative h-[104px] w-[220px]" aria-hidden="true">
       {/* soft blob */}
@@ -114,11 +114,13 @@ export function QuestionArt({ questionKey }: { questionKey: string }) {
         />
       </svg>
       {/* the object */}
-      <div className="absolute left-[28px] top-[12px] [transform:rotate(-5deg)]">
-        <svg width="80" height="80" viewBox="0 0 48 48" fill="none" className="shrink-0">
-          <Object_ />
-        </svg>
-      </div>
+      {object ? (
+        <div className="absolute left-[28px] top-[12px] [transform:rotate(-5deg)]">
+          <svg width="80" height="80" viewBox="0 0 48 48" fill="none" className="shrink-0">
+            {object}
+          </svg>
+        </div>
+      ) : null}
       {/* star */}
       <div className="absolute left-[124px] top-[8px]">
         <svg width="26" height="26" viewBox="0 0 48 48" fill="none" className="shrink-0">
@@ -128,15 +130,27 @@ export function QuestionArt({ questionKey }: { questionKey: string }) {
       </div>
       {/* wavy line */}
       <div className="absolute left-[150px] top-[56px]">
-        <svg width="70" height="18" viewBox="0 0 120 18" fill="none">
-          <path
-            d="M3 10 C 12 2, 20 2, 28 10 C 36 18, 44 18, 52 10 C 60 2, 68 2, 76 10 C 84 18, 92 18, 100 10 C 106 5, 112 4, 117 8"
-            stroke="var(--clay)"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
+        <div className={slowWave ? "jl-slow-wave" : undefined}>
+          <svg width="70" height="18" viewBox="0 0 120 18" fill="none">
+            <path
+              d="M3 10 C 12 2, 20 2, 28 10 C 36 18, 44 18, 52 10 C 60 2, 68 2, 76 10 C 84 18, 92 18, 100 10 C 106 5, 112 4, 117 8"
+              stroke="var(--clay)"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
       </div>
     </div>
   );
+}
+
+export function QuestionArt({ questionKey }: { questionKey: string }) {
+  const Object_ = ART[questionKey] ?? Dial;
+  return <ArtFrame object={<Object_ />} />;
+}
+
+/** Loading screen: the same frame without an object, the wavy line moving slowly. */
+export function LoadingArt() {
+  return <ArtFrame slowWave />;
 }

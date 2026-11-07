@@ -10,8 +10,8 @@ import { GentleNotice, SafetyPage, SafetyUnavailable } from "@/components/safety
 import { CHECKIN_CHIP_LABELS, type SafetyPayload, type SafetyPagePayload } from "@/lib/safety";
 import { JournalTheme } from "@/components/journal-theme";
 import { errorBox, primaryButton } from "@/components/journal-auth-ui";
-import { QuestionArt } from "@/components/journal-onboarding-art";
-import { QUESTION_NOTES, QuestionProgress, backLink, numberInput, questionTitle, textareaInput } from "@/components/journal-onboarding-ui";
+import { LoadingArt, QuestionArt } from "@/components/journal-onboarding-art";
+import { DarkScope, QUESTION_NOTES, QuestionProgress, backLink, numberInput, questionTitle, textareaInput } from "@/components/journal-onboarding-ui";
 
 // One emoji per preset check-in button, in the order of CHECKIN_CHIP_LABELS (the wording lives in @/lib/safety).
 const CHECKIN_CHIP_EMOJIS = ["😎", "😅", "🤡"] as const;
@@ -504,17 +504,23 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   if (step === "checkin-persona") {
     return (
       <>
-        <PersonaSelector
-          onSelect={onCheckInPersonaSelect}
-          isPro={isPro}
-          onUpgradeRequest={() => setUpgradeReason("pro_feature")}
-        />
-        <UpgradeModal
-          isOpen={upgradeReason !== null}
-          onClose={() => setUpgradeReason(null)}
-          reason={upgradeReason ?? undefined}
-          userEmail={userEmail}
-        />
+        <JournalTheme className="w-full max-w-md">
+          <div data-journal-screen className="jl w-full">
+            <PersonaSelector
+              onSelect={onCheckInPersonaSelect}
+              isPro={isPro}
+              onUpgradeRequest={() => setUpgradeReason("pro_feature")}
+            />
+          </div>
+        </JournalTheme>
+        <DarkScope>
+          <UpgradeModal
+            isOpen={upgradeReason !== null}
+            onClose={() => setUpgradeReason(null)}
+            reason={upgradeReason ?? undefined}
+            userEmail={userEmail}
+          />
+        </DarkScope>
       </>
     );
   }
@@ -632,42 +638,59 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
 
   if (step === "loading") {
     return (
-      <div className="w-full max-w-md text-center">
-        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-ember border-t-transparent" />
-        <p className="text-lg text-text animate-pulse">
-          {LOADING_MESSAGES[loadingMsgIndex]}
-        </p>
-        {error ? <p className="mt-4 text-sm text-grade-f">{error}</p> : null}
-        <UpgradeModal
-          isOpen={upgradeReason !== null}
-          onClose={() => setUpgradeReason(null)}
-          reason={upgradeReason ?? undefined}
-          userEmail={userEmail}
-        />
-      </div>
+      <>
+        <JournalTheme className="w-full max-w-md">
+          <div data-journal-screen className="jl w-full">
+            <LoadingArt />
+            <p className="font-display mt-7 min-h-[7rem] text-[30px] font-medium leading-[1.12]">
+              {LOADING_MESSAGES[loadingMsgIndex]}
+            </p>
+            {error ? (
+              <p role="alert" className={`${errorBox} mt-2`}>
+                {error}
+              </p>
+            ) : null}
+          </div>
+        </JournalTheme>
+        {/* text-center: the old loading screen centred its contents, and the modal inherited that. */}
+        <DarkScope className="text-center">
+          <UpgradeModal
+            isOpen={upgradeReason !== null}
+            onClose={() => setUpgradeReason(null)}
+            reason={upgradeReason ?? undefined}
+            userEmail={userEmail}
+          />
+        </DarkScope>
+      </>
     );
   }
 
   if (step === "persona") {
     return (
       <>
-        <PersonaSelector
-          onSelect={(persona) => {
-            // Ignore a double tap while a roast is already being requested (generateRoast guards itself too).
-            if (generatingRef.current) return;
-            track("persona_selected", { persona, context: "onboarding" });
-            onPersonaSelect(persona);
-          }}
-          disabled={isGenerating}
-          isPro={isPro}
-          onUpgradeRequest={() => setUpgradeReason("pro_feature")}
-        />
-        <UpgradeModal
-          isOpen={upgradeReason !== null}
-          onClose={() => setUpgradeReason(null)}
-          reason={upgradeReason ?? undefined}
-          userEmail={userEmail}
-        />
+        <JournalTheme className="w-full max-w-md">
+          <div data-journal-screen className="jl w-full">
+            <PersonaSelector
+              onSelect={(persona) => {
+                // Ignore a double tap while a roast is already being requested (generateRoast guards itself too).
+                if (generatingRef.current) return;
+                track("persona_selected", { persona, context: "onboarding" });
+                onPersonaSelect(persona);
+              }}
+              disabled={isGenerating}
+              isPro={isPro}
+              onUpgradeRequest={() => setUpgradeReason("pro_feature")}
+            />
+          </div>
+        </JournalTheme>
+        <DarkScope>
+          <UpgradeModal
+            isOpen={upgradeReason !== null}
+            onClose={() => setUpgradeReason(null)}
+            reason={upgradeReason ?? undefined}
+            userEmail={userEmail}
+          />
+        </DarkScope>
       </>
     );
   }
@@ -681,7 +704,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
     const note = QUESTION_NOTES[q.key];
     return (
       <JournalTheme className="w-full max-w-md">
-        <div data-journal-question className="jl flex w-full flex-col">
+        <div data-journal-screen className="jl flex w-full flex-col">
           <QuestionProgress current={slideIndex} total={allQuestions.length} />
 
           <div className="mt-10">

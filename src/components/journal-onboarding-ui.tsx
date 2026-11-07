@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { focusRing } from "@/components/journal-auth-ui";
 
 /**
@@ -39,3 +40,16 @@ export function QuestionProgress({ current, total }: { current: number; total: n
     </div>
   );
 }
+
+/**
+ * Keeps its children in the original dark colours while a journal screen is on the page. Used for the upgrade
+ * modal, which is rendered beside (not inside) the journal wrapper and must look as it always did.
+ */
+export function DarkScope({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div data-theme="dark" className={className}>
+      {children}
+    </div>
+  );
+}
+
