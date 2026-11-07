@@ -297,3 +297,19 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .jl *, .jl *::before, .jl *::after { animation: none !important; transition: none !important; }
 }
+
+/* --- Journal auth fields (login / signup) -------------------------------------
+   Keep the field on the surface colour when the browser autofills it (otherwise
+   Chrome / Safari paint it yellow or blue). The inset shadow is the standard way
+   to repaint the autofill background; it is the same colour as the field. */
+.jl-input:-webkit-autofill,
+.jl-input:-webkit-autofill:hover,
+.jl-input:-webkit-autofill:focus,
+.jl-input:autofill {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  box-shadow: 0 0 0 1000px var(--surface) inset;
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset;
+  transition: background-color 600000s 0s;
+}
+

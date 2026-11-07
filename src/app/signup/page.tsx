@@ -1,4 +1,7 @@
+import type { Viewport } from "next";
 import { Suspense } from "react";
+import { AuthFrame } from "@/components/journal-auth-ui";
+import { JournalTheme } from "@/components/journal-theme";
 import { SignupForm } from "@/components/signup-form";
 import { pageMetadata } from "@/lib/seo";
 
@@ -9,16 +12,17 @@ export const metadata = pageMetadata({
   noindex: true,
 });
 
+// Journal theme: browser UI colour matches the page background (this page only).
+export const viewport: Viewport = { themeColor: "#DCE6EE" };
+
 export default function SignupPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 py-12 text-text-legacy">
-      <Suspense
-        fallback={
-          <p className="text-sm text-text-secondary-legacy">Loading…</p>
-        }
-      >
-        <SignupForm />
-      </Suspense>
-    </main>
+    <JournalTheme>
+      <AuthFrame>
+        <Suspense fallback={<p className="text-sm text-text-muted">Loading…</p>}>
+          <SignupForm />
+        </Suspense>
+      </AuthFrame>
+    </JournalTheme>
   );
 }
