@@ -8,11 +8,18 @@ import { fraunces, gaegu, sora } from "@/app/journal-fonts";
  * - The three font variables are defined here, so the journal fonts load only on
  *   pages that use this wrapper.
  */
-export function JournalTheme({ children }: { children: ReactNode }) {
+export function JournalTheme({
+  children,
+  className = "min-h-screen",
+}: {
+  children: ReactNode;
+  /** Sizing classes for the wrapper. The default (a full-height page) is what every page uses. */
+  className?: string;
+}) {
   return (
     <div
       data-theme="journal"
-      className={`${fraunces.variable} ${sora.variable} ${gaegu.variable} min-h-screen bg-bg font-sans text-text`}
+      className={`${fraunces.variable} ${sora.variable} ${gaegu.variable} ${className} bg-bg font-sans text-text`}
     >
       {children}
     </div>

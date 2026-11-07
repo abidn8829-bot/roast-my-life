@@ -8,6 +8,10 @@ import { PersonaSelector } from "@/components/persona-selector";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { GentleNotice, SafetyPage, SafetyUnavailable } from "@/components/safety-page";
 import { CHECKIN_CHIP_LABELS, type SafetyPayload, type SafetyPagePayload } from "@/lib/safety";
+import { JournalTheme } from "@/components/journal-theme";
+import { errorBox, primaryButton } from "@/components/journal-auth-ui";
+import { QuestionArt } from "@/components/journal-onboarding-art";
+import { QUESTION_NOTES, QuestionProgress, backLink, numberInput, questionTitle, textareaInput } from "@/components/journal-onboarding-ui";
 
 // One emoji per preset check-in button, in the order of CHECKIN_CHIP_LABELS (the wording lives in @/lib/safety).
 const CHECKIN_CHIP_EMOJIS = ["😎", "😅", "🤡"] as const;
@@ -22,7 +26,7 @@ const LOADING_MESSAGES = [
 const BASE_QUESTIONS = [
   {
     key: "phoneHours" as const,
-    label: "How many hours a day are you glued to your phone, pretending to be productive?",
+    label: "How many hours a day are you on your phone?",
     emoji: "📱",
     type: "number" as const,
     min: 1,
@@ -31,14 +35,14 @@ const BASE_QUESTIONS = [
   },
   {
     key: "worstApp" as const,
-    label: "Which app is currently winning the battle for your soul?",
+    label: "Which app takes most of that time?",
     emoji: "🎭",
     type: "text" as const,
     placeholder: "TikTok, Instagram…",
   },
   {
     key: "sleepHours" as const,
-    label: "How many hours of sleep are you sacrificing for absolutely no reason?",
+    label: "On a normal night, how many hours do you sleep?",
     emoji: "😴",
     type: "number" as const,
     min: 1,
@@ -47,7 +51,7 @@ const BASE_QUESTIONS = [
   },
   {
     key: "foodDeliverySpend" as const,
-    label: "How much money do you throw at food delivery because cooking is apparently impossible?",
+    label: "How many dollars a week do you spend on food delivery?",
     emoji: "💸",
     type: "number" as const,
     min: 0,
@@ -55,7 +59,7 @@ const BASE_QUESTIONS = [
   },
   {
     key: "neverDoThing" as const,
-    label: "What's your biggest broken promise to yourself?",
+    label: "What's the promise to yourself you keep breaking?",
     emoji: "🤥",
     type: "text" as const,
     placeholder: "Go to the gym, read more…",
@@ -65,7 +69,7 @@ const BASE_QUESTIONS = [
 const PRO_QUESTIONS = [
   {
     key: "socialMediaHours" as const,
-    label: "How many hours do you doomscroll social media daily?",
+    label: "How many hours a day do you spend doomscrolling?",
     emoji: "👀",
     type: "number" as const,
     min: 0,
@@ -74,7 +78,7 @@ const PRO_QUESTIONS = [
   },
   {
     key: "workoutFrequency" as const,
-    label: "How many times did you actually move your body this week?",
+    label: "How many times did you move your body this week?",
     emoji: "🏃",
     type: "number" as const,
     min: 0,
@@ -670,6 +674,72 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
 
   const slideIndex = typeof step === "number" ? step : 0;
   const q = allQuestions[slideIndex];
+
+  // Journal look for the question screens only. While an upgrade modal is open (a returning free user who has
+  // used today's roast) the previous markup below is kept, so that modal looks exactly as it always did.
+  if (upgradeReason === null) {
+    const note = QUESTION_NOTES[q.key];
+    return (
+      <JournalTheme className="w-full max-w-md">
+        <div data-journal-question className="jl flex w-full flex-col">
+          <QuestionProgress current={slideIndex} total={allQuestions.length} />
+
+          <div className="mt-10">
+            <QuestionArt questionKey={q.key} />
+          </div>
+
+          <div key={q.key} className="mt-7">
+            <label className="flex w-full flex-col gap-6">
+              <span className={questionTitle}>{q.label}</span>
+
+              {/* Input */}
+              {q.type === "text" ? (
+                <textarea
+                  rows={2}
+                  placeholder={q.placeholder}
+                  value={values[q.key]}
+                  onChange={(e) => setters[q.key](e.target.value)}
+                  className={`ph-no-capture ${textareaInput}`}
+                />
+              ) : (
+                <input
+                  type="number"
+                  min={q.min}
+                  max={q.max}
+                  placeholder={q.placeholder}
+                  value={values[q.key]}
+                  onChange={(e) => setters[q.key](e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onNext();
+                  }}
+                  className={numberInput}
+                />
+              )}
+            </label>
+
+            {note ? <p className="font-note mt-4 text-[22px] leading-tight text-text-muted [transform:rotate(-1.5deg)]">{note}</p> : null}
+            {error ? (
+              <p role="alert" className={`${errorBox} mt-5`}>
+                {error}
+              </p>
+            ) : null}
+          </div>
+
+          {/* Navigation buttons */}
+          <div className="mt-10 flex flex-col items-center gap-3">
+            <button type="button" onClick={onNext} className={primaryButton}>
+              {slideIndex === allQuestions.length - 1 ? "Choose Your Roaster →" : "Next →"}
+            </button>
+            {slideIndex > 0 ? (
+              <button type="button" onClick={onBack} className={backLink}>
+                ← Back
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </JournalTheme>
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-12">
