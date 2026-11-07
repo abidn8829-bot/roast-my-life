@@ -2,6 +2,7 @@
 
 import { focusRing } from "@/components/journal-auth-ui";
 import { questionTitle } from "@/components/journal-onboarding-ui";
+import { PersonaIcon } from "@/components/journal-persona-art";
 import { FREE_PERSONA, ROAST_PERSONA_LIST } from "@/lib/roast-personas";
 import type { RoastPersona } from "@/lib/roast-types";
 
@@ -16,8 +17,9 @@ type Props = {
 // Names, icons and blurbs come from src/lib/roast-personas.ts (the only place they are written).
 const PERSONAS = ROAST_PERSONA_LIST.map((p) => ({ id: p.id, name: p.label, emoji: p.emoji, description: p.blurb }));
 
-// Journal look: one column of bordered rows, 14px radius, at least 56px high. The icon is not drawn on the row.
-const rowBase = `flex min-h-[64px] w-full flex-col items-start justify-center rounded-[14px] border px-[18px] py-3 text-left transition ${focusRing}`;
+// Journal look: one column of bordered rows, 14px radius, at least 56px high. A small hand-drawn icon
+// (journal-persona-art.tsx) sits in a fixed-width slot at the left, so the names line up.
+const rowBase = `flex min-h-[64px] w-full flex-row items-center gap-3 rounded-[14px] border px-[18px] py-3 text-left transition ${focusRing}`;
 const rowAvailable =
   "border-border-strong-legacy bg-surface text-text hover:bg-surface-2 disabled:cursor-wait disabled:hover:bg-surface";
 // Locked: dimmed (no fill, lighter border) but the text stays readable.
@@ -36,9 +38,14 @@ export function PersonaSelector({ onSelect, isPro, onUpgradeRequest, disabled = 
             disabled={disabled || (!isPro && persona.id !== FREE_PERSONA)}
             className={`${rowBase} ${isPro || persona.id === FREE_PERSONA ? rowAvailable : rowLocked}`}
           >
-            <span className="block text-base font-medium">{persona.name}</span>
-            <span className="mt-0.5 block text-sm font-light text-text-muted">
-              {isPro || persona.id === FREE_PERSONA ? persona.description : "Pro only"}
+            <span className={`flex w-[44px] shrink-0 items-center justify-center ${isPro || persona.id === FREE_PERSONA ? "" : "opacity-50"}`}>
+              <PersonaIcon id={persona.id} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-base font-medium">{persona.name}</span>
+              <span className="mt-0.5 block text-sm font-light text-text-muted">
+                {isPro || persona.id === FREE_PERSONA ? persona.description : "Pro only"}
+              </span>
             </span>
           </button>
         ))}
