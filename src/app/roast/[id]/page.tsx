@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { JournalTheme } from "@/components/journal-theme";
-import { roastBackLink } from "@/components/journal-roast-ui";
+import { EmberMark, roastBackLink } from "@/components/journal-roast-ui";
 import { RoastView } from "@/components/roast-view";
 import { backfillCardPunchline } from "@/lib/card-punchline";
 import { fetchOwnRoastById } from "@/lib/fetch-own-roast";
@@ -66,14 +66,17 @@ export default async function RoastDetailPage({
 
     return (
       <JournalTheme>
-        <main className="mx-auto w-full max-w-[40rem] px-4 pb-12 pt-8 sm:pt-12">
+        <main className="mx-auto w-full max-w-[40rem] px-4 pb-12 pt-8 sm:max-[1279px]:pt-12 min-[1280px]:max-w-[1320px] min-[1280px]:px-10 min-[1280px]:pb-0 min-[1280px]:pt-1 compact:pt-0">
           {/* Owner-only: this branch is only reached by the logged-in owner of the roast (see the guards above), so
               the link can never send a logged-out or other viewer to the login page. */}
-          <div className="mb-10">
+          <div className="mb-10 min-[1280px]:mb-1 min-[1280px]:flex min-[1280px]:min-h-[52px] min-[1280px]:items-center min-[1280px]:justify-between compact:min-h-[44px]">
             <Link href="/dashboard" className={roastBackLink}>
               <span aria-hidden>←</span>
               Back to dashboard
             </Link>
+            <span className="hidden min-[1280px]:block">
+              <EmberMark />
+            </span>
           </div>
           <RoastView
             roastId={roast.id}

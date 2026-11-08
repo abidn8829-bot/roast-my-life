@@ -66,14 +66,16 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
   }
 
   const btnBase =
-    "flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface transition hover:scale-105 disabled:opacity-50";
+    "flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface transition hover:scale-105 disabled:opacity-50 " +
+    // From 1280px up (the desktop result page): a 44px outlined circle with a line icon, no brand colours, no grow.
+    "min-[1280px]:h-11 min-[1280px]:w-11 min-[1280px]:border-text/35 min-[1280px]:bg-transparent min-[1280px]:transition-none min-[1280px]:hover:scale-100 min-[1280px]:hover:border-text min-[1280px]:hover:bg-text/10 min-[1280px]:focus-visible:outline min-[1280px]:focus-visible:outline-2 min-[1280px]:focus-visible:outline-offset-[3px] min-[1280px]:focus-visible:outline-text";
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <p className="text-xs font-medium uppercase tracking-widest text-text-faint">
+    <div className="flex flex-col items-center gap-3 min-[1280px]:shrink-0 min-[1280px]:flex-row min-[1280px]:gap-2">
+      <p className="text-xs font-medium uppercase tracking-widest text-text-faint min-[1280px]:mr-1 min-[1280px]:whitespace-nowrap min-[1280px]:tracking-[0.08em] min-[1280px]:text-text-muted">
         Share the damage
       </p>
-      <div className="flex flex-wrap justify-center gap-3">
+      <div className="flex flex-wrap justify-center gap-3 min-[1280px]:flex-nowrap min-[1280px]:gap-2">
         <a
           href={whatsappHref}
           target="_blank"
@@ -82,7 +84,8 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           className={`${btnBase} hover:border-[#25D366] hover:bg-[#25D366]/10`}
           aria-label="Share on WhatsApp"
         >
-          <WhatsAppIcon />
+          <span className="contents min-[1280px]:hidden"><WhatsAppIcon /></span>
+          <LineIcon className="hidden min-[1280px]:block"><path d="M4 20 L5.4 15.6 A8.6 8.6 0 1 1 8.4 18.6 Z" /><path d="M9.2 9.2 C9.4 12.2 11.8 14.6 14.8 14.8" /></LineIcon>
         </a>
         <a
           href={twitterHref}
@@ -92,7 +95,8 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           className={`${btnBase} hover:border-text-faint hover:bg-surface-2`}
           aria-label="Share on X"
         >
-          <XIcon />
+          <span className="contents min-[1280px]:hidden"><XIcon /></span>
+          <LineIcon className="hidden min-[1280px]:block"><path d="M5 5 L19 19 M19 5 L5 19" /></LineIcon>
         </a>
         <button
           type="button"
@@ -101,7 +105,8 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           className={`${btnBase} hover:border-[#E4405F] hover:bg-[#E4405F]/10`}
           aria-label="Save for Instagram"
         >
-          <InstagramIcon />
+          <span className="contents min-[1280px]:hidden"><InstagramIcon /></span>
+          <LineIcon className="hidden min-[1280px]:block"><rect x="4" y="4" width="16" height="16" rx="5" /><circle cx="12" cy="12" r="3.6" /><circle cx="17" cy="7" r="1" fill="var(--text)" /></LineIcon>
         </button>
         <button
           type="button"
@@ -110,7 +115,8 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           className={`${btnBase} hover:border-ember hover:bg-ember-soft`}
           aria-label="Download report card"
         >
-          <DownloadIcon />
+          <span className="contents min-[1280px]:hidden"><DownloadIcon /></span>
+          <LineIcon className="hidden min-[1280px]:block"><path d="M12 4 L12 15 M7.5 10.5 L12 15 L16.5 10.5 M5 19 L19 19" /></LineIcon>
         </button>
       </div>
       {status ? <p className="text-sm text-text-muted">{status}</p> : null}
@@ -118,6 +124,26 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
   );
 }
 
+
+/** The desktop line icons: 22px, ink strokes only (decorative; the button carries the aria-label). */
+function LineIcon({ className, children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <svg
+      className={className}
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--text)"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {children}
+    </svg>
+  );
+}
 
 function WhatsAppIcon() {
   return (
