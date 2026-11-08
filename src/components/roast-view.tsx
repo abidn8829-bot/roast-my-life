@@ -10,6 +10,8 @@ import { ShareSheet } from "@/components/share-sheet";
 import { cleanRoastText } from "@/lib/clean-roast-text";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
 import { personaLabel } from "@/lib/roast-personas";
+import { REMINDER_COPY } from "@/lib/plan-reminder";
+import { usePlanReminder } from "@/lib/use-plan-reminder";
 import { weakestCategory } from "@/lib/weakest-category";
 import { isRoastPersona, type CategoryScores, type Grade, type OnboardingAnswers, type ReportCard, type RoastMode, type RoastPersona } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -106,6 +108,16 @@ export function RoastView({
   // The server already sent a valid plan: draw it now and skip the browser fetch. Otherwise (no plan, or one that did
   // not pass the server's check) the fetch below runs exactly as it always did.
   const visiblePlan = initialPlan ?? plan;
+
+  // "Remind me tomorrow": inactive (no looking, no asking) unless a plan is shown. It only ever acts on a click.
+  const reminder = usePlanReminder(Boolean(visiblePlan));
+  const reminderShowsButton = reminder.status === "idle" || reminder.status === "working" || reminder.status === "error";
+  const reminderLine =
+    reminder.status === "subscribed" ? REMINDER_COPY.subscribed
+    : reminder.status === "denied" ? REMINDER_COPY.denied
+    : reminder.status === "unsupported" ? REMINDER_COPY.unsupported
+    : reminder.status === "error" ? REMINDER_COPY.error
+    : "";
 
   useEffect(() => {
     if (initialPlan) return;
@@ -327,15 +339,24 @@ export function RoastView({
             </ol>
           </div>
           <PlanArrow />
-          <div className="rounded-[14px] bg-bg px-[18px] py-4 text-text min-[1280px]:px-4 min-[1280px]:flex min-[1280px]:w-[31%] min-[1280px]:shrink-0 min-[1280px]:flex-col min-[1280px]:justify-center compact:py-3">
+          <div className="rounded-[14px] bg-bg px-[18px] py-4 text-text min-[1280px]:px-4 min-[1280px]:py-3 min-[1280px]:flex min-[1280px]:w-[31%] min-[1280px]:shrink-0 min-[1280px]:flex-col min-[1280px]:justify-center compact:py-3">
             <p className="font-display text-[23px] font-medium leading-[1.1] min-[1280px]:text-[21px]">Do it today. Check in tomorrow.</p>
             <p className="mt-1 text-sm leading-[1.3] text-text-muted">See if your {lifeScore} moves.</p>
-            <button
-              type="button"
-              className="mt-3 h-11 w-full rounded-xl bg-text px-5 text-[15px] font-medium text-bg hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-text"
-            >
-              Remind me tomorrow
-            </button>
+            <div className="mt-2 flex min-h-[62px] flex-col gap-0.5">
+              {reminderShowsButton && (
+                <button
+                  type="button"
+                  onClick={() => void reminder.request()}
+                  disabled={reminder.status === "working"}
+                  className="h-11 w-full rounded-xl bg-text px-5 text-[15px] font-medium text-bg hover:opacity-90 disabled:cursor-default disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-text"
+                >
+                  {reminder.status === "working" ? REMINDER_COPY.working : "Remind me tomorrow"}
+                </button>
+              )}
+              <p role="status" aria-live="polite" className="text-xs leading-[1.3] text-text">
+                {reminderLine}
+              </p>
+            </div>
           </div>
         </section>
       )}

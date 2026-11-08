@@ -89,13 +89,21 @@ test("plan band: contrast of the text on the dark band meets WCAG AA (ink band, 
   assert.ok(ratio(ink, page) >= 4.5);
 });
 
-test("check-in button: a real <button type=\"button\"> with no click behaviour, no request, no permission prompt", () => {
+test("check-in button: a real <button type=\"button\"> whose click goes only through the reminder hook, with no push call of its own in the view", () => {
   const at = view.indexOf("Remind me tomorrow");
   const start = view.lastIndexOf("<button", at);
   const tag = view.slice(start, at);
   assert.match(tag, /^<button\s+type="button"/);
-  assert.doesNotMatch(tag, /\bon[A-Z][A-Za-z]*=|\bdisabled\b|\bform\b|\bhref\b/, "the button must have no handler in this step");
+  // its only handler calls the hook's request(); the hook (use-plan-reminder.ts) is where asking and saving happen
+  assert.equal(tag.match(/\bon[A-Z][A-Za-z]*=/g)?.length, 1, "exactly one handler on the button");
+  assert.match(tag, /onClick=\{\(\) => void reminder\.request\(\)\}/);
+  assert.match(view, /const reminder = usePlanReminder\(/);
+  assert.doesNotMatch(tag, /\bform\b|\bhref\b/);
+  // roast-view.tsx makes no push call of its own: no permission or push words, and no new fetch (the one fetch
+  // left is the reaction buttons' call that was already there)
   assert.doesNotMatch(view, /Notification|pushManager|serviceWorker|requestPermission|\/api\/push/, "no permission request or push call");
+  assert.equal(view.match(/\bfetch\(/g)?.length, 1, "no new fetch in roast-view.tsx");
+  assert.match(view, /fetch\(`\/api\/roast\/\$\{roastId\}\/reaction`/);
 });
 
 // ---------------------------------------------------------------------------
