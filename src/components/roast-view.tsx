@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { DarkScope } from "@/components/journal-onboarding-ui";
+import { GradeRow, StepMarker, sectionLabel } from "@/components/journal-roast-ui";
 import { ShareButtons } from "@/components/share-buttons";
 import { ShareSheet } from "@/components/share-sheet";
 import { cleanRoastText } from "@/lib/clean-roast-text";
-import { gradeColor, scoreGlowBg, scoreTextColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
 import type { CategoryScores, Grade, OnboardingAnswers, ReportCard, RoastMode, RoastPersona } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -186,73 +187,51 @@ export function RoastView({
   }
 
   function getStreakMessage(streak: number): string {
-    if (streak === 1) return "Day 1 of facing reality 👀";
-    if (streak === 3) return "3 days of self inflicted damage 🔥";
+    if (streak === 1) return "Day 1 of facing reality";
+    if (streak === 3) return "3 days of self inflicted damage";
     if (streak === 7) return "7 day streak — therapy would be cheaper";
-    if (streak === 30) return "30 days — you're either improving or masochistic 💀";
+    if (streak === 30) return "30 days — you're either improving or masochistic";
     if (streak >= 100) return `${streak} days — you need a new hobby at this point`;
     return `${streak} day streak`;
   }
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-8 pb-12">
+    <div className="flex w-full flex-col gap-12 pb-12">
       {/* Life Score Section */}
-      <div className="relative flex flex-col items-center gap-4 text-center">
-        <div className={`absolute inset-0 -z-10 rounded-full opacity-70 blur-3xl ${scoreGlowBg(lifeScore)}`} />
-        <p className="text-xs font-semibold tracking-[0.35em] text-text-faint uppercase">
-          Your Life Score
+      <div>
+        <p className="text-[13px] text-text-muted">Your Life Score</p>
+        <p className="mt-2 flex items-baseline gap-2 text-text">
+          <span className="font-display text-[96px] font-medium leading-none tabular-nums">{lifeScore}</span>
+          <span className="font-display text-[30px] leading-none text-text-muted">/100</span>
         </p>
-        <div className={`text-8xl font-black tabular-nums tracking-tighter ${scoreTextColor(lifeScore)}`}>
-          {lifeScore}
-          <span className="text-4xl text-text-faint">/100</span>
-        </div>
-        <h1 className="text-3xl font-bold tracking-tight text-text sm:text-4xl">
+        <h1 className="mt-5 font-display text-[34px] font-medium leading-[1.1] text-text">
           {funnyTitle}
         </h1>
-        <p className="text-xs text-text-faint">
+        <p className="mt-3 text-sm text-text-muted">
           Week {weekCount} of facing reality
         </p>
         {currentStreak > 0 && (
-          <div className="mt-2 rounded-full border border-ember/50 bg-ember-soft px-4 py-2">
-            <p className="text-sm font-semibold text-ember">
-              {getStreakMessage(currentStreak)}
-            </p>
-          </div>
+          <p className="mt-1 text-sm text-text-muted">{getStreakMessage(currentStreak)}</p>
         )}
       </div>
 
       {/* Full Roast */}
-      <section className="flex flex-col gap-4">
-        <p className="text-center text-sm font-semibold uppercase tracking-widest text-text-faint">
-          The Full {mode === "coach" ? "Coach Report" : "Roast"}
-        </p>
-        <div className="rounded-xl border border-border bg-surface-2 p-6">
-          <p className="whitespace-pre-wrap text-base leading-relaxed text-text">
+      <section>
+        <h2 className={sectionLabel}>The Full {mode === "coach" ? "Coach Report" : "Roast"}</h2>
+        <div className="ph-no-capture mt-4 border-y border-border py-8">
+          <p className="whitespace-pre-wrap break-words text-[17px] leading-[1.6] text-text">
             {cleanRoastText(roastText)}
           </p>
         </div>
       </section>
 
-      {/* Category Scorecards */}
+      {/* Category rows: the letter carries the grade, the bar is the score */}
       {categoryScores && (
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="divide-y divide-border">
           {Object.entries(categoryScores).map(([key, data]) => (
-            <div
-              key={key}
-              className={`rounded-xl border p-5 transition-transform hover:scale-[1.02] ${gradeColor(data.grade)}`}
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-semibold uppercase tracking-wide text-text-muted">
-                  {key}
-                </span>
-                <span className="text-2xl font-black">{data.grade}</span>
-              </div>
-              <div className="mb-2 text-3xl font-bold tabular-nums text-text">
-                {Math.round(data.score / 10)}/10
-              </div>
-            </div>
+            <GradeRow key={key} label={key} grade={data.grade} score={data.score} />
           ))}
-        </section>
+        </ul>
       )}
 
       {/* Upgrade CTA (free plan only) */}
@@ -277,35 +256,27 @@ export function RoastView({
 
       {/* Improvement Suggestion */}
       {suggestionLine && suggestionLine.trim() && (
-        <section className="flex flex-col gap-4">
-          <p className="text-center text-sm font-semibold uppercase tracking-widest text-text-faint">
-            Improvement Suggestion
-          </p>
-          <div className="rounded-xl border border-ember/30 bg-ember-soft p-4">
-            <p className="text-sm text-text">{suggestionLine}</p>
-          </div>
+        <section>
+          <h2 className={sectionLabel}>Improvement Suggestion</h2>
+          <p className="mt-3 text-base leading-[1.6] text-text">{suggestionLine}</p>
         </section>
       )}
 
       {/* Your Plan */}
       {plan && (
-        <section className="flex flex-col gap-4">
-          <p className="text-center text-sm font-semibold uppercase tracking-widest text-text-faint">
-            Your Plan
-          </p>
-          <div className="rounded-xl border border-border bg-surface-2 p-5">
-            <p className="mb-4 text-base font-semibold text-text">
+        <section>
+          <h2 className={sectionLabel}>Your Plan</h2>
+          <div className="ph-no-capture mt-4">
+            <p className="text-[17px] font-medium leading-snug text-text">
               {plan.challenge}
             </p>
-            <ol className="flex flex-col gap-4">
+            <ol role="list" className="mt-5 flex flex-col gap-5">
               {plan.steps.map((s, index) => (
-                <li key={index} className="flex gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-ember text-xs font-bold text-ember">
-                    {index + 1}
-                  </span>
+                <li key={index} className="flex gap-4">
+                  <StepMarker />
                   <div className="flex flex-col gap-1">
                     <p className="text-base text-text">{s.step}</p>
-                    <p className="text-sm text-text-faint">{s.why}</p>
+                    <p className="text-sm text-text-muted">{s.why}</p>
                   </div>
                 </li>
               ))}
@@ -352,12 +323,16 @@ export function RoastView({
         {checkingLimit ? "Checking..." : "Roast me again"}
       </button>
 
+      {/* The sheet is not restyled yet: it keeps its original dark colours and font on the light page. "contents"
+          means this wrapper takes no space of its own (the sheet itself is fixed to the screen). */}
       {shareSheetOpen && (
-        <ShareSheet
-          roastId={roastId}
-          shareSlug={shareSlug}
-          onClose={closeShareSheet}
-        />
+        <DarkScope className="contents text-text [font-family:var(--font-poppins),Arial,Helvetica,sans-serif]">
+          <ShareSheet
+            roastId={roastId}
+            shareSlug={shareSlug}
+            onClose={closeShareSheet}
+          />
+        </DarkScope>
       )}
     </div>
   );

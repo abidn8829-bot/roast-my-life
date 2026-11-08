@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { JournalTheme } from "@/components/journal-theme";
+import { roastBackLink } from "@/components/journal-roast-ui";
 import { RoastView } from "@/components/roast-view";
 import { backfillCardPunchline } from "@/lib/card-punchline";
 import { fetchOwnRoastById } from "@/lib/fetch-own-roast";
@@ -62,40 +64,39 @@ export default async function RoastDetailPage({
       .single();
 
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 py-12 text-text">
-        {/* Owner-only: this branch is only reached by the logged-in owner of the roast (see the guards above), so
-            the link can never send a logged-out or other viewer to the login page. */}
-        <div className="mb-6 w-full max-w-2xl">
-          <Link
-            href="/dashboard"
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-4 text-sm font-medium text-text transition hover:border-ember/40"
-          >
-            <span aria-hidden>←</span>
-            Back to dashboard
-          </Link>
-        </div>
-        <RoastView
-          roastId={roast.id}
-          roastText={roast.roast_text}
-          reportCard={roast.report_card}
-          shareSlug={roast.share_slug}
-          initialReaction={roast.reaction}
-          canReact
-          answers={roast.answers}
-          weekCount={weekCount}
-          lifeScore={roast.life_score}
-          funnyTitle={roast.funny_title}
-          subscriptionTier={userData?.subscription_tier ?? "free"}
-          categoryScores={roast.category_scores}
-          currentStreak={userData?.current_streak}
-          longestStreak={userData?.longest_streak}
-          mode={roast.mode}
-          persona={roast.persona}
-          suggestionLine={roast.suggestion_line}
-          showShareSheet={share === "1"}
-          userEmail={user.email ?? undefined}
-        />
-      </main>
+      <JournalTheme>
+        <main className="mx-auto w-full max-w-[40rem] px-4 pb-12 pt-8 sm:pt-12">
+          {/* Owner-only: this branch is only reached by the logged-in owner of the roast (see the guards above), so
+              the link can never send a logged-out or other viewer to the login page. */}
+          <div className="mb-10">
+            <Link href="/dashboard" className={roastBackLink}>
+              <span aria-hidden>←</span>
+              Back to dashboard
+            </Link>
+          </div>
+          <RoastView
+            roastId={roast.id}
+            roastText={roast.roast_text}
+            reportCard={roast.report_card}
+            shareSlug={roast.share_slug}
+            initialReaction={roast.reaction}
+            canReact
+            answers={roast.answers}
+            weekCount={weekCount}
+            lifeScore={roast.life_score}
+            funnyTitle={roast.funny_title}
+            subscriptionTier={userData?.subscription_tier ?? "free"}
+            categoryScores={roast.category_scores}
+            currentStreak={userData?.current_streak}
+            longestStreak={userData?.longest_streak}
+            mode={roast.mode}
+            persona={roast.persona}
+            suggestionLine={roast.suggestion_line}
+            showShareSheet={share === "1"}
+            userEmail={user.email ?? undefined}
+          />
+        </main>
+      </JournalTheme>
     );
   }
 
