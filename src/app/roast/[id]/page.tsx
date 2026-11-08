@@ -7,6 +7,7 @@ import { RoastView } from "@/components/roast-view";
 import { backfillCardPunchline } from "@/lib/card-punchline";
 import { fetchOwnRoastById } from "@/lib/fetch-own-roast";
 import { isUuid } from "@/lib/is-uuid";
+import { parsePlanSteps } from "@/lib/parse-plan-steps";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +93,7 @@ export default async function RoastDetailPage({
             mode={roast.mode}
             persona={roast.persona}
             suggestionLine={roast.suggestion_line}
+            initialPlan={parsePlanSteps(roast.plan_steps)}
             showShareSheet={share === "1"}
             userEmail={user.email ?? undefined}
           />

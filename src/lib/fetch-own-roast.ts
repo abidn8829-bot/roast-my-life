@@ -16,6 +16,8 @@ export type OwnRoast = {
   mode?: RoastMode;
   persona?: RoastPersona;
   suggestion_line?: string;
+  /** Raw jsonb: validated by the page (parsePlanSteps), never trusted here. Owner-only data. */
+  plan_steps?: unknown;
 };
 
 export async function fetchOwnRoastById(
@@ -25,7 +27,7 @@ export async function fetchOwnRoastById(
 ): Promise<OwnRoast | null> {
   const { data, error } = await supabase
     .from("roasts")
-    .select("id, roast_text, report_card, share_slug, answers, life_score, funny_title, top_5_roasts, category_scores, mode, persona, suggestion_line")
+    .select("id, roast_text, report_card, share_slug, answers, life_score, funny_title, top_5_roasts, category_scores, mode, persona, suggestion_line, plan_steps")
     .eq("id", roastId)
     .eq("user_id", userId)
     .maybeSingle();
@@ -76,5 +78,6 @@ export async function fetchOwnRoastById(
     mode: data.mode as RoastMode | undefined,
     persona: data.persona as RoastPersona | undefined,
     suggestion_line: data.suggestion_line ?? undefined,
+    plan_steps: data.plan_steps ?? undefined,
   };
 }

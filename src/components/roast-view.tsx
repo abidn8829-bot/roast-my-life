@@ -39,6 +39,8 @@ type Props = {
   mode?: RoastMode;
   persona?: RoastPersona;
   suggestionLine?: string;
+  /** The plan, loaded on the server with the roast. When it is valid the browser fetch below is skipped. */
+  initialPlan?: ChallengePlan | null;
   showShareSheet?: boolean;
   userEmail?: string;
 };
@@ -60,6 +62,7 @@ export function RoastView({
   mode = "roast",
   persona = "default",
   suggestionLine,
+  initialPlan = null,
   showShareSheet = false,
   userEmail,
 }: Props) {
@@ -97,7 +100,12 @@ export function RoastView({
     setClosedLocally(true);
   }
 
+  // The server already sent a valid plan: draw it now and skip the browser fetch. Otherwise (no plan, or one that did
+  // not pass the server's check) the fetch below runs exactly as it always did.
+  const visiblePlan = initialPlan ?? plan;
+
   useEffect(() => {
+    if (initialPlan) return;
     let cancelled = false;
     (async () => {
       const supabase = createSupabaseBrowserClient();
@@ -114,7 +122,7 @@ export function RoastView({
     return () => {
       cancelled = true;
     };
-  }, [roastId]);
+  }, [roastId, initialPlan]);
 
   async function onReaction(emoji: ReactionEmoji) {
     if (!canReact || savingReaction) return;
@@ -263,15 +271,15 @@ export function RoastView({
       )}
 
       {/* Your Plan */}
-      {plan && (
+      {visiblePlan && (
         <section>
           <h2 className={sectionLabel}>Your Plan</h2>
           <div className="ph-no-capture mt-4">
             <p className="text-[17px] font-medium leading-snug text-text">
-              {plan.challenge}
+              {visiblePlan.challenge}
             </p>
             <ol role="list" className="mt-5 flex flex-col gap-5">
-              {plan.steps.map((s, index) => (
+              {visiblePlan.steps.map((s, index) => (
                 <li key={index} className="flex gap-4">
                   <StepMarker />
                   <div className="flex flex-col gap-1">
