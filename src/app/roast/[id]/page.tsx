@@ -48,15 +48,6 @@ export default async function RoastDetailPage({
     // Make sure the share card has a real punchline before the share sheet asks for the image.
     await backfillCardPunchline(supabase, roast, user.id);
 
-    // Fetch week count
-    const { data: weekData } = await supabase
-      .from("roasts")
-      .select("week_start_date")
-      .eq("user_id", user.id);
-    
-    const uniqueWeeks = new Set(weekData?.map(r => r.week_start_date) || []);
-    const weekCount = uniqueWeeks.size;
-
     // Fetch user streak data
     const { data: userData } = await supabase
       .from("users")
@@ -87,7 +78,6 @@ export default async function RoastDetailPage({
               initialReaction={roast.reaction}
               canReact
               answers={roast.answers}
-              weekCount={weekCount}
               lifeScore={roast.life_score}
               funnyTitle={roast.funny_title}
               subscriptionTier={userData?.subscription_tier ?? "free"}

@@ -106,9 +106,11 @@ test("one-glance height: share and reactions are in the top bar, the bottom bar 
   // smaller ring and tighter pages
   assert.match(view, /min-\[1280px\]:text-\[96px\]/);
   assert.doesNotMatch(view, /118px|min-h-\[490px\]/);
-  // "Day N" (the streak line) and "Week N" are two different facts, so both are still there, once each
+  // the streak line ("Day N of facing reality" and its other wordings) stays, once; the "Week N of facing reality" line
+  // and the week count behind it are gone (the page no longer even reads the weeks)
   assert.equal(view.match(/getStreakMessage\(currentStreak\)/g)?.length, 1);
-  assert.equal(view.match(/Week \{weekCount\} of facing reality/g)?.length, 1);
+  assert.doesNotMatch(view, /weekCount|Week \{|of facing reality<\/p>/);
+  assert.doesNotMatch(page, /weekCount|week_start_date|uniqueWeeks/);
 });
 
 test("plan band: contrast of the text on the dark band meets WCAG AA (ink band, light text, powder 'why' line)", () => {

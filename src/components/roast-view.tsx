@@ -34,7 +34,6 @@ type Props = {
   initialReaction?: string | null;
   canReact?: boolean;
   answers?: OnboardingAnswers;
-  weekCount?: number;
   lifeScore?: number;
   funnyTitle?: string;
   subscriptionTier?: string;
@@ -57,7 +56,6 @@ export function RoastView({
   shareSlug,
   initialReaction = null,
   canReact = false,
-  weekCount = 1,
   lifeScore = 50,
   funnyTitle = "Your Life",
   subscriptionTier,
@@ -277,11 +275,8 @@ export function RoastView({
                 {funnyTitle}
               </h1>
               <WavyUnderline />
-              <p className="mt-3 text-sm text-text-muted min-[1280px]:order-2 min-[1280px]:mt-2 min-[1280px]:max-w-[9rem] min-[1280px]:origin-left min-[1280px]:-rotate-2 min-[1280px]:font-note min-[1280px]:text-[23px] min-[1280px]:leading-[1.1]">
-                Week {weekCount} of facing reality
-              </p>
               {currentStreak > 0 && (
-                <p className="mt-1 text-sm text-text-muted min-[1280px]:order-1 min-[1280px]:text-[13px]">{getStreakMessage(currentStreak)}</p>
+                <p className="mt-3 text-sm text-text-muted min-[1280px]:mt-1 min-[1280px]:text-[13px]">{getStreakMessage(currentStreak)}</p>
               )}
             </div>
           </div>
