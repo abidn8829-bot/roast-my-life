@@ -32,7 +32,7 @@ const CLAY = "var(--clay)";
  */
 export function GradeRow({ label, grade, score, weakest = false }: { label: string; grade: string; score: number; weakest?: boolean }) {
   return (
-    <li className="flex items-center gap-4 py-4 min-[1280px]:min-h-[52px] min-[1280px]:py-0 compact:min-h-[40px]">
+    <li className="flex items-center gap-4 py-4 min-[1280px]:min-h-[46px] min-[1280px]:py-0 compact:min-h-[38px]">
       <span className="w-24 shrink-0 text-[15px] capitalize text-text-muted">{label}</span>
       <span className="relative w-7 shrink-0 font-display text-[28px] font-medium leading-none text-text min-[1280px]:w-14 min-[1280px]:text-[36px] compact:text-[30px]">
         {weakest ? (
@@ -127,15 +127,6 @@ export function WavyUnderline() {
   return (
     <svg className="mt-0.5 hidden h-[14px] w-[110px] min-[1280px]:block" viewBox="0 0 130 14" fill="none" aria-hidden="true" focusable="false">
       <path d="M3 8 C 12 1, 20 1, 28 8 C 36 14, 44 14, 52 8 C 60 1, 68 1, 76 8 C 84 14, 92 14, 100 8 C 108 3, 116 3, 126 7" stroke={CLAY} strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-/** A small curved arrow between the plan steps and the check-in panel. Desktop only. */
-export function PlanArrow() {
-  return (
-    <svg className="hidden h-10 w-10 shrink-0 min-[1280px]:block" viewBox="0 0 40 40" fill="none" aria-hidden="true" focusable="false">
-      <path d="M4 26 C 12 10, 24 8, 34 18 M34 18 L25 16 M34 18 L32 27" stroke="var(--bg)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

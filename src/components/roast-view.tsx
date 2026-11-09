@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { DarkScope } from "@/components/journal-onboarding-ui";
 import { PersonaIcon } from "@/components/journal-persona-art";
-import { GradeRow, PlanArrow, ScoreRing, ScoreStar, StepMarker, WavyUnderline, sectionLabel } from "@/components/journal-roast-ui";
+import { GradeRow, ScoreRing, ScoreStar, StepMarker, WavyUnderline, sectionLabel } from "@/components/journal-roast-ui";
 import { ShareButtons } from "@/components/share-buttons";
 import { ShareSheet } from "@/components/share-sheet";
 import { cleanRoastText } from "@/lib/clean-roast-text";
@@ -221,20 +221,53 @@ export function RoastView({
   // The weakest category (lowest score, the first one on a tie) gets the clay circle on the desktop spread.
   const weakestKey = weakestCategory(categoryScores);
 
+  // The reaction buttons. Rendered twice (one is always hidden): in the desktop top bar, and in the stacked layout's
+  // bottom area. The handler and state are shared, so a reaction saves the same way from either.
+  const reactionRow = canReact ? (
+    <section className="flex flex-col items-center gap-3 min-[1280px]:shrink-0 min-[1280px]:flex-row min-[1280px]:gap-2">
+      <p className="text-sm text-text-muted min-[1280px]:mr-1 min-[1280px]:whitespace-nowrap min-[1280px]:text-xs min-[1280px]:uppercase min-[1280px]:tracking-[0.08em]">How did that feel?</p>
+      <div className="flex gap-2">
+        {REACTION_EMOJIS.map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            disabled={savingReaction}
+            onClick={() => void onReaction(emoji)}
+            className={`flex h-12 w-12 items-center justify-center rounded-full border text-2xl transition min-[1280px]:h-11 min-[1280px]:w-11 min-[1280px]:text-xl min-[1280px]:transition-none min-[1280px]:focus-visible:outline min-[1280px]:focus-visible:outline-2 min-[1280px]:focus-visible:outline-offset-[3px] min-[1280px]:focus-visible:outline-text ${
+              reaction === emoji
+                ? "border-ember bg-ember-soft scale-110 min-[1280px]:scale-100"
+                : "border-border bg-surface hover:border-ember/50 hover:bg-surface-2 min-[1280px]:border-text/35 min-[1280px]:bg-transparent min-[1280px]:hover:border-text min-[1280px]:hover:bg-text/10"
+            }`}
+            aria-label={`React ${emoji}`}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+    </section>
+  ) : null;
+
   return (
-    <div className="flex w-full flex-col gap-12 pb-12 min-[1280px]:gap-3.5 min-[1280px]:pb-4 compact:gap-3 compact:pb-3">
+    <div className="flex w-full flex-col gap-12 pb-12 min-[1280px]:gap-3 min-[1280px]:pb-3 compact:gap-2.5 compact:pb-2">
+      {/* Desktop only: share and reactions sit in the top bar, over the middle of it (page.tsx holds the bar). First in
+          the page order, so the keyboard order matches the picture. */}
+      <div className="hidden min-[1280px]:absolute min-[1280px]:inset-x-0 min-[1280px]:top-0 min-[1280px]:mx-auto min-[1280px]:flex min-[1280px]:h-[48px] min-[1280px]:w-fit min-[1280px]:items-center min-[1280px]:gap-6 compact:h-[44px]">
+        <ShareButtons roastId={roastId} shareSlug={shareSlug} />
+        {reactionRow}
+      </div>
+
       {/* The spread. Below 1280px the wrappers are "contents" (no box of their own), so everything stacks in the old
           order. From 1280px up they become two pages side by side with a dashed line between them. */}
       <div className="contents min-[1280px]:grid min-[1280px]:grid-cols-[minmax(0,52fr)_minmax(0,48fr)] min-[1280px]:items-stretch">
         {/* Left page */}
-        <div className="contents min-[1280px]:flex min-[1280px]:min-h-[490px] min-[1280px]:flex-col min-[1280px]:rounded-l-[18px] min-[1280px]:border min-[1280px]:border-r-0 min-[1280px]:border-border min-[1280px]:bg-surface min-[1280px]:px-9 min-[1280px]:py-8 compact:min-h-0 compact:px-7 compact:py-5">
+        <div className="contents min-[1280px]:flex min-[1280px]:flex-col min-[1280px]:rounded-l-[18px] min-[1280px]:border min-[1280px]:border-r-0 min-[1280px]:border-border min-[1280px]:bg-surface min-[1280px]:px-8 min-[1280px]:py-5 compact:px-6 compact:py-4">
           {/* Life Score Section */}
           <div className="min-[1280px]:grid min-[1280px]:grid-cols-[auto_1fr] min-[1280px]:items-start min-[1280px]:gap-x-6">
             <p className="text-[13px] text-text-muted min-[1280px]:col-span-2">Your Life Score</p>
             <p className="mt-2 flex items-baseline gap-2 text-text min-[1280px]:mt-1 min-[1280px]:gap-1">
-              <span className="relative inline-block min-[1280px]:px-7 min-[1280px]:py-3 compact:py-1">
+              <span className="relative inline-block min-[1280px]:px-5 min-[1280px]:py-1.5 compact:py-1">
                 <ScoreRing />
-                <span className="relative font-display text-[96px] font-medium leading-none tabular-nums min-[1280px]:text-[118px] compact:text-[88px]">{lifeScore}</span>
+                <span className="relative font-display text-[96px] font-medium leading-none tabular-nums min-[1280px]:text-[96px] compact:text-[80px]">{lifeScore}</span>
                 <ScoreStar />
               </span>
               <span className="font-display text-[30px] leading-none text-text-muted">/100</span>
@@ -254,9 +287,9 @@ export function RoastView({
           </div>
 
           {/* Full Roast */}
-          <section className="min-[1280px]:mt-3.5 min-[1280px]:flex min-[1280px]:flex-1 min-[1280px]:flex-col">
+          <section className="min-[1280px]:mt-2.5 min-[1280px]:flex min-[1280px]:flex-1 min-[1280px]:flex-col">
             <h2 className={`${sectionLabel} min-[1280px]:sr-only`}>The Full {mode === "coach" ? "Coach Report" : "Roast"}</h2>
-            <div className="ph-no-capture mt-4 border-y border-border py-8 min-[1280px]:mt-0 min-[1280px]:flex-1 min-[1280px]:border-b-0 min-[1280px]:pb-0 min-[1280px]:pt-3.5 compact:pt-2">
+            <div className="ph-no-capture mt-4 border-y border-border py-8 min-[1280px]:mt-0 min-[1280px]:flex-1 min-[1280px]:border-b-0 min-[1280px]:pb-0 min-[1280px]:pt-3 compact:pt-2">
               <p className="whitespace-pre-wrap break-words text-[17px] leading-[1.6] text-text min-[1280px]:text-[15px] min-[1280px]:leading-[1.5] compact:text-[14px]">
                 {cleanRoastText(roastText)}
               </p>
@@ -273,7 +306,7 @@ export function RoastView({
         </div>
 
         {/* Right page */}
-        <div className="contents min-[1280px]:flex min-[1280px]:flex-col min-[1280px]:rounded-r-[18px] min-[1280px]:border min-[1280px]:border-border min-[1280px]:border-l-text/40 min-[1280px]:[border-left-style:dashed] min-[1280px]:bg-surface min-[1280px]:px-9 min-[1280px]:py-8 compact:px-7 compact:py-5">
+        <div className="contents min-[1280px]:flex min-[1280px]:flex-col min-[1280px]:rounded-r-[18px] min-[1280px]:border min-[1280px]:border-border min-[1280px]:border-l-text/40 min-[1280px]:[border-left-style:dashed] min-[1280px]:bg-surface min-[1280px]:px-8 min-[1280px]:py-5 compact:px-6 compact:py-4">
           {/* Category rows: the letter carries the grade, the bar is the score */}
           {categoryScores && (
             <>
@@ -308,17 +341,42 @@ export function RoastView({
 
           {/* Improvement Suggestion */}
           {suggestionLine && suggestionLine.trim() && (
-            <section className="min-[1280px]:mt-6 compact:mt-4">
+            <section className="min-[1280px]:mt-4 compact:mt-3">
               <h2 className={`${sectionLabel} min-[1280px]:font-display min-[1280px]:text-[23px] min-[1280px]:leading-[1.2] min-[1280px]:text-text`}>Improvement Suggestion</h2>
               <p className="mt-3 break-words text-base leading-[1.6] text-text min-[1280px]:mt-1.5 min-[1280px]:text-[15px] min-[1280px]:leading-[1.55]">{suggestionLine}</p>
             </section>
           )}
+
+          {/* Desktop only: the quiet upgrade link and "Roast me again" close the right page (there is no bottom bar). */}
+          <div className="hidden min-[1280px]:mt-auto min-[1280px]:flex min-[1280px]:flex-wrap min-[1280px]:items-center min-[1280px]:gap-x-4 min-[1280px]:gap-y-2 min-[1280px]:pt-4">
+            {subscriptionTier !== "pro" && (
+              <div className="flex items-center gap-3">
+                <span className="whitespace-nowrap text-xs text-text-muted">Ember has more to say.</span>
+                <a
+                  href={getUpgradeUrl(userEmail)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-11 items-center whitespace-nowrap text-sm font-medium text-text underline decoration-1 underline-offset-4 hover:decoration-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-text"
+                >
+                  Unlock My Full Read →
+                </a>
+              </div>
+            )}
+            <button
+              type="button"
+              disabled={checkingLimit}
+              onClick={() => void handleRoastAgain()}
+              className="ml-auto h-11 whitespace-nowrap rounded-xl border border-text bg-transparent px-4 text-[15px] font-medium text-text hover:bg-text/10 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-text"
+            >
+              {checkingLimit ? "Checking..." : "Roast me again"}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Your Plan: a dark band with the check-in panel. Only when a plan exists: no plan, no band, no panel. */}
       {visiblePlan && (
-        <section className="flex flex-col gap-6 rounded-[18px] bg-text px-6 py-6 text-bg min-[1280px]:flex-row min-[1280px]:items-stretch min-[1280px]:gap-6 min-[1280px]:px-7 min-[1280px]:py-5 compact:py-4">
+        <section className="flex flex-col gap-6 rounded-[18px] bg-text px-6 py-6 text-bg min-[1280px]:flex-row min-[1280px]:items-stretch min-[1280px]:gap-6 min-[1280px]:px-7 min-[1280px]:py-4 compact:py-3">
           <div className="ph-no-capture flex min-w-0 flex-col gap-6 min-[1280px]:flex-1 min-[1280px]:flex-row min-[1280px]:gap-6">
             <div className="min-w-0 min-[1280px]:w-[22%] min-[1280px]:shrink-0">
               <h2 className="font-display text-[28px] font-medium leading-[1.1]">Your Plan</h2>
@@ -338,7 +396,6 @@ export function RoastView({
               ))}
             </ol>
           </div>
-          <PlanArrow />
           <div className="rounded-[14px] bg-bg px-[18px] py-4 text-text min-[1280px]:px-4 min-[1280px]:py-3 min-[1280px]:flex min-[1280px]:w-[31%] min-[1280px]:shrink-0 min-[1280px]:flex-col min-[1280px]:justify-center compact:py-3">
             <p className="font-display text-[23px] font-medium leading-[1.1] min-[1280px]:text-[21px]">Do it today. Check in tomorrow.</p>
             <p className="mt-1 text-sm leading-[1.3] text-text-muted">See if your {lifeScore} moves.</p>
@@ -361,62 +418,24 @@ export function RoastView({
         </section>
       )}
 
-      {/* Bottom bar: share, reactions, the upgrade link, roast again. Stacked below 1280px, one row from 1280px up. */}
-      <div className="contents min-[1280px]:flex min-[1280px]:flex-wrap min-[1280px]:items-center min-[1280px]:justify-between min-[1280px]:gap-x-4 min-[1280px]:gap-y-3">
+      {/* Stacked layout only (below 1280px): share, reactions, roast again. From 1280px up share and reactions are in
+          the top bar and "Roast me again" is on the right page, so this whole area is hidden there. */}
+      <div className="contents min-[1280px]:hidden">
         {/* Share Buttons */}
         <ShareButtons roastId={roastId} shareSlug={shareSlug} />
 
         {/* Reactions */}
-        {canReact && (
-          <section className="flex flex-col items-center gap-3 min-[1280px]:shrink-0 min-[1280px]:flex-row min-[1280px]:gap-2">
-            <p className="text-sm text-text-muted min-[1280px]:mr-1 min-[1280px]:whitespace-nowrap min-[1280px]:text-xs min-[1280px]:uppercase min-[1280px]:tracking-[0.08em]">How did that feel?</p>
-            <div className="flex gap-2">
-              {REACTION_EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  disabled={savingReaction}
-                  onClick={() => void onReaction(emoji)}
-                  className={`flex h-12 w-12 items-center justify-center rounded-full border text-2xl transition min-[1280px]:h-11 min-[1280px]:w-11 min-[1280px]:text-xl min-[1280px]:transition-none min-[1280px]:focus-visible:outline min-[1280px]:focus-visible:outline-2 min-[1280px]:focus-visible:outline-offset-[3px] min-[1280px]:focus-visible:outline-text ${
-                    reaction === emoji
-                      ? "border-ember bg-ember-soft scale-110 min-[1280px]:scale-100"
-                      : "border-border bg-surface hover:border-ember/50 hover:bg-surface-2 min-[1280px]:border-text/35 min-[1280px]:bg-transparent min-[1280px]:hover:border-text min-[1280px]:hover:bg-text/10"
-                  }`}
-                  aria-label={`React ${emoji}`}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
+        {reactionRow}
 
-        <div className="contents min-[1280px]:flex min-[1280px]:shrink-0 min-[1280px]:items-center min-[1280px]:gap-3">
-          {/* The upgrade offer as a quiet link (desktop only; same condition as the card above) */}
-          {subscriptionTier !== "pro" && (
-            <div className="hidden min-[1280px]:flex min-[1280px]:items-center min-[1280px]:gap-3">
-              <span className="whitespace-nowrap text-xs text-text-muted">Ember has more to say.</span>
-              <a
-                href={getUpgradeUrl(userEmail)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-11 items-center whitespace-nowrap text-sm font-medium text-text underline decoration-1 underline-offset-4 hover:decoration-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-text"
-              >
-                Unlock My Full Read →
-              </a>
-            </div>
-          )}
-
-          {/* Roast Again Button */}
-          <button
-            type="button"
-            disabled={checkingLimit}
-            onClick={() => void handleRoastAgain()}
-            className="w-full rounded-xl border border-border px-4 py-3 text-center text-sm font-medium text-text transition hover:border-ember/40 disabled:opacity-50 min-[1280px]:h-11 min-[1280px]:w-auto min-[1280px]:whitespace-nowrap min-[1280px]:border-text min-[1280px]:bg-transparent min-[1280px]:px-4 min-[1280px]:py-0 min-[1280px]:text-[15px] min-[1280px]:transition-none min-[1280px]:hover:border-text min-[1280px]:hover:bg-text/10 min-[1280px]:focus-visible:outline min-[1280px]:focus-visible:outline-2 min-[1280px]:focus-visible:outline-offset-[3px] min-[1280px]:focus-visible:outline-text"
-          >
-            {checkingLimit ? "Checking..." : "Roast me again"}
-          </button>
-        </div>
+        {/* Roast Again Button */}
+        <button
+          type="button"
+          disabled={checkingLimit}
+          onClick={() => void handleRoastAgain()}
+          className="w-full rounded-xl border border-border px-4 py-3 text-center text-sm font-medium text-text transition hover:border-ember/40 disabled:opacity-50"
+        >
+          {checkingLimit ? "Checking..." : "Roast me again"}
+        </button>
       </div>
 
       {/* The sheet is not restyled yet: it keeps its original dark colours and font on the light page. "contents"

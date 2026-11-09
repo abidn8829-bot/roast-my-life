@@ -30,7 +30,8 @@ test("desktop: the spread, the wide container and the short-screen variant exist
   assert.match(view, /min-\[1280px\]:grid-cols-\[minmax\(0,52fr\)_minmax\(0,48fr\)\]/, "left page about 52 percent, right page about 48 (minmax(0, ...) so a very long word cannot widen a page)");
   assert.match(page, /min-\[1280px\]:max-w-\[1320px\] min-\[1280px\]:px-10/, "a wider container from 1280px: 1320px wide with 40px side padding is about 1240px of content");
   assert.match(page, /max-w-\[40rem\]/, "the 40rem column stays below 1280px");
-  assert.match(css, /@custom-variant compact \(@media \(min-width: 1280px\) and \(max-height: 759px\)\);/);
+  // the short-screen cutoff is 799px high (it was 759px): 1366x768 laptops now get the compact spacing too
+  assert.match(css, /@custom-variant compact \(@media \(min-width: 1280px\) and \(max-height: 799px\)\);/);
   assert.match(view, /\bcompact:/);
   // nothing in the new layout uses a different desktop breakpoint
   for (const [name, code] of [["roast-view", view], ["journal-roast-ui", ui], ["share-buttons", share], ["page", page]] as const) {
@@ -43,11 +44,11 @@ test("desktop: the spread, the wide container and the short-screen variant exist
 
 test("desktop: below 1280px the pages are 'contents', so the phone keeps its single stacked column in the old order", () => {
   const wrappers = view.match(/className="contents min-\[1280px\]:/g) ?? [];
-  assert.ok(wrappers.length >= 5, `expected the spread, both pages, the bottom bar and its right group, found ${wrappers.length}`);
-  assert.match(view, /<div className="flex w-full flex-col gap-12 pb-12 min-\[1280px\]:gap-3\.5/);
-  // the upgrade card stays for the phone and is hidden on desktop; the quiet link is desktop only; same condition
+  assert.ok(wrappers.length >= 4, `expected the spread, both pages and the stacked-only area, found ${wrappers.length}`);
+  assert.match(view, /<div className="flex w-full flex-col gap-12 pb-12 min-\[1280px\]:gap-3 min-\[1280px\]:pb-3/);
+  // the upgrade card stays for the phone and is hidden on desktop; the quiet link is desktop only (it now sits at the
+  // bottom of the right page, see the next test); same condition for both
   assert.match(view, /rounded-xl border border-ember\/30 bg-ember-soft p-5 text-center min-\[1280px\]:hidden/);
-  assert.match(view, /className="hidden min-\[1280px\]:flex min-\[1280px\]:items-center min-\[1280px\]:gap-3"/);
   assert.equal(view.match(/subscriptionTier !== "pro"/g)?.length, 2);
 });
 
@@ -58,7 +59,7 @@ test("desktop: below 1280px the pages are 'contents', so the phone keeps its sin
 test("plan band: the band, the plan text and the check-in panel exist only inside {visiblePlan && (...)}", () => {
   assert.equal(view.match(/\{visiblePlan && \(/g)?.length, 1);
   const open = view.indexOf("{visiblePlan && (");
-  const closeAt = view.indexOf('<div className="contents min-[1280px]:flex min-[1280px]:flex-wrap min-[1280px]:items-center min-[1280px]:justify-between');
+  const closeAt = view.indexOf('<div className="contents min-[1280px]:hidden">');
   assert.ok(open !== -1 && closeAt > open);
   const band = view.slice(open, closeAt);
   for (const text of ["Your Plan", "Do it today. Check in tomorrow.", "Remind me tomorrow", "See if your {lifeScore} moves.", "bg-text px-6 py-6 text-bg", "{visiblePlan.challenge}", "visiblePlan.steps.map("]) {
@@ -69,6 +70,45 @@ test("plan band: the band, the plan text and the check-in panel exist only insid
   for (const text of ["Do it today. Check in tomorrow.", "Remind me tomorrow", "bg-text px-6 py-6 text-bg", "visiblePlan.challenge", "visiblePlan.steps"]) {
     assert.ok(!outside.includes(text), `${text} must not be outside the plan conditional`);
   }
+});
+
+test("one-glance height: share and reactions are in the top bar, the bottom bar is gone, and the arrow is removed", () => {
+  // the stray curved arrow between the plan steps and the check-in panel is gone everywhere
+  for (const [name, code] of [["roast-view", view], ["journal-roast-ui", ui]] as const) assert.doesNotMatch(code, /PlanArrow|viewBox="0 0 40 40"/, `${name} still has the arrow`);
+
+  // desktop: share + reactions sit in the top bar, positioned over the middle of the bar that page.tsx draws
+  const group = view.slice(view.indexOf('<div className="hidden min-[1280px]:absolute'), view.indexOf('min-[1280px]:grid-cols-[minmax'));
+  assert.match(group, /min-\[1280px\]:absolute min-\[1280px\]:inset-x-0 min-\[1280px\]:top-0 min-\[1280px\]:mx-auto min-\[1280px\]:flex min-\[1280px\]:h-\[48px\] min-\[1280px\]:w-fit/);
+  assert.ok(group.includes("<ShareButtons") && group.includes("{reactionRow}"), "share and reactions are in the top group");
+  // it is the FIRST thing in the page, so the keyboard order (Back link, share, reactions, ...) matches what is drawn
+  assert.match(view, /<div className="flex w-full flex-col gap-12[^"]*">\s*(?:\{\s*\}\s*)?<div className="hidden min-\[1280px\]:absolute/);
+  assert.match(page, /<div className="relative">\s*<div className="mb-10 min-\[1280px\]:mb-1 min-\[1280px\]:flex min-\[1280px\]:min-h-\[48px\]/, "page.tsx gives the top bar a positioning wrapper");
+  assert.equal(page.match(/<Link\b/g)?.length, 1);
+
+  // the stacked layout keeps share, reactions and roast-again in one phone-only area; nothing is lost on a phone
+  const phone = view.slice(view.indexOf('<div className="contents min-[1280px]:hidden">'), view.indexOf("</button>", view.indexOf('<div className="contents min-[1280px]:hidden">')));
+  for (const part of ["<ShareButtons", "{reactionRow}", "handleRoastAgain", "Roast me again"]) assert.ok(phone.includes(part), `the phone-only area is missing ${part}`);
+  // every control exists in both layouts (one copy per layout, the other hidden), with the same handlers and labels
+  assert.equal(view.match(/<ShareButtons\b/g)?.length, 2);
+  assert.equal(view.match(/\{reactionRow\}/g)?.length, 2);
+  assert.equal(view.match(/onClick=\{\(\) => void handleRoastAgain\(\)\}/g)?.length, 2);
+  assert.equal(view.match(/Roast me again/g)?.length, 2);
+  assert.equal(view.match(/onClick=\{\(\) => void onReaction\(emoji\)\}/g)?.length, 1, "one reaction handler, shared");
+  assert.equal(view.match(/Unlock My Full Read/g)?.length, 2, "the phone card's button and the desktop quiet link");
+
+  // desktop: the quiet upgrade link and "Roast me again" close the RIGHT page, where there was spare room
+  const right = view.slice(view.indexOf('<div className="hidden min-[1280px]:mt-auto min-[1280px]:flex'));
+  assert.ok(right.indexOf("Unlock My Full Read") !== -1 && right.indexOf("Roast me again") > right.indexOf("Unlock My Full Read"));
+  assert.ok(view.indexOf('<div className="hidden min-[1280px]:mt-auto min-[1280px]:flex') < view.indexOf("{visiblePlan && ("), "the right page closes before the plan band");
+  // the old desktop bottom bar is gone
+  assert.doesNotMatch(view, /min-\[1280px\]:justify-between min-\[1280px\]:gap-x-4 min-\[1280px\]:gap-y-3/);
+
+  // smaller ring and tighter pages
+  assert.match(view, /min-\[1280px\]:text-\[96px\]/);
+  assert.doesNotMatch(view, /118px|min-h-\[490px\]/);
+  // "Day N" (the streak line) and "Week N" are two different facts, so both are still there, once each
+  assert.equal(view.match(/getStreakMessage\(currentStreak\)/g)?.length, 1);
+  assert.equal(view.match(/Week \{weekCount\} of facing reality/g)?.length, 1);
 });
 
 test("plan band: contrast of the text on the dark band meets WCAG AA (ink band, light text, powder 'why' line)", () => {
