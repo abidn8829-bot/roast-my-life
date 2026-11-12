@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { JournalTheme } from "@/components/journal-theme";
@@ -14,6 +14,9 @@ export const dynamic = "force-dynamic";
 
 // Private (UUID) roasts and the legacy /roast/<slug> redirect: never index, never canonicalize.
 export const metadata: Metadata = { robots: { index: false, follow: false } };
+
+// Journal theme: browser UI colour matches the page background (this page only).
+export const viewport: Viewport = { themeColor: "#DCE6EE" };
 
 export default async function RoastDetailPage({
   params,

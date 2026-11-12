@@ -2,8 +2,22 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import {
+  errorBox,
+  fieldInput,
+  fieldLabel,
+  inkLink,
+  JournalWordmark,
+  noteBox,
+  primaryButton,
+} from "@/components/journal-auth-ui";
+import { JournalTheme } from "@/components/journal-theme";
 import { SafetyPage } from "@/components/safety-page";
 import type { SafetyPagePayload } from "@/lib/safety";
+
+// Same 16 px text, border and ink focus ring as the login fields (fieldInput), minus its fixed 48 px height.
+const textareaInput =
+  "jl-input ph-no-capture w-full resize-none rounded-xl border border-border-strong-legacy bg-surface px-4 py-3 text-base text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text";
 
 export function ContactPage() {
   const [name, setName] = useState("");
@@ -52,81 +66,76 @@ export function ContactPage() {
   if (safetyPage) return <SafetyPage payload={safetyPage} />;
 
   return (
-    <main className="min-h-screen bg-bg px-4 py-10 text-text-legacy">
-      <div className="mx-auto w-full max-w-sm flex flex-col gap-6">
-        <div className="text-center mb-4">
-          <h1 className="text-3xl font-black tracking-tight text-ember-legacy mb-2">
-            EMBER
+    <JournalTheme>
+      <div className="jl mx-auto flex w-full max-w-[28rem] flex-col px-4 pb-16 pt-6">
+        <header>
+          <JournalWordmark />
+        </header>
+
+        <main className="mt-14 flex flex-col gap-6">
+          <h1 className="font-display text-[clamp(2.25rem,9vw,3.25rem)] font-medium leading-[1.05] tracking-[-0.01em]">
+            Got something to say?
           </h1>
-          <p className="text-sm text-text-secondary-legacy">Got something to say?</p>
-        </div>
 
-        {sent ? (
-          <p className="rounded-md border border-border-strong-legacy bg-surface-sunken-legacy/60 px-3 py-2 text-sm text-text-emphasis-legacy text-center">
-            Message sent. We&apos;ll get back to you.
+          {sent ? (
+            <p className={`${noteBox} text-center`}>
+              Message sent. We&apos;ll get back to you.
+            </p>
+          ) : (
+            <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-5">
+              {error ? <p className={errorBox}>{error}</p> : null}
+
+              <label className={fieldLabel}>
+                <span>Name</span>
+                <input
+                  name="name"
+                  type="text"
+                  autoComplete="name"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className={fieldInput}
+                />
+              </label>
+
+              <label className={fieldLabel}>
+                <span>Email</span>
+                <input
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={fieldInput}
+                />
+              </label>
+
+              <label className={fieldLabel}>
+                <span>Message</span>
+                <textarea
+                  name="message"
+                  required
+                  rows={5}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className={textareaInput}
+                />
+              </label>
+
+              <button type="submit" disabled={loading} className={`${primaryButton} mt-1`}>
+                {loading ? "Sending…" : "Send message"}
+              </button>
+            </form>
+          )}
+
+          <p>
+            <Link href="/" className={inkLink}>
+              Back to home
+            </Link>
           </p>
-        ) : (
-          <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-4">
-            {error ? (
-              <p className="rounded-md border border-error-border/60 bg-error-bg/40 px-3 py-2 text-sm text-error-text">
-                {error}
-              </p>
-            ) : null}
-
-            <label className="flex flex-col gap-1.5 text-sm">
-              <span className="text-text-body-legacy">Name</span>
-              <input
-                name="name"
-                type="text"
-                autoComplete="name"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="rounded-md border border-line-subtle-legacy bg-surface px-3 py-2 text-text-legacy outline-none ring-ember-legacy focus:ring-2"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1.5 text-sm">
-              <span className="text-text-body-legacy">Email</span>
-              <input
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="rounded-md border border-line-subtle-legacy bg-surface px-3 py-2 text-text-legacy outline-none ring-ember-legacy focus:ring-2"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1.5 text-sm">
-              <span className="text-text-body-legacy">Message</span>
-              <textarea
-                name="message"
-                required
-                rows={5}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className="ph-no-capture resize-none rounded-md border border-line-subtle-legacy bg-surface px-3 py-2 text-text-legacy outline-none ring-ember-legacy focus:ring-2"
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="mt-1 rounded-md bg-ember-legacy px-4 py-2.5 text-sm font-medium text-on-accent transition hover:brightness-110 disabled:opacity-50"
-            >
-              {loading ? "Sending…" : "Send message"}
-            </button>
-          </form>
-        )}
-
-        <p className="text-center text-sm text-text-secondary-legacy">
-          <Link href="/" className="font-medium text-ember-legacy hover:underline">
-            Back to home
-          </Link>
-        </p>
+        </main>
       </div>
-    </main>
+    </JournalTheme>
   );
 }

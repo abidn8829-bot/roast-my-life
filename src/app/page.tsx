@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import { JournalHome } from "@/components/journal-home";
 import { JournalTheme } from "@/components/journal-theme";
 import { PRO_PRICE } from "@/lib/plans";
@@ -14,6 +15,10 @@ export const metadata = pageMetadata({
   path: "/",
   absoluteTitle: true,
 });
+
+// Journal theme: browser UI colour matches the page background (this page only).
+// If the old dark HomePage is ever switched back in below, remove this line too.
+export const viewport: Viewport = { themeColor: "#DCE6EE" };
 
 const jsonLd = {
   "@context": "https://schema.org",
