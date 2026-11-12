@@ -26,13 +26,21 @@ import {
   parseRoastResponse,
 } from "@/lib/safety-prompts";
 import { gentleGate, respondFlagged, respondOutputBlocked, respondUnavailable } from "@/lib/safety-response";
+import { generateFirstRoastPlan, planRowFields } from "@/lib/first-roast-plan";
 
 const MODEL = "openai/gpt-oss-120b";
 
-// Seconds this route may run on Vercel. The pipeline is a safety classify call, then the roast, then
-// the punchline and memory calls (each with a timeout of its own), and a slow Groq day can add up.
+// Seconds this route may run on Vercel. The pipeline is a safety classify call (8 s, one short retry), then the
+// roast call (15 s, no retry), then the punchline, memory and plan calls side by side. Those three each have a hard
+// timeout and no SDK retries: the memory call and each punchline attempt 10 s (SIDE_CALL_OPTIONS below; the
+// punchline helper makes up to two attempts), the plan call 8 s (inside lib/first-roast-plan.ts). The SDK default
+// would be 1 minute and 2 retries, which a hung call could stretch past this limit before the roast is saved.
 // 60 is within the Hobby plan's documented maximum whether or not Fluid Compute is on.
 export const maxDuration = 60;
+
+// Per-request limits for the calls that run after the roast text exists (memory, punchline). A failure is still
+// swallowed by the caller, as before: it only comes sooner now.
+const SIDE_CALL_OPTIONS = { timeout: 10_000, maxRetries: 0 } as const;
 
 const CONTINUITY_MEMORY_SYSTEM_PROMPT = `You are building lightweight current-arc memory for a roast AI. Remember only the current habit storyline, not a transcript. Return a JSON object with these fields:
 - activeTheme: the current theme/issue (e.g., "procrastination", "phone addiction")
@@ -329,14 +337,22 @@ async function handlePost(request: Request, slot: { release: () => void }) {
   const funny_title = getFunnyTitle(life_score);
   const category_scores = calculateCategoryScores(answers);
 
-  // Card punchline runs alongside the continuity-memory call (both only need roastText).
-  const punchlinePromise = generateCardPunchline(groq, MODEL, {
+  // Card punchline runs alongside the continuity-memory call and the first-roast plan (the first two only need
+  // roastText). The punchline helper makes its own AI calls without per-request options, so it gets a client that
+  // carries the same 10 s timeout and no retries.
+  const punchlineGroq = new Groq({ apiKey, ...SIDE_CALL_OPTIONS });
+  const punchlinePromise = generateCardPunchline(punchlineGroq, MODEL, {
     answers,
     categoryScores: category_scores,
     lifeScore: life_score,
     roastText,
     mode,
   });
+
+  // The plan and the improvement suggestion. Started only here: every pause, limit, flag, unavailable and output
+  // exit above has already passed. It never throws and gives up after 8 s (lib/first-roast-plan.ts); null means
+  // the roast is saved without a plan.
+  const planPromise = generateFirstRoastPlan(groq, { answers, categoryScores: category_scores });
 
   // Generate continuity memory
   let newContinuityMemory = continuityMemory || { activeTheme: "", followUpQuestion: "", lastResponse: "", callbackCount: 0, resolved: false, challenge: "", updatedAt: "" };
@@ -363,7 +379,7 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
         { role: "user", content: memoryPrompt },
       ],
       response_format: { type: "json_object" },
-    });
+    }, SIDE_CALL_OPTIONS);
 
     const memoryContent = memoryCompletion.choices[0]?.message?.content?.trim() || "";
     if (memoryContent) {
@@ -380,6 +396,7 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
   }
 
   const cardPunchline = await punchlinePromise;
+  const firstRoastPlan = await planPromise;
 
   // Final output check over everything the AI wrote, before anything is saved.
   const memoryChallenge = (newContinuityMemory as Record<string, unknown>).challenge;
@@ -403,6 +420,8 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
     mode,
     persona,
     continuity_memory: newContinuityMemory,
+    // plan_steps + suggestion_line, only when the helper returned a plan (nothing at all otherwise).
+    ...planRowFields(firstRoastPlan),
   };
 
   // The server saves the roast (service role); user.id comes from the verified session above.

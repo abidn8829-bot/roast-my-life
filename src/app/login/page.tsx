@@ -1,4 +1,7 @@
+import type { Viewport } from "next";
 import { Suspense } from "react";
+import { AuthFrame } from "@/components/journal-auth-frame";
+import { JournalTheme } from "@/components/journal-theme";
 import { LoginForm } from "@/components/login-form";
 import { pageMetadata } from "@/lib/seo";
 
@@ -9,16 +12,17 @@ export const metadata = pageMetadata({
   absoluteTitle: true,
 });
 
+// Journal theme: browser UI colour matches the page background (this page only).
+export const viewport: Viewport = { themeColor: "#DCE6EE" };
+
 export default function LoginPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[#0A0A0A] px-4 py-12 text-[#FAFAFA]">
-      <Suspense
-        fallback={
-          <p className="text-sm text-neutral-400">Loading…</p>
-        }
-      >
-        <LoginForm />
-      </Suspense>
-    </main>
+    <JournalTheme>
+      <AuthFrame>
+        <Suspense fallback={<p className="text-sm text-text-muted">Loading…</p>}>
+          <LoginForm />
+        </Suspense>
+      </AuthFrame>
+    </JournalTheme>
   );
 }

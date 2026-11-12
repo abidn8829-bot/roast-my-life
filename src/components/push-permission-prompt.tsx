@@ -112,7 +112,7 @@ export function PushPermissionPrompt() {
         <button
           onClick={() => void enable()}
           disabled={busy}
-          className="rounded-xl bg-ember px-3 py-1.5 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-50"
+          className="rounded-xl bg-ember px-3 py-1.5 text-sm font-medium text-on-accent transition hover:brightness-110 disabled:opacity-50"
         >
           {busy ? "..." : "Turn on"}
         </button>

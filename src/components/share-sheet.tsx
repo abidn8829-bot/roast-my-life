@@ -200,7 +200,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
       onKeyDown={onKeyDown}
     >
       <div
-        className={`absolute inset-0 bg-black/75 transition-opacity duration-300 motion-reduce:transition-none ${
+        className={`absolute inset-0 bg-overlay/75 transition-opacity duration-300 motion-reduce:transition-none ${
           open ? "opacity-100" : "opacity-0"
         }`}
         onClick={() => close("backdrop")}
@@ -210,7 +210,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
       <div
         ref={sheetRef}
         tabIndex={-1}
-        className="relative w-full max-w-[480px] overflow-y-auto overscroll-contain rounded-t-[36px] bg-[#111111] px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] outline-none motion-reduce:transition-none"
+        className="relative w-full max-w-[480px] overflow-y-auto overscroll-contain rounded-t-[36px] bg-panel-legacy px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] outline-none motion-reduce:transition-none"
         style={{
           maxHeight: "94dvh",
           transform: `translateY(${open ? `${dragY}px` : "100%"})`,
@@ -225,32 +225,32 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
           onPointerUp={onDragEnd}
           onPointerCancel={onDragEnd}
         >
-          <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#333333]" aria-hidden />
+          <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-line-legacy" aria-hidden />
           <h2
             id="share-sheet-title"
-            className="text-center text-3xl font-black tracking-tight text-[#f5f3f0]"
+            className="text-center text-3xl font-black tracking-tight text-text"
           >
             This is embarrassing.
           </h2>
-          <p className="mt-1 text-center text-base text-[#98979c]">
+          <p className="mt-1 text-center text-base text-text-muted">
             Show it off before you fix it.
           </p>
         </div>
 
         {/* Card preview (shrinks on short viewports so the buttons stay reachable) */}
         <div
-          className="relative mx-auto mt-5 max-w-full overflow-hidden rounded-[24px] border border-[#262626] bg-[#0a0a0b]"
+          className="relative mx-auto mt-5 max-w-full overflow-hidden rounded-[24px] border border-line-subtle-legacy bg-bg"
           style={{ height: "clamp(300px, calc(100dvh - 470px), 605px)", aspectRatio: "9 / 16" }}
         >
           {previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- blob: URL from the generated card
             <img src={previewUrl} alt="Your Ember roast card" className="h-full w-full object-cover" />
           ) : cardFailed ? (
-            <p className="flex h-full items-center justify-center px-6 text-center text-sm text-[#98979c]">
+            <p className="flex h-full items-center justify-center px-6 text-center text-sm text-text-muted">
               Couldn&apos;t generate your card preview.
             </p>
           ) : (
-            <div className="h-full w-full animate-pulse bg-[#1A1A1A]" aria-label="Generating your card" />
+            <div className="h-full w-full animate-pulse bg-control-legacy" aria-label="Generating your card" />
           )}
         </div>
 
@@ -259,7 +259,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
             type="button"
             disabled={busy || cardFailed}
             onClick={() => void onShareToInstagram()}
-            className="w-full rounded-2xl bg-[#FF3D00] px-6 py-4 text-lg font-bold text-white transition hover:brightness-110 active:scale-[0.99] disabled:opacity-50"
+            className="w-full rounded-2xl bg-ember-legacy px-6 py-4 text-lg font-bold text-on-accent transition hover:brightness-110 active:scale-[0.99] disabled:opacity-50"
           >
             {busy ? "Preparing…" : "Share to Instagram Story"}
           </button>
@@ -268,7 +268,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
             <button
               type="button"
               onClick={() => void onCopyLink()}
-              className="rounded-2xl border border-[#333333] bg-[#1A1A1A] px-4 py-3.5 text-base font-semibold text-white transition hover:border-[#4a4a4a] active:scale-[0.99]"
+              className="rounded-2xl border border-line-legacy bg-control-legacy px-4 py-3.5 text-base font-semibold text-white transition hover:border-line-hover-legacy active:scale-[0.99]"
             >
               Copy Link
             </button>
@@ -276,7 +276,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
               type="button"
               disabled={busy || cardFailed}
               onClick={() => void onSaveImage()}
-              className="rounded-2xl border border-[#333333] bg-[#1A1A1A] px-4 py-3.5 text-base font-semibold text-white transition hover:border-[#4a4a4a] active:scale-[0.99] disabled:opacity-50"
+              className="rounded-2xl border border-line-legacy bg-control-legacy px-4 py-3.5 text-base font-semibold text-white transition hover:border-line-hover-legacy active:scale-[0.99] disabled:opacity-50"
             >
               Save Image
             </button>
@@ -285,19 +285,19 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
 
         <div aria-live="polite" className="mt-3 empty:hidden">
           {showManualPrompt ? (
-            <p className="rounded-2xl border border-[#262626] bg-[#1A1A1A] px-4 py-3 text-center text-sm leading-relaxed text-[#d4d4d8]">
+            <p className="rounded-2xl border border-line-subtle-legacy bg-control-legacy px-4 py-3 text-center text-sm leading-relaxed text-[#d4d4d8]">
               Image saved to your device. Open Instagram, start a Story, and pick it from your photos
               or downloads. 📸
             </p>
           ) : status ? (
-            <p className="break-all text-center text-sm text-[#98979c]">{status}</p>
+            <p className="break-all text-center text-sm text-text-muted">{status}</p>
           ) : null}
         </div>
 
         <button
           type="button"
           onClick={() => close("skip")}
-          className="mx-auto mt-2 block px-4 py-3 text-sm text-[#6b6b70] transition hover:text-[#98979c]"
+          className="mx-auto mt-2 block px-4 py-3 text-sm text-[#6b6b70] transition hover:text-text-muted"
         >
           Skip for now
         </button>

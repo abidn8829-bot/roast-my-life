@@ -1,5 +1,8 @@
 "use client";
 
+import { focusRing } from "@/components/journal-auth-ui";
+import { questionTitle } from "@/components/journal-onboarding-ui";
+import { PersonaIcon } from "@/components/journal-persona-art";
 import { FREE_PERSONA, ROAST_PERSONA_LIST } from "@/lib/roast-personas";
 import type { RoastPersona } from "@/lib/roast-types";
 
@@ -14,28 +17,36 @@ type Props = {
 // Names, icons and blurbs come from src/lib/roast-personas.ts (the only place they are written).
 const PERSONAS = ROAST_PERSONA_LIST.map((p) => ({ id: p.id, name: p.label, emoji: p.emoji, description: p.blurb }));
 
+// Journal look: one column of bordered rows, 14px radius, at least 56px high. A small hand-drawn icon
+// (journal-persona-art.tsx) sits in a fixed-width slot at the left, so the names line up.
+const rowBase = `flex min-h-[64px] w-full flex-row items-center gap-3 rounded-[14px] border px-[18px] py-3 text-left transition ${focusRing}`;
+const rowAvailable =
+  "border-border-strong-legacy bg-surface text-text hover:bg-surface-2 disabled:cursor-wait disabled:hover:bg-surface";
+// Locked: dimmed (no fill, lighter border) but the text stays readable.
+const rowLocked = "cursor-not-allowed border-border bg-transparent text-text-muted";
+
 export function PersonaSelector({ onSelect, isPro, onUpgradeRequest, disabled = false }: Props) {
   return (
-    <div className="w-full max-w-md">
-      <h2 className="mb-6 text-center text-2xl font-bold text-[#FAFAFA]">Choose your persona</h2>
-      <div className="grid grid-cols-2 gap-3">
+    <div className="w-full">
+      <h2 className={`${questionTitle} mb-8`}>Choose your persona</h2>
+      <div className="flex flex-col gap-2.5">
         {PERSONAS.map((persona) => (
           <button
             key={persona.id}
             type="button"
             onClick={() => (isPro || persona.id === FREE_PERSONA ? onSelect(persona.id) : onUpgradeRequest())}
             disabled={disabled || (!isPro && persona.id !== FREE_PERSONA)}
-            className={`rounded-xl border-2 px-4 py-4 text-center transition ${
-              isPro || persona.id === FREE_PERSONA
-                ? "border-[#FF3D00] bg-[#FF3D00]/10 hover:bg-[#FF3D00]/20"
-                : "border-neutral-800 bg-neutral-900 opacity-50 cursor-not-allowed"
-            }`}
+            className={`${rowBase} ${isPro || persona.id === FREE_PERSONA ? rowAvailable : rowLocked}`}
           >
-            <div className="text-4xl mb-2">{persona.emoji}</div>
-            <div className="text-sm font-bold text-[#FAFAFA]">{persona.name}</div>
-            <div className="text-xs text-neutral-400 mt-1">
-              {isPro || persona.id === FREE_PERSONA ? persona.description : "Pro only 🔒"}
-            </div>
+            <span className={`flex w-[44px] shrink-0 items-center justify-center ${isPro || persona.id === FREE_PERSONA ? "" : "opacity-50"}`}>
+              <PersonaIcon id={persona.id} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-base font-medium">{persona.name}</span>
+              <span className="mt-0.5 block text-sm font-light text-text-muted">
+                {isPro || persona.id === FREE_PERSONA ? persona.description : "Pro only"}
+              </span>
+            </span>
           </button>
         ))}
       </div>

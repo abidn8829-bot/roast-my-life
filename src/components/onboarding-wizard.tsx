@@ -8,6 +8,10 @@ import { PersonaSelector } from "@/components/persona-selector";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { GentleNotice, SafetyPage, SafetyUnavailable } from "@/components/safety-page";
 import { CHECKIN_CHIP_LABELS, type SafetyPayload, type SafetyPagePayload } from "@/lib/safety";
+import { JournalTheme } from "@/components/journal-theme";
+import { errorBox, primaryButton } from "@/components/journal-auth-ui";
+import { LoadingArt, QuestionArt } from "@/components/journal-onboarding-art";
+import { DarkScope, QUESTION_NOTES, QuestionProgress, backLink, numberInput, questionTitle, textareaInput } from "@/components/journal-onboarding-ui";
 
 // One emoji per preset check-in button, in the order of CHECKIN_CHIP_LABELS (the wording lives in @/lib/safety).
 const CHECKIN_CHIP_EMOJIS = ["😎", "😅", "🤡"] as const;
@@ -22,7 +26,7 @@ const LOADING_MESSAGES = [
 const BASE_QUESTIONS = [
   {
     key: "phoneHours" as const,
-    label: "How many hours a day are you glued to your phone, pretending to be productive?",
+    label: "How many hours a day are you on your phone?",
     emoji: "📱",
     type: "number" as const,
     min: 1,
@@ -31,14 +35,14 @@ const BASE_QUESTIONS = [
   },
   {
     key: "worstApp" as const,
-    label: "Which app is currently winning the battle for your soul?",
+    label: "Which app takes most of that time?",
     emoji: "🎭",
     type: "text" as const,
     placeholder: "TikTok, Instagram…",
   },
   {
     key: "sleepHours" as const,
-    label: "How many hours of sleep are you sacrificing for absolutely no reason?",
+    label: "On a normal night, how many hours do you sleep?",
     emoji: "😴",
     type: "number" as const,
     min: 1,
@@ -47,7 +51,7 @@ const BASE_QUESTIONS = [
   },
   {
     key: "foodDeliverySpend" as const,
-    label: "How much money do you throw at food delivery because cooking is apparently impossible?",
+    label: "How many dollars a week do you spend on food delivery?",
     emoji: "💸",
     type: "number" as const,
     min: 0,
@@ -55,7 +59,7 @@ const BASE_QUESTIONS = [
   },
   {
     key: "neverDoThing" as const,
-    label: "What's your biggest broken promise to yourself?",
+    label: "What's the promise to yourself you keep breaking?",
     emoji: "🤥",
     type: "text" as const,
     placeholder: "Go to the gym, read more…",
@@ -65,7 +69,7 @@ const BASE_QUESTIONS = [
 const PRO_QUESTIONS = [
   {
     key: "socialMediaHours" as const,
-    label: "How many hours do you doomscroll social media daily?",
+    label: "How many hours a day do you spend doomscrolling?",
     emoji: "👀",
     type: "number" as const,
     min: 0,
@@ -74,7 +78,7 @@ const PRO_QUESTIONS = [
   },
   {
     key: "workoutFrequency" as const,
-    label: "How many times did you actually move your body this week?",
+    label: "How many times did you move your body this week?",
     emoji: "🏃",
     type: "number" as const,
     min: 0,
@@ -482,7 +486,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
           <button
             type="button"
             onClick={() => router.replace("/dashboard")}
-            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
+            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-on-accent shadow-ember-glow transition hover:brightness-110"
           >
             Back to dashboard
           </button>
@@ -500,17 +504,23 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   if (step === "checkin-persona") {
     return (
       <>
-        <PersonaSelector
-          onSelect={onCheckInPersonaSelect}
-          isPro={isPro}
-          onUpgradeRequest={() => setUpgradeReason("pro_feature")}
-        />
-        <UpgradeModal
-          isOpen={upgradeReason !== null}
-          onClose={() => setUpgradeReason(null)}
-          reason={upgradeReason ?? undefined}
-          userEmail={userEmail}
-        />
+        <JournalTheme className="w-full max-w-md">
+          <div data-journal-screen className="jl w-full">
+            <PersonaSelector
+              onSelect={onCheckInPersonaSelect}
+              isPro={isPro}
+              onUpgradeRequest={() => setUpgradeReason("pro_feature")}
+            />
+          </div>
+        </JournalTheme>
+        <DarkScope>
+          <UpgradeModal
+            isOpen={upgradeReason !== null}
+            onClose={() => setUpgradeReason(null)}
+            reason={upgradeReason ?? undefined}
+            userEmail={userEmail}
+          />
+        </DarkScope>
       </>
     );
   }
@@ -572,7 +582,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
               <button
                 onClick={() => void onCheckInSubmit()}
                 disabled={!followUpAnswer.trim() || isGenerating}
-                className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-on-accent shadow-ember-glow transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Continue →
               </button>
@@ -617,7 +627,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
           <button
             onClick={onFollowUpSubmit}
             disabled={!followUpAnswer.trim()}
-            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-on-accent shadow-ember-glow transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Get Roasted →
           </button>
@@ -628,48 +638,131 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
 
   if (step === "loading") {
     return (
-      <div className="w-full max-w-md text-center">
-        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-ember border-t-transparent" />
-        <p className="text-lg text-text animate-pulse">
-          {LOADING_MESSAGES[loadingMsgIndex]}
-        </p>
-        {error ? <p className="mt-4 text-sm text-grade-f">{error}</p> : null}
-        <UpgradeModal
-          isOpen={upgradeReason !== null}
-          onClose={() => setUpgradeReason(null)}
-          reason={upgradeReason ?? undefined}
-          userEmail={userEmail}
-        />
-      </div>
+      <>
+        <JournalTheme className="w-full max-w-md">
+          <div data-journal-screen className="jl w-full">
+            <LoadingArt />
+            <p className="font-display mt-7 min-h-[7rem] text-[30px] font-medium leading-[1.12]">
+              {LOADING_MESSAGES[loadingMsgIndex]}
+            </p>
+            {error ? (
+              <p role="alert" className={`${errorBox} mt-2`}>
+                {error}
+              </p>
+            ) : null}
+          </div>
+        </JournalTheme>
+        {/* text-center: the old loading screen centred its contents, and the modal inherited that. */}
+        <DarkScope className="text-center">
+          <UpgradeModal
+            isOpen={upgradeReason !== null}
+            onClose={() => setUpgradeReason(null)}
+            reason={upgradeReason ?? undefined}
+            userEmail={userEmail}
+          />
+        </DarkScope>
+      </>
     );
   }
 
   if (step === "persona") {
     return (
       <>
-        <PersonaSelector
-          onSelect={(persona) => {
-            // Ignore a double tap while a roast is already being requested (generateRoast guards itself too).
-            if (generatingRef.current) return;
-            track("persona_selected", { persona, context: "onboarding" });
-            onPersonaSelect(persona);
-          }}
-          disabled={isGenerating}
-          isPro={isPro}
-          onUpgradeRequest={() => setUpgradeReason("pro_feature")}
-        />
-        <UpgradeModal
-          isOpen={upgradeReason !== null}
-          onClose={() => setUpgradeReason(null)}
-          reason={upgradeReason ?? undefined}
-          userEmail={userEmail}
-        />
+        <JournalTheme className="w-full max-w-md">
+          <div data-journal-screen className="jl w-full">
+            <PersonaSelector
+              onSelect={(persona) => {
+                // Ignore a double tap while a roast is already being requested (generateRoast guards itself too).
+                if (generatingRef.current) return;
+                track("persona_selected", { persona, context: "onboarding" });
+                onPersonaSelect(persona);
+              }}
+              disabled={isGenerating}
+              isPro={isPro}
+              onUpgradeRequest={() => setUpgradeReason("pro_feature")}
+            />
+          </div>
+        </JournalTheme>
+        <DarkScope>
+          <UpgradeModal
+            isOpen={upgradeReason !== null}
+            onClose={() => setUpgradeReason(null)}
+            reason={upgradeReason ?? undefined}
+            userEmail={userEmail}
+          />
+        </DarkScope>
       </>
     );
   }
 
   const slideIndex = typeof step === "number" ? step : 0;
   const q = allQuestions[slideIndex];
+
+  // Journal look for the question screens only. While an upgrade modal is open (a returning free user who has
+  // used today's roast) the previous markup below is kept, so that modal looks exactly as it always did.
+  if (upgradeReason === null) {
+    const note = QUESTION_NOTES[q.key];
+    return (
+      <JournalTheme className="w-full max-w-md">
+        <div data-journal-screen className="jl flex w-full flex-col">
+          <QuestionProgress current={slideIndex} total={allQuestions.length} />
+
+          <div className="mt-10">
+            <QuestionArt questionKey={q.key} />
+          </div>
+
+          <div key={q.key} className="mt-7">
+            <label className="flex w-full flex-col gap-6">
+              <span className={questionTitle}>{q.label}</span>
+
+              {/* Input */}
+              {q.type === "text" ? (
+                <textarea
+                  rows={2}
+                  placeholder={q.placeholder}
+                  value={values[q.key]}
+                  onChange={(e) => setters[q.key](e.target.value)}
+                  className={`ph-no-capture ${textareaInput}`}
+                />
+              ) : (
+                <input
+                  type="number"
+                  min={q.min}
+                  max={q.max}
+                  placeholder={q.placeholder}
+                  value={values[q.key]}
+                  onChange={(e) => setters[q.key](e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") onNext();
+                  }}
+                  className={numberInput}
+                />
+              )}
+            </label>
+
+            {note ? <p className="font-note mt-4 text-[22px] leading-tight text-text-muted [transform:rotate(-1.5deg)]">{note}</p> : null}
+            {error ? (
+              <p role="alert" className={`${errorBox} mt-5`}>
+                {error}
+              </p>
+            ) : null}
+          </div>
+
+          {/* Navigation buttons */}
+          <div className="mt-10 flex flex-col items-center gap-3">
+            <button type="button" onClick={onNext} className={primaryButton}>
+              {slideIndex === allQuestions.length - 1 ? "Choose Your Roaster →" : "Next →"}
+            </button>
+            {slideIndex > 0 ? (
+              <button type="button" onClick={onBack} className={backLink}>
+                ← Back
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </JournalTheme>
+    );
+  }
 
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-12">
@@ -744,7 +837,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
           <button
             type="button"
             onClick={onNext}
-            className="rounded-xl bg-ember px-8 py-4 text-lg font-medium text-white transition hover:brightness-110 hover:scale-105"
+            className="rounded-xl bg-ember px-8 py-4 text-lg font-medium text-on-accent transition hover:brightness-110 hover:scale-105"
           >
             {slideIndex === allQuestions.length - 1 ? "Choose Your Roaster →" : "Next →"}
           </button>

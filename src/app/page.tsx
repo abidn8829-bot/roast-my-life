@@ -1,4 +1,6 @@
-import { HomePage } from "@/components/home-page";
+import type { Viewport } from "next";
+import { JournalHome } from "@/components/journal-home";
+import { JournalTheme } from "@/components/journal-theme";
 import { PRO_PRICE } from "@/lib/plans";
 import { pageMetadata } from "@/lib/seo";
 import { SITE_URL } from "@/lib/site";
@@ -13,6 +15,10 @@ export const metadata = pageMetadata({
   path: "/",
   absoluteTitle: true,
 });
+
+// Journal theme: browser UI colour matches the page background (this page only).
+// If the old dark HomePage is ever switched back in below, remove this line too.
+export const viewport: Viewport = { themeColor: "#DCE6EE" };
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -50,7 +56,11 @@ export default function Page() {
         // Escape "<" so no string value can close the script tag.
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
-      <HomePage />
+      {/* To switch back to the old dark page: import { HomePage } from "@/components/home-page"
+          and render <HomePage /> here instead of the two lines below. */}
+      <JournalTheme>
+        <JournalHome />
+      </JournalTheme>
     </>
   );
 }

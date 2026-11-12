@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { roastShareUrl } from "@/lib/site";
 import posthog from "posthog-js";
 
@@ -66,14 +66,16 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
   }
 
   const btnBase =
-    "flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface transition hover:scale-105 disabled:opacity-50";
+    "flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface transition hover:scale-105 disabled:opacity-50 " +
+    // From 1280px up (the desktop result page): a 44px outlined circle with a line icon, no brand colours, no grow.
+    "min-[1280px]:h-11 min-[1280px]:w-11 min-[1280px]:border-text/35 min-[1280px]:bg-transparent min-[1280px]:transition-none min-[1280px]:hover:scale-100 min-[1280px]:hover:border-text min-[1280px]:hover:bg-text/10 min-[1280px]:focus-visible:outline min-[1280px]:focus-visible:outline-2 min-[1280px]:focus-visible:outline-offset-[3px] min-[1280px]:focus-visible:outline-text";
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <p className="text-xs font-medium uppercase tracking-widest text-text-faint">
+    <div className="flex flex-col items-center gap-3 min-[1280px]:shrink-0 min-[1280px]:flex-row min-[1280px]:gap-2">
+      <p className="text-xs font-medium uppercase tracking-widest text-text-faint min-[1280px]:mr-1 min-[1280px]:whitespace-nowrap min-[1280px]:tracking-[0.08em] min-[1280px]:text-text-muted">
         Share the damage
       </p>
-      <div className="flex flex-wrap justify-center gap-3">
+      <div className="flex flex-wrap justify-center gap-3 min-[1280px]:flex-nowrap min-[1280px]:gap-2">
         <a
           href={whatsappHref}
           target="_blank"
@@ -82,7 +84,8 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           className={`${btnBase} hover:border-[#25D366] hover:bg-[#25D366]/10`}
           aria-label="Share on WhatsApp"
         >
-          <WhatsAppIcon />
+          <span className="contents min-[1280px]:hidden"><WhatsAppIcon /></span>
+          <LineIcon className="hidden min-[1280px]:block"><path d="M4 20 L5.4 15.6 A8.6 8.6 0 1 1 8.4 18.6 Z" /><path d="M9.2 9.2 C9.4 12.2 11.8 14.6 14.8 14.8" /></LineIcon>
         </a>
         <a
           href={twitterHref}
@@ -92,7 +95,8 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           className={`${btnBase} hover:border-text-faint hover:bg-surface-2`}
           aria-label="Share on X"
         >
-          <XIcon />
+          <span className="contents min-[1280px]:hidden"><XIcon /></span>
+          <LineIcon className="hidden min-[1280px]:block"><path d="M5 5 L19 19 M19 5 L5 19" /></LineIcon>
         </a>
         <button
           type="button"
@@ -101,7 +105,8 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           className={`${btnBase} hover:border-[#E4405F] hover:bg-[#E4405F]/10`}
           aria-label="Save for Instagram"
         >
-          <InstagramIcon />
+          <span className="contents min-[1280px]:hidden"><InstagramIcon /></span>
+          <LineIcon className="hidden min-[1280px]:block"><rect x="4" y="4" width="16" height="16" rx="5" /><circle cx="12" cy="12" r="3.6" /><circle cx="17" cy="7" r="1" fill="var(--text)" /></LineIcon>
         </button>
         <button
           type="button"
@@ -110,7 +115,8 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
           className={`${btnBase} hover:border-ember hover:bg-ember-soft`}
           aria-label="Download report card"
         >
-          <DownloadIcon />
+          <span className="contents min-[1280px]:hidden"><DownloadIcon /></span>
+          <LineIcon className="hidden min-[1280px]:block"><path d="M12 4 L12 15 M7.5 10.5 L12 15 L16.5 10.5 M5 19 L19 19" /></LineIcon>
         </button>
       </div>
       {status ? <p className="text-sm text-text-muted">{status}</p> : null}
@@ -118,6 +124,26 @@ export function ShareButtons({ roastId, shareSlug }: Props) {
   );
 }
 
+
+/** The desktop line icons: 22px, ink strokes only (decorative; the button carries the aria-label). */
+function LineIcon({ className, children }: { className?: string; children: React.ReactNode }) {
+  return (
+    <svg
+      className={className}
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--text)"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {children}
+    </svg>
+  );
+}
 
 function WhatsAppIcon() {
   return (
@@ -129,24 +155,27 @@ function WhatsAppIcon() {
 
 function XIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="#f5f3f0" aria-hidden>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--text)" aria-hidden>
       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
     </svg>
   );
 }
 
 function InstagramIcon() {
+  // The share buttons are on the page twice (one copy is always hidden), so each copy needs its own gradient id:
+  // a gradient inside a hidden copy cannot be drawn, and a shared id would point the visible icon at it.
+  const gradientId = `ig-${useId().replace(/:/g, "")}`;
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
       <defs>
-        <linearGradient id="ig" x1="0%" y1="100%" x2="100%" y2="0%">
+        <linearGradient id={gradientId} x1="0%" y1="100%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#FD5949" />
           <stop offset="50%" stopColor="#D6249F" />
           <stop offset="100%" stopColor="#285AEB" />
         </linearGradient>
       </defs>
       <path
-        fill="url(#ig)"
+        fill={`url(#${gradientId})`}
         d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"
       />
     </svg>
@@ -160,7 +189,7 @@ function DownloadIcon() {
       height="22"
       viewBox="0 0 24 24"
       fill="none"
-      stroke="#ff5a36"
+      stroke="var(--ember)"
       strokeWidth="2"
       aria-hidden
     >

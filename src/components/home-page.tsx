@@ -213,7 +213,7 @@ export function HomePage() {
           </Link>
           <Link
             href="/signup"
-            className="rounded-lg bg-ember px-4 py-2 text-sm font-bold text-white transition hover:brightness-110 hover:scale-[1.03]"
+            className="rounded-lg bg-ember px-4 py-2 text-sm font-bold text-on-accent transition hover:brightness-110 hover:scale-[1.03]"
           >
             Get Started
           </Link>
@@ -241,7 +241,7 @@ export function HomePage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <Link
               href="/signup"
-              className="inline-block rounded-xl bg-ember px-8 py-4 text-lg font-bold text-white transition hover:brightness-110 hover:scale-[1.02]"
+              className="inline-block rounded-xl bg-ember px-8 py-4 text-lg font-bold text-on-accent transition hover:brightness-110 hover:scale-[1.02]"
             >
               Start your arc →
             </Link>
@@ -325,7 +325,7 @@ export function HomePage() {
                 }`}
               >
                 {!p.free && (
-                  <span className="absolute -top-2 -right-2 rounded-full bg-ember px-2 py-0.5 text-[10px] font-bold text-white">
+                  <span className="absolute -top-2 -right-2 rounded-full bg-ember px-2 py-0.5 text-[10px] font-bold text-on-accent">
                     PRO
                   </span>
                 )}
@@ -445,7 +445,7 @@ export function HomePage() {
 
             {/* Pro */}
             <div className="relative rounded-2xl border-2 border-ember bg-surface p-7 shadow-[0_0_32px_rgba(255,90,54,0.15)]">
-              <span className="absolute -top-3 left-7 rounded-full bg-ember px-3 py-1 text-xs font-bold text-white">
+              <span className="absolute -top-3 left-7 rounded-full bg-ember px-3 py-1 text-xs font-bold text-on-accent">
                 MOST POPULAR
               </span>
               <h3 className="text-xl font-bold">Pro</h3>
@@ -467,7 +467,7 @@ export function HomePage() {
                 href={getUpgradeUrl(userEmail)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-8 block rounded-lg bg-ember px-4 py-3 text-center text-sm font-bold text-white shadow-[0_0_24px_rgba(255,90,54,0.3)] transition hover:brightness-110"
+                className="mt-8 block rounded-lg bg-ember px-4 py-3 text-center text-sm font-bold text-on-accent shadow-ember-glow transition hover:brightness-110"
               >
                 Upgrade to Pro 🔥
               </a>
@@ -521,7 +521,7 @@ export function HomePage() {
         </p>
         <Link
           href="/signup"
-          className="rounded-xl bg-ember px-10 py-4 text-xl font-black tracking-wide text-white transition hover:brightness-110 hover:scale-[1.02]"
+          className="rounded-xl bg-ember px-10 py-4 text-xl font-black tracking-wide text-on-accent transition hover:brightness-110 hover:scale-[1.02]"
         >
           Get Started Free →
         </Link>
@@ -555,7 +555,7 @@ export function HomePage() {
       <dialog
         ref={sampleDialogRef}
         aria-labelledby="sample-roast-title"
-        className="w-full max-w-md rounded-3xl border border-border bg-surface p-0 text-text shadow-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm"
+        className="w-full max-w-md rounded-3xl border border-border bg-surface p-0 text-text shadow-2xl backdrop:bg-overlay/70 backdrop:backdrop-blur-sm"
       >
         <div className="p-7">
           <div className="mb-4 flex items-start justify-between gap-4">
@@ -597,7 +597,7 @@ export function HomePage() {
 
           <Link
             href="/signup"
-            className="mt-6 block rounded-xl bg-ember px-6 py-3.5 text-center text-base font-extrabold text-white transition hover:brightness-110"
+            className="mt-6 block rounded-xl bg-ember px-6 py-3.5 text-center text-base font-extrabold text-on-accent transition hover:brightness-110"
           >
             Get my real roast →
           </Link>

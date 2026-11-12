@@ -2,6 +2,7 @@
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useState } from "react";
+import { outlineButton } from "@/components/journal-auth-ui";
 
 type Props = {
   label?: string;
@@ -44,7 +45,7 @@ export function GoogleAuthButton({
       type="button"
       onClick={() => void signInWithGoogle()}
       disabled={loading}
-      className="w-full rounded-md border-2 border-neutral-700 bg-[#1a1a1a] px-4 py-3 text-sm font-bold text-[#FAFAFA] transition hover:bg-neutral-800 hover:border-neutral-600 disabled:opacity-50 disabled:cursor-not-allowed"
+      className={outlineButton}
     >
       {loading ? "Connecting..." : label}
     </button>

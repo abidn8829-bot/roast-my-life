@@ -45,7 +45,7 @@ export function EliteWaitlistModal({ isOpen, onClose, defaultEmail }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/80 p-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6">
         <div className="mb-6 text-center">
           <span className="text-5xl">👑</span>
@@ -80,7 +80,7 @@ export function EliteWaitlistModal({ isOpen, onClose, defaultEmail }: Props) {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 rounded-xl bg-ember px-4 py-3 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50"
+                className="flex-1 rounded-xl bg-ember px-4 py-3 text-sm font-semibold text-on-accent transition hover:brightness-110 disabled:opacity-50"
               >
                 {loading ? "Joining..." : "Join Waitlist 👑"}
               </button>

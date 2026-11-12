@@ -59,10 +59,10 @@ export default async function SharePage({ params }: Params) {
     <main className="flex min-h-screen flex-col items-center bg-bg px-4 pb-16 pt-6 text-text">
       <div className="flex w-full max-w-md flex-col gap-8">
         <header className="flex items-center justify-between">
-          <span className="text-lg font-extrabold tracking-[0.2em] text-[#FF3D00]">EMBERAI</span>
+          <span className="text-lg font-extrabold tracking-[0.2em] text-ember-legacy">EMBERAI</span>
           <ShareCta
             location="header"
-            className="rounded-full bg-[#FF3D00] px-4 py-2 text-sm font-bold text-white transition hover:brightness-110"
+            className="rounded-full bg-ember-legacy px-4 py-2 text-sm font-bold text-on-accent transition hover:brightness-110"
           >
             Get roasted →
           </ShareCta>
@@ -90,12 +90,12 @@ export default async function SharePage({ params }: Params) {
               return (
                 <div
                   key={key}
-                  className="flex items-center gap-4 rounded-[18px] bg-[#111111] px-5 py-4"
+                  className="flex items-center gap-4 rounded-[18px] bg-panel-legacy px-5 py-4"
                   style={{ border: `2px solid ${color}55` }}
                 >
                   <span className="w-24 shrink-0 text-base font-bold">{label}</span>
                   <div
-                    className="h-2.5 flex-1 overflow-hidden rounded-full bg-[#262626]"
+                    className="h-2.5 flex-1 overflow-hidden rounded-full bg-line-subtle-legacy"
                     role="img"
                     aria-label={`${label}: ${Math.round(score)} out of 100`}
                   >
@@ -113,7 +113,7 @@ export default async function SharePage({ params }: Params) {
           </section>
         )}
 
-        <section className="rounded-[20px] border-2 border-[#FF3D00] bg-[#111111] p-6 text-center">
+        <section className="rounded-[20px] border-2 border-ember-legacy bg-panel-legacy p-6 text-center">
           <p className="text-xl font-semibold leading-snug">&ldquo;{punchline}&rdquo;</p>
         </section>
 
@@ -128,14 +128,14 @@ export default async function SharePage({ params }: Params) {
           </section>
         )}
 
-        <section className="flex flex-col items-center gap-3 rounded-[28px] bg-[#111111] px-6 py-8 text-center">
+        <section className="flex flex-col items-center gap-3 rounded-[28px] bg-panel-legacy px-6 py-8 text-center">
           <h2 className="text-2xl font-black tracking-tight">Think your life scores higher?</h2>
           <p className="text-sm text-text-muted">
             Answer 5 questions. Get graded. Get roasted. Free.
           </p>
           <ShareCta
             location="footer"
-            className="mt-2 w-full rounded-2xl bg-[#FF3D00] px-6 py-4 text-lg font-bold text-white transition hover:brightness-110"
+            className="mt-2 w-full rounded-2xl bg-ember-legacy px-6 py-4 text-lg font-bold text-on-accent transition hover:brightness-110"
           >
             Get your own roast
           </ShareCta>
