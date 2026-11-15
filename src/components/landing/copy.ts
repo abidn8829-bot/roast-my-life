@@ -19,9 +19,13 @@ export const NAV = {
 export const HERO = {
   label: "AI accountability, with jokes",
   heading: "You said nine hours of screen time like it was a personality.",
+  /** The one word in the heading that gets the hand-drawn underline. Must appear in `heading`. */
+  underlineWord: "personality",
   body: "Ember is an AI that grades your habits and roasts the gap between what you planned and what you did. Five questions to start. One check-in a day.",
   cta: SIGNUP,
   note: START_NOTE,
+  /** Handwritten aside next to the hero button (decorative joke, not a claim). */
+  handNote: "yes, it will judge you",
 };
 
 export const WHY = {
