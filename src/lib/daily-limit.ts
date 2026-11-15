@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { localDayRangeUtc } from "./local-day.ts";
 
 // The ONLY place the daily limits live. Change these two numbers (and the site copy
 // that reads them follows). One unit = one row in `roasts`, and both a roast and a
@@ -38,8 +39,11 @@ export type DailyLimitResult =
 
 /**
  * Whether this user may start another roast / check-in today. Call it before any AI
- * call. Counts the user's `roasts` rows from today (same UTC day, same range as the
- * original free-user check in /api/roast).
+ * call. Counts the user's `roasts` rows from today: the user's LOCAL calendar day in
+ * users.timezone, from local midnight up to (not including) the next local midnight.
+ * A null, invalid or unreadable zone means "UTC", which is exactly the old window.
+ * `timeZone` and `now` can be passed in (tests, or a caller that already read the zone);
+ * without `timeZone` the zone is read from the user's own row.
  *
  * On allowed: the returned `release()` MUST be called when the request ends, whether
  * it succeeded or failed (the row is only written at the very end, so a failed
@@ -54,18 +58,28 @@ export async function checkDailyLimit(
   supabase: SupabaseClient,
   userId: string,
   tier: string | null | undefined,
-  options: { claim?: boolean } = {},
+  options: { claim?: boolean; timeZone?: string | null; now?: Date } = {},
 ): Promise<DailyLimitResult> {
   const isPro = tier === "pro";
   const limit = dailyLimitFor(tier);
 
-  const today = new Date().toISOString().split("T")[0];
+  let timeZone: unknown = options.timeZone;
+  if (timeZone === undefined) {
+    try {
+      const { data: zoneRow, error: zoneError } = await supabase.from("users").select("timezone").eq("id", userId).maybeSingle();
+      timeZone = zoneError ? null : (zoneRow as { timezone?: unknown } | null)?.timezone ?? null;
+    } catch {
+      timeZone = null; // unreadable zone: count the UTC day, as before
+    }
+  }
+  const { start, end } = localDayRangeUtc(options.now ?? new Date(), timeZone);
+
   const { count, error } = await supabase
     .from("roasts")
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
-    .gte("created_at", `${today}T00:00:00.000Z`)
-    .lte("created_at", `${today}T23:59:59.999Z`);
+    .gte("created_at", start.toISOString())
+    .lt("created_at", end.toISOString());
 
   if (error || count === null) {
     console.error("[daily-limit] usage count failed:", error?.message ?? "count was null");

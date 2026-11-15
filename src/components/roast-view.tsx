@@ -6,6 +6,7 @@ import { ShareButtons } from "@/components/share-buttons";
 import { ShareSheet } from "@/components/share-sheet";
 import { cleanRoastText } from "@/lib/clean-roast-text";
 import { gradeColor, scoreGlowBg, scoreTextColor } from "@/lib/grades";
+import { localDayRangeUtc } from "@/lib/local-day";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
 import type { CategoryScores, Grade, OnboardingAnswers, ReportCard, RoastMode, RoastPersona } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -35,6 +36,8 @@ type Props = {
   categoryScores?: CategoryScores;
   currentStreak?: number;
   longestStreak?: number;
+  /** The user's IANA time zone ("UTC" when unknown), for "today" in the roast-again check. */
+  timeZone?: string;
   mode?: RoastMode;
   persona?: RoastPersona;
   suggestionLine?: string;
@@ -56,6 +59,7 @@ export function RoastView({
   categoryScores,
   currentStreak = 0,
   longestStreak = 0,
+  timeZone = "UTC",
   mode = "roast",
   persona = "default",
   suggestionLine,
@@ -161,13 +165,13 @@ export function RoastView({
       const subscriptionTier = userData?.subscription_tier || "free";
 
       if (subscriptionTier === "free") {
-        const today = new Date().toISOString().split('T')[0];
+        const { start, end } = localDayRangeUtc(new Date(), timeZone);
         const { data: existingRoast } = await supabase
           .from("roasts")
           .select("id")
           .eq("user_id", user.id)
-          .gte("created_at", `${today}T00:00:00.000Z`)
-          .lte("created_at", `${today}T23:59:59.999Z`)
+          .gte("created_at", start.toISOString())
+          .lt("created_at", end.toISOString())
           .maybeSingle();
 
         if (existingRoast) {

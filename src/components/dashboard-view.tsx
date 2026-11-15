@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import posthog from "posthog-js";
 import { ACHIEVEMENTS, type UserAchievements } from "@/lib/achievements";
 import { cleanRoastText } from "@/lib/clean-roast-text";
+import { dayKeyInZone } from "@/lib/day-key";
 import { formatWeekLabel, snippet } from "@/lib/format-week";
 import type { CategoryScores } from "@/lib/roast-types";
 import { ArcSection } from "@/components/arc-section";
@@ -43,6 +44,8 @@ type Props = {
   streak: number;
   currentStreak: number;
   longestStreak: number;
+  /** The user's IANA time zone ("UTC" when unknown): "today" below means the user's own day. */
+  timeZone?: string;
   achievements: UserAchievements;
   newlyUnlockedAchievements: string[];
   isPro: boolean;
@@ -215,7 +218,7 @@ function AchievementCelebration({
   );
 }
 
-export function DashboardView({ name, roasts, scoreHistory, streak, longestStreak, achievements, newlyUnlockedAchievements, isPro, userEmail, paused = false }: Props) {
+export function DashboardView({ name, roasts, scoreHistory, streak, longestStreak, achievements, newlyUnlockedAchievements, isPro, userEmail, paused = false, timeZone = "UTC" }: Props) {
   const [celebrationQueue, setCelebrationQueue] = useState<string[]>([]);
   const [activeCelebration, setActiveCelebration] = useState<string | null>(null);
   const latest = roasts[0] ?? null;
@@ -241,15 +244,15 @@ export function DashboardView({ name, roasts, scoreHistory, streak, longestStrea
 
   // Check if user has already roasted today (for free users)
   const hasRoastedToday = !isPro && latest && (() => {
-    const today = new Date().toISOString().split('T')[0];
-    const roastDate = new Date(latest.created_at).toISOString().split('T')[0];
+    const today = dayKeyInZone(new Date(), timeZone);
+    const roastDate = dayKeyInZone(latest.created_at, timeZone);
     return today === roastDate;
   })();
 
   // Check if user has any activity (roast or check-in) today, for the streak banner
   const hasActivityToday = Boolean(latest) && (() => {
-    const today = new Date().toISOString().split('T')[0];
-    const activityDate = new Date(latest!.created_at).toISOString().split('T')[0];
+    const today = dayKeyInZone(new Date(), timeZone);
+    const activityDate = dayKeyInZone(latest!.created_at, timeZone);
     return today === activityDate;
   })();
 

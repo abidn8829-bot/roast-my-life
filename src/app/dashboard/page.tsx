@@ -10,8 +10,9 @@ import { getDisplayName } from "@/lib/display-name";
 import { parseCategoryScores } from "@/lib/parse-category-scores";
 import { PENDING_ACHIEVEMENT_COOKIE, decodePendingAchievements } from "@/lib/pending-achievement-cookie";
 import { getGentleState } from "@/lib/safety-server";
-import { calculateStreak } from "@/lib/streak";
+import { getUserTimezone } from "@/lib/day-key";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getUserStreak } from "@/lib/user-streak";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +69,7 @@ export default async function DashboardPage() {
 
   const { data: userData, error: userDataError } = await supabase
     .from("users")
-    .select("subscription_tier, achievements, current_streak, longest_streak")
+    .select("subscription_tier, achievements, timezone")
     .eq("id", user.id)
     .single();
 
@@ -78,8 +79,9 @@ export default async function DashboardPage() {
 
   const subscriptionTier = userData?.subscription_tier || "free";
   const achievements = parseAchievements(userData?.achievements);
-  const currentStreak = userData?.current_streak ?? 0;
-  const longestStreak = userData?.longest_streak ?? 0;
+  // One streak, in the user's own days, from ALL roast dates (not the 12/100 rows loaded for display).
+  const timeZone = getUserTimezone(userData?.timezone);
+  const { current: streak, longest: longestStreak } = await getUserStreak(supabase, user.id, timeZone);
 
   const query = supabase
     .from("roasts")
@@ -128,7 +130,6 @@ export default async function DashboardPage() {
     });
   }
 
-  const streak = calculateStreak(rows.map((r) => r.created_at));
   const name = getDisplayName(user);
 
   return (
@@ -142,8 +143,9 @@ export default async function DashboardPage() {
           roasts={roasts}
           scoreHistory={scoreHistory}
           streak={streak}
-          currentStreak={currentStreak}
+          currentStreak={streak}
           longestStreak={longestStreak}
+          timeZone={timeZone}
           achievements={achievements}
           newlyUnlockedAchievements={newlyUnlockedAchievements}
           isPro={subscriptionTier === "pro"}
