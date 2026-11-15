@@ -1,4 +1,4 @@
-import { calculateStreak } from "@/lib/streak";
+import { streakFromDates } from "@/lib/user-streak";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type AchievementId =
@@ -58,9 +58,10 @@ function memoryFlag(memory: unknown, key: string): boolean {
   return !!memory && typeof memory === "object" && Boolean((memory as Record<string, unknown>)[key]);
 }
 
-function getProgress(rows: RoastHistoryRow[]): Progress {
+function getProgress(rows: RoastHistoryRow[], timeZone: unknown): Progress {
   const roastCount = rows.length;
-  const streak = calculateStreak(rows.map((row) => row.created_at));
+  // Same streak rule as the dashboard and result page (lib/user-streak.ts), in the user's local days.
+  const streak = streakFromDates(rows.map((row) => row.created_at), timeZone).current;
   const followUpCompleted = rows.some((row) => memoryFlag(row.continuity_memory, "lastResponse") || memoryFlag(row.continuity_memory, "lastAnswer"));
   const maxCallbackCount = rows.reduce((max, row) => {
     const memory = row.continuity_memory as Record<string, unknown> | null;
@@ -107,7 +108,7 @@ export async function unlockAchievements(
 
   for (let attempt = 1; attempt <= MAX_UNLOCK_ATTEMPTS; attempt++) {
     const [{ data: userRow, error: userError }, { data: roasts }] = await Promise.all([
-      supabase.from("users").select("achievements").eq("id", userId).single(),
+      supabase.from("users").select("achievements, timezone").eq("id", userId).single(),
       supabase.from("roasts").select("created_at, continuity_memory").eq("user_id", userId).order("created_at", { ascending: false }),
     ]);
 
@@ -120,7 +121,7 @@ export async function unlockAchievements(
     const current = parseAchievements(previousRaw);
     lastKnown = current;
 
-    const progress = getProgress((roasts ?? []) as RoastHistoryRow[]);
+    const progress = getProgress((roasts ?? []) as RoastHistoryRow[], (userRow as { timezone?: unknown }).timezone);
     const updated: UserAchievements = { ...current };
     const newlyUnlocked: AchievementId[] = [];
 

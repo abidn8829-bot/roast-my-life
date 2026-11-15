@@ -419,69 +419,6 @@ ${continuityMemory ? `Previous continuity memory: ${JSON.stringify(continuityMem
 
   console.log("[api/roast] Successfully inserted roast with ID:", data?.id);
 
-  // Update streak
-  try {
-    const { data: userData } = await supabase
-      .from("users")
-      .select("current_streak, longest_streak")
-      .eq("id", user.id)
-      .single();
-
-    const currentStreak = userData?.current_streak ?? 0;
-    const longestStreak = userData?.longest_streak ?? 0;
-
-    // Get the last roast date, excluding the one just inserted above.
-    const { data: lastRoast } = await supabase
-      .from("roasts")
-      .select("created_at")
-      .eq("user_id", user.id)
-      .neq("id", data?.id ?? "")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    let newStreak = 1;
-    let streakReset = false;
-
-    if (lastRoast && lastRoast.created_at) {
-      // Calendar-date-key comparison, matching lib/streak.ts's calculateStreak() exactly
-      // (toDateKey/previousDay), so the write path here and the display path agree —
-      // a raw hours-elapsed diff would disagree with it across a midnight boundary.
-      const toDateKey = (iso: string) => new Date(iso).toISOString().split("T")[0]!;
-      const lastDateKey = toDateKey(lastRoast.created_at);
-      const todayKey = toDateKey(new Date().toISOString());
-      const yesterday = new Date(`${todayKey}T12:00:00`);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayKey = yesterday.toISOString().split("T")[0]!;
-
-      if (lastDateKey === todayKey) {
-        // Same calendar day, don't increment
-        newStreak = currentStreak;
-      } else if (lastDateKey === yesterdayKey) {
-        // Consecutive calendar day
-        newStreak = currentStreak + 1;
-      } else {
-        // Gap of 2+ calendar days
-        newStreak = 1;
-        streakReset = true;
-      }
-    }
-
-    const newLongestStreak = Math.max(longestStreak, newStreak);
-
-    await supabase
-      .from("users")
-      .update({
-        current_streak: newStreak,
-        longest_streak: newLongestStreak,
-      })
-      .eq("id", user.id);
-
-    console.log("[api/roast] Updated streak:", { newStreak, newLongestStreak, streakReset });
-  } catch (err) {
-    console.error("[api/roast] Failed to update streak:", err);
-  }
-
   let newlyUnlockedAchievements: AchievementId[] = [];
   try {
     const achievementResult = await unlockAchievements(supabase, user.id);

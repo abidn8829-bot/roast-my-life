@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { parseAchievements } from "@/lib/achievements";
 import { parseCategoryScores } from "@/lib/parse-category-scores";
 import { buildPushNudge } from "@/lib/roast-nudge";
-import { calculateStreak } from "@/lib/streak";
+import { addDaysToKey, dayKeyInZone, getUserTimezone } from "@/lib/day-key";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { getUserStreak } from "@/lib/user-streak";
 import { getPauseSummaries } from "@/lib/safety-server";
 import { sendPushNotification } from "@/lib/webpush";
 
@@ -11,12 +12,13 @@ export const dynamic = "force-dynamic";
 
 // Whole-day difference between "now" and a past timestamp, ignoring time of
 // day (so a roast done at 11pm yesterday and a check today 1 hour later both
-// read as "1 day since"), not a rolling 24h window.
-function daysSince(dateIso: string): number {
-  const thenKey = new Date(dateIso).toISOString().split("T")[0]!;
-  const nowKey = new Date().toISOString().split("T")[0]!;
-  const diffMs = new Date(nowKey).getTime() - new Date(thenKey).getTime();
-  return Math.round(diffMs / 86_400_000);
+// read as "1 day since"), not a rolling 24h window. Days are the user's own local days.
+function daysSince(dateIso: string, timeZone: string): number {
+  const thenKey = dayKeyInZone(dateIso, timeZone);
+  const nowKey = dayKeyInZone(new Date(), timeZone);
+  let days = 0;
+  for (let key = thenKey; key < nowKey && days < 3650; key = addDaysToKey(key, 1)) days++;
+  return days;
 }
 
 export async function GET(request: Request) {
@@ -60,7 +62,7 @@ export async function GET(request: Request) {
     }
 
     const [{ data: userRow }, { data: roastRows }] = await Promise.all([
-      supabase.from("users").select("achievements").eq("id", userId).maybeSingle(),
+      supabase.from("users").select("achievements, timezone").eq("id", userId).maybeSingle(),
       supabase
         .from("roasts")
         .select("created_at, category_scores")
@@ -74,14 +76,16 @@ export async function GET(request: Request) {
       continue;
     }
 
-    const daysSinceLastActivity = daysSince(roastRows[0]!.created_at as string);
+    const timeZone = getUserTimezone(userRow?.timezone);
+    const daysSinceLastActivity = daysSince(roastRows[0]!.created_at as string, timeZone);
     if (daysSinceLastActivity === 0) {
       // Already checked in today — no nudge needed.
       skipped++;
       continue;
     }
 
-    const streak = calculateStreak(roastRows.map((r) => r.created_at as string));
+    // Same streak as the dashboard and result page (all roast dates, the user's local days).
+    const streak = (await getUserStreak(supabase, userId, timeZone)).current;
     const latestScores = parseCategoryScores(roastRows[0]!.category_scores);
     const achievements = parseAchievements(userRow?.achievements);
     const hasRunningJoke = Boolean(

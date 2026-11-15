@@ -3,9 +3,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { RoastView } from "@/components/roast-view";
 import { backfillCardPunchline } from "@/lib/card-punchline";
+import { getUserTimezone } from "@/lib/day-key";
 import { fetchOwnRoastById } from "@/lib/fetch-own-roast";
 import { isUuid } from "@/lib/is-uuid";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getUserStreak } from "@/lib/user-streak";
 
 export const dynamic = "force-dynamic";
 
@@ -54,12 +56,14 @@ export default async function RoastDetailPage({
     const uniqueWeeks = new Set(weekData?.map(r => r.week_start_date) || []);
     const weekCount = uniqueWeeks.size;
 
-    // Fetch user streak data
+    // Tier and time zone; the streak comes from the same function as the dashboard (lib/user-streak.ts).
     const { data: userData } = await supabase
       .from("users")
-      .select("current_streak, longest_streak, subscription_tier")
+      .select("subscription_tier, timezone")
       .eq("id", user.id)
       .single();
+    const timeZone = getUserTimezone(userData?.timezone);
+    const streak = await getUserStreak(supabase, user.id, timeZone);
 
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-4 py-12 text-text">
@@ -87,8 +91,9 @@ export default async function RoastDetailPage({
           funnyTitle={roast.funny_title}
           subscriptionTier={userData?.subscription_tier ?? "free"}
           categoryScores={roast.category_scores}
-          currentStreak={userData?.current_streak}
-          longestStreak={userData?.longest_streak}
+          currentStreak={streak.current}
+          longestStreak={streak.longest}
+          timeZone={timeZone}
           mode={roast.mode}
           persona={roast.persona}
           suggestionLine={roast.suggestion_line}
