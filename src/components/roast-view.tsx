@@ -7,7 +7,8 @@ import { ShareSheet } from "@/components/share-sheet";
 import { cleanRoastText } from "@/lib/clean-roast-text";
 import { gradeColor, scoreGlowBg, scoreTextColor } from "@/lib/grades";
 import { REACTION_EMOJIS, type ReactionEmoji } from "@/lib/reactions";
-import type { CategoryScores, Grade, OnboardingAnswers, ReportCard, RoastMode, RoastPersona } from "@/lib/roast-types";
+import { MISSION_LENGTH } from "@/lib/missions";
+import { ROAST_PERSONA_IDS, type CategoryScores, type Grade, type OnboardingAnswers, type ReportCard, type RoastMode, type RoastPersona } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 
@@ -258,9 +259,8 @@ export function RoastView({
       {/* Upgrade CTA (free plan only) */}
       {subscriptionTier !== "pro" && (
         <section className="flex flex-col items-center gap-2 rounded-xl border border-ember/30 bg-ember-soft p-5 text-center">
-          <p className="text-lg font-bold text-text">Ember has more to say.</p>
           <p className="text-sm text-text-muted">
-            I found some patterns in your answers that aren&apos;t visible in your roast yet.
+            Want more from Ember? Pro adds a second roast or check-in each day, all {ROAST_PERSONA_IDS.length} voices and {MISSION_LENGTH}-day missions.
           </p>
           <a
             href={getUpgradeUrl(userEmail)}
@@ -268,7 +268,7 @@ export function RoastView({
             rel="noopener noreferrer"
             className="mt-2 inline-block rounded-lg bg-ember px-5 py-2.5 text-sm font-semibold text-white transition hover:brightness-110"
           >
-            Unlock My Full Read →
+            See Pro
           </a>
           <span className="text-xs font-semibold uppercase tracking-widest text-ember">Pro</span>
           <p className="text-xs text-text-faint">{UPGRADE_EMAIL_HINT}</p>
