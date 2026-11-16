@@ -445,9 +445,6 @@ export function HomePage() {
 
             {/* Pro */}
             <div className="relative rounded-2xl border-2 border-ember bg-surface p-7 shadow-[0_0_32px_rgba(255,90,54,0.15)]">
-              <span className="absolute -top-3 left-7 rounded-full bg-ember px-3 py-1 text-xs font-bold text-white">
-                MOST POPULAR
-              </span>
               <h3 className="text-xl font-bold">Pro</h3>
               <p className="mt-1 text-3xl font-black">
                 {PRO_PRICE}<span className="text-lg font-normal text-text-faint">/month</span>
