@@ -46,3 +46,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Ember skill packs (week files and generated SQL stay OUTSIDE git)
+/ember-packs/
+*.pack.md
