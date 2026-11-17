@@ -26,8 +26,4 @@ export const PRO_FEATURES = [
     title: "Your Arc",
     desc: "See how you stack up against everyone else brave enough to do this — and get a plan for closing the gap. We're not explaining the rest. You'll see.",
   },
-  {
-    title: "More categories, unlocking soon",
-    desc: "We're not done grading you yet.",
-  },
 ];

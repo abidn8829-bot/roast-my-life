@@ -65,7 +65,7 @@ function TermsContent() {
           <section>
             <h2 className="text-xl font-bold text-text-legacy mb-3">Subscription and Payments</h2>
             <p className="leading-relaxed">
-              We offer free and paid subscription tiers. Pro is a monthly subscription sold and processed through Gumroad; purchase, billing and cancellation are handled under Gumroad&apos;s terms. An Elite tier is planned, and you can join its waitlist to be notified when it launches.
+              We offer free and paid subscription tiers. Pro is a monthly subscription sold and processed through Gumroad; purchase, billing and cancellation are handled under Gumroad&apos;s terms.
             </p>
           </section>
 
@@ -106,7 +106,7 @@ function TermsContent() {
         </div>
 
         <p className="mt-12 text-sm text-text-tertiary-legacy">
-          Last updated: June 2026
+          Last updated: November 2026
         </p>
       </div>
     </main>

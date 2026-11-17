@@ -13,7 +13,8 @@ import { personaLabel } from "@/lib/roast-personas";
 import { REMINDER_COPY } from "@/lib/plan-reminder";
 import { usePlanReminder } from "@/lib/use-plan-reminder";
 import { weakestCategory } from "@/lib/weakest-category";
-import { isRoastPersona, type CategoryScores, type Grade, type OnboardingAnswers, type ReportCard, type RoastMode, type RoastPersona } from "@/lib/roast-types";
+import { MISSION_LENGTH } from "@/lib/missions";
+import { isRoastPersona, ROAST_PERSONA_IDS, type CategoryScores, type Grade, type OnboardingAnswers, type ReportCard, type RoastMode, type RoastPersona } from "@/lib/roast-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 
@@ -317,9 +318,8 @@ export function RoastView({
           {/* Upgrade CTA (free plan only). On the desktop spread the offer is a quiet link in the bottom bar instead. */}
           {subscriptionTier !== "pro" && (
             <section className="flex flex-col items-center gap-2 rounded-xl border border-ember/30 bg-ember-soft p-5 text-center min-[1280px]:hidden">
-              <p className="text-lg font-bold text-text">Ember has more to say.</p>
               <p className="text-sm text-text-muted">
-                I found some patterns in your answers that aren&apos;t visible in your roast yet.
+                Want more from Ember? Pro adds a second roast or check-in each day, all {ROAST_PERSONA_IDS.length} voices and {MISSION_LENGTH}-day missions.
               </p>
               <a
                 href={getUpgradeUrl(userEmail)}
@@ -327,7 +327,7 @@ export function RoastView({
                 rel="noopener noreferrer"
                 className="mt-2 inline-block rounded-lg bg-ember px-5 py-2.5 text-sm font-semibold text-on-accent transition hover:brightness-110"
               >
-                Unlock My Full Read →
+                See Pro
               </a>
               <span className="text-xs font-semibold uppercase tracking-widest text-ember">Pro</span>
               <p className="text-xs text-text-faint">{UPGRADE_EMAIL_HINT}</p>
@@ -346,14 +346,14 @@ export function RoastView({
           <div className="hidden min-[1280px]:mt-auto min-[1280px]:flex min-[1280px]:flex-wrap min-[1280px]:items-center min-[1280px]:gap-x-4 min-[1280px]:gap-y-2 min-[1280px]:pt-4">
             {subscriptionTier !== "pro" && (
               <div className="flex items-center gap-3">
-                <span className="whitespace-nowrap text-xs text-text-muted">Ember has more to say.</span>
+                <span className="whitespace-nowrap text-xs text-text-muted">Want more from Ember?</span>
                 <a
                   href={getUpgradeUrl(userEmail)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex min-h-11 items-center whitespace-nowrap text-sm font-medium text-text underline decoration-1 underline-offset-4 hover:decoration-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-text"
                 >
-                  Unlock My Full Read →
+                  See Pro
                 </a>
               </div>
             )}

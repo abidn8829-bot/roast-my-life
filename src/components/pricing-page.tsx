@@ -1,14 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { EliteWaitlistModal } from "@/components/elite-waitlist-modal";
 import { FREE_FEATURES, PRO_FEATURES, PRO_PRICE } from "@/lib/plans";
 import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 import { useUserEmail } from "@/lib/use-user-email";
 
 export function PricingPage() {
-  const [showEliteWaitlistModal, setShowEliteWaitlistModal] = useState(false);
   const userEmail = useUserEmail();
 
   return (
@@ -55,9 +52,6 @@ export function PricingPage() {
 
           {/* Pro Tier */}
           <div className="rounded-xl border-2 border-ember-legacy bg-panel-legacy p-6 shadow-[0_0_32px_rgba(255,61,0,0.15)]">
-            <div className="mb-2 inline-block rounded-full bg-ember-legacy/10 px-3 py-1 text-xs font-semibold text-ember-legacy">
-              MOST POPULAR
-            </div>
             <div className="mb-4">
               <h2 className="text-2xl font-bold text-text-legacy">Pro</h2>
               <p className="text-3xl font-black text-ember-legacy">{PRO_PRICE}<span className="text-lg font-normal text-text-secondary-legacy">/month</span></p>
@@ -83,33 +77,8 @@ export function PricingPage() {
             </a>
             <p className="mt-2 text-center text-xs text-text-secondary-legacy">{UPGRADE_EMAIL_HINT}</p>
           </div>
-
-          {/* Elite Tier */}
-          <div className="rounded-xl border border-line-subtle-legacy bg-panel-legacy p-6">
-            <div className="mb-2 inline-block rounded-full bg-line-subtle-legacy px-3 py-1 text-xs font-semibold text-text-secondary-legacy">
-              COMING SOON
-            </div>
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold text-text-legacy">Elite</h2>
-              <p className="text-3xl font-black text-text-secondary-legacy">???</p>
-            </div>
-            <p className="mb-6 text-sm text-text-secondary-legacy">
-              Everything in Pro, plus more we&apos;re still building. Join the waitlist to hear first.
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowEliteWaitlistModal(true)}
-              className="block w-full rounded-lg border border-border-strong-legacy px-4 py-3 text-center text-sm font-semibold text-text-legacy transition hover:border-border-hover-legacy"
-            >
-              Join Elite Waitlist 👑
-            </button>
-          </div>
         </div>
       </div>
-
-      {showEliteWaitlistModal && (
-        <EliteWaitlistModal isOpen onClose={() => setShowEliteWaitlistModal(false)} defaultEmail={userEmail} />
-      )}
     </main>
   );
 }

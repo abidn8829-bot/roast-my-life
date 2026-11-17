@@ -94,11 +94,11 @@ test("one-glance height: share and reactions are in the top bar, the bottom bar 
   assert.equal(view.match(/onClick=\{\(\) => void handleRoastAgain\(\)\}/g)?.length, 2);
   assert.equal(view.match(/Roast me again/g)?.length, 2);
   assert.equal(view.match(/onClick=\{\(\) => void onReaction\(emoji\)\}/g)?.length, 1, "one reaction handler, shared");
-  assert.equal(view.match(/Unlock My Full Read/g)?.length, 2, "the phone card's button and the desktop quiet link");
+  assert.equal(view.match(/See Pro/g)?.length, 2, "the phone card's button and the desktop quiet link");
 
   // desktop: the quiet upgrade link and "Roast me again" close the RIGHT page, where there was spare room
   const right = view.slice(view.indexOf('<div className="hidden min-[1280px]:mt-auto min-[1280px]:flex'));
-  assert.ok(right.indexOf("Unlock My Full Read") !== -1 && right.indexOf("Roast me again") > right.indexOf("Unlock My Full Read"));
+  assert.ok(right.indexOf("See Pro") !== -1 && right.indexOf("Roast me again") > right.indexOf("See Pro"));
   assert.ok(view.indexOf('<div className="hidden min-[1280px]:mt-auto min-[1280px]:flex') < view.indexOf("{visiblePlan && ("), "the right page closes before the plan band");
   // the old desktop bottom bar is gone
   assert.doesNotMatch(view, /min-\[1280px\]:justify-between min-\[1280px\]:gap-x-4 min-\[1280px\]:gap-y-3/);
