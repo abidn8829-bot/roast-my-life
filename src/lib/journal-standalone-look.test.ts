@@ -143,12 +143,12 @@ test("push prompt: same words, same push code; the card is scoped (no <JournalTh
 // the error pages
 // ---------------------------------------------------------------------------
 
-test("error pages: friendly message, a Try again button wired to reset, and the raw error is never shown", () => {
+test("error pages: friendly message, a Try again button wired to Next's retry (it re-fetches server data), and the raw error is never shown", () => {
   for (const file of ["../app/error.tsx", "../app/global-error.tsx"]) {
     const code = stripComments(read(file));
     assert.match(code, /^"use client";/, `${file}: error boundaries are client components`);
     assert.match(code, /Something went wrong\. Try again\./, file);
-    assert.match(code, /onClick=\{\(\) => reset\(\)\}/, file);
+    assert.match(code, /onClick=\{\(\) => retry\(\)\}/, file);
     assert.match(code, />\s*Try again\s*</, file);
     assert.doesNotMatch(code, /\berror\.(message|digest|stack|name|cause)\b/, `${file}: raw error text`);
     assert.doesNotMatch(code, /\{\s*error\s*\}|\{String\(error\)\}|JSON\.stringify\(error/, `${file}: raw error`);

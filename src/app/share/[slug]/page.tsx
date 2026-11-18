@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { GradeRow } from "@/components/journal-roast-ui";
+import { JournalTheme } from "@/components/journal-theme";
 import { ShareCta } from "@/components/share-cta";
 import { cleanRoastText } from "@/lib/clean-roast-text";
 import { getShareCardData } from "@/lib/get-share-card";
 import { isUuid } from "@/lib/is-uuid";
-import { gradeOgColor, scoreToGrade } from "@/lib/grades";
 import type { CategoryScores } from "@/lib/roast-types";
 import { SITE_URL } from "@/lib/site";
 
@@ -53,95 +54,78 @@ export default async function SharePage({ params }: Params) {
   }
 
   const { lifeScore, funnyTitle, punchline, categoryScores, roastText } = result.card;
-  const scoreColor = gradeOgColor(scoreToGrade(lifeScore));
 
+  // Journal look: powder mist page, ink green text. Grade letters are ink; the bar is what carries the score.
   return (
-    <main className="flex min-h-screen flex-col items-center bg-bg px-4 pb-16 pt-6 text-text">
-      <div className="flex w-full max-w-md flex-col gap-8">
-        <header className="flex items-center justify-between">
-          <span className="text-lg font-extrabold tracking-[0.2em] text-ember-legacy">EMBERAI</span>
-          <ShareCta
-            location="header"
-            className="rounded-full bg-ember-legacy px-4 py-2 text-sm font-bold text-on-accent transition hover:brightness-110"
-          >
-            Get roasted →
-          </ShareCta>
-        </header>
+    <JournalTheme>
+      <main className="flex min-h-screen flex-col items-center px-4 pb-16 pt-6">
+        <div className="flex w-full max-w-md flex-col gap-8">
+          <header className="flex items-center justify-between">
+            <span className="text-lg font-semibold tracking-[0.2em] text-text">EMBERAI</span>
+            <ShareCta
+              location="header"
+              className="inline-flex min-h-11 items-center rounded-full bg-text px-5 text-sm font-medium text-on-accent transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-text"
+            >
+              Get roasted →
+            </ShareCta>
+          </header>
 
-        <section className="flex flex-col items-center gap-3 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-text-faint">
-            Their life score
-          </p>
-          <div
-            className="text-8xl font-black tabular-nums tracking-tighter"
-            style={{ color: scoreColor }}
-          >
-            {lifeScore}
-            <span className="text-4xl text-text-faint">/100</span>
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight">{funnyTitle}</h1>
-        </section>
-
-        {categoryScores && (
-          <section className="flex flex-col gap-3">
-            {CATEGORIES.map(({ key, label }) => {
-              const { score, grade } = categoryScores[key];
-              const color = gradeOgColor(grade);
-              return (
-                <div
-                  key={key}
-                  className="flex items-center gap-4 rounded-[18px] bg-panel-legacy px-5 py-4"
-                  style={{ border: `2px solid ${color}55` }}
-                >
-                  <span className="w-24 shrink-0 text-base font-bold">{label}</span>
-                  <div
-                    className="h-2.5 flex-1 overflow-hidden rounded-full bg-line-subtle-legacy"
-                    role="img"
-                    aria-label={`${label}: ${Math.round(score)} out of 100`}
-                  >
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${Math.max(0, Math.min(100, score))}%`, background: color }}
-                    />
-                  </div>
-                  <span className="w-7 text-right text-3xl font-black" style={{ color }}>
-                    {grade}
-                  </span>
-                </div>
-              );
-            })}
-          </section>
-        )}
-
-        <section className="rounded-[20px] border-2 border-ember-legacy bg-panel-legacy p-6 text-center">
-          <p className="text-xl font-semibold leading-snug">&ldquo;{punchline}&rdquo;</p>
-        </section>
-
-        {roastText && (
-          <section className="flex flex-col gap-3">
-            <p className="text-center text-xs font-semibold uppercase tracking-widest text-text-faint">
-              The full roast
-            </p>
-            <div className="rounded-xl border border-border bg-surface-2 p-5">
-              <p className="whitespace-pre-wrap text-base leading-relaxed">{cleanRoastText(roastText)}</p>
+          <section className="flex flex-col items-center gap-3 text-center">
+            <p className="text-[13px] font-medium text-text-muted">Their life score</p>
+            <div className="font-display flex items-baseline gap-2 text-[96px] font-medium leading-none tabular-nums text-text">
+              {lifeScore}
+              <span className="text-[30px] text-text-muted">/100</span>
             </div>
+            <span
+              className="block h-3 w-full max-w-[16rem] overflow-hidden rounded-[3px] border border-text bg-powder"
+              role="img"
+              aria-label={`Life score: ${lifeScore} out of 100`}
+            >
+              <span className="block h-full bg-bar" style={{ width: `${Math.max(0, Math.min(100, lifeScore))}%` }} />
+            </span>
+            <h1 className="font-display mt-2 break-words text-[34px] font-medium leading-[1.1]">{funnyTitle}</h1>
           </section>
-        )}
 
-        <section className="flex flex-col items-center gap-3 rounded-[28px] bg-panel-legacy px-6 py-8 text-center">
-          <h2 className="text-2xl font-black tracking-tight">Think your life scores higher?</h2>
-          <p className="text-sm text-text-muted">
-            Answer 5 questions. Get graded. Get roasted. Free.
-          </p>
-          <ShareCta
-            location="footer"
-            className="mt-2 w-full rounded-2xl bg-ember-legacy px-6 py-4 text-lg font-bold text-on-accent transition hover:brightness-110"
-          >
-            Get your own roast
-          </ShareCta>
-          <p className="text-xs text-text-faint">emberai.site</p>
-        </section>
-      </div>
-    </main>
+          {categoryScores && (
+            <section>
+              <h2 className="sr-only">Category scores</h2>
+              <ul className="divide-y divide-border rounded-[18px] border border-border bg-surface px-5">
+                {CATEGORIES.map(({ key, label }) => {
+                  const { score, grade } = categoryScores[key];
+                  return <GradeRow key={key} label={label} grade={grade} score={score} />;
+                })}
+              </ul>
+            </section>
+          )}
+
+          <section className="rounded-[20px] border border-text bg-surface p-6 text-center">
+            <p className="font-display break-words text-[24px] font-medium leading-snug">&ldquo;{punchline}&rdquo;</p>
+          </section>
+
+          {roastText && (
+            <section className="flex flex-col gap-3">
+              <h2 className="text-center text-[13px] font-medium text-text-muted">The full roast</h2>
+              <div className="rounded-[18px] border border-border bg-surface p-5">
+                <p className="whitespace-pre-wrap break-words text-[17px] leading-[1.6]">{cleanRoastText(roastText)}</p>
+              </div>
+            </section>
+          )}
+
+          <section className="flex flex-col items-center gap-3 rounded-[18px] border border-border bg-surface px-6 py-8 text-center">
+            <h2 className="font-display text-[28px] font-medium leading-[1.15]">Think your life scores higher?</h2>
+            <p className="text-sm text-text-muted">
+              Answer 5 questions. Get graded. Get roasted. Free.
+            </p>
+            <ShareCta
+              location="footer"
+              className="mt-2 inline-flex h-14 w-full items-center justify-center rounded-xl bg-text text-base font-medium text-on-accent transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-text"
+            >
+              Get your own roast
+            </ShareCta>
+            <p className="text-xs text-text-faint">emberai.site</p>
+          </section>
+        </div>
+      </main>
+    </JournalTheme>
   );
 }
