@@ -914,3 +914,186 @@ export async function saveTestResult(
     };
   });
 }
+
+// ---------------------------------------------------------------------------
+// getHome and getHandout (READ ONLY: pages for the skills home, the pack map and the weekly handout)
+// ---------------------------------------------------------------------------
+
+export type HomeNext =
+  | { done: true }
+  /** The next step is open now. */
+  | { open: true; month: number; weekNo: number; dayNo: number }
+  /** The next step opens later (the 20-hour wait). */
+  | { open: false; month: number; weekNo: number; dayNo: number; opensAt: string | null }
+  /** The next step is in a month this plan cannot open: exactly { locked, month, teaser } and nothing else. */
+  | LockedResult;
+
+export type HomeData = {
+  packId: string;
+  packTitle: string | null;
+  /** True once at least one step is completed. */
+  hasProgress: boolean;
+  completedSteps: number;
+  totalSteps: number;
+  /** Reviews due now (the same rule as getDueReviews: a free user does not count locked-month items). */
+  dueReviews: number;
+  next: HomeNext;
+  /** For weeks of OPEN months only: the day numbers (1 to 5) this user has completed. Locked months have no entry. */
+  progress: Array<{ weekNo: number; doneDays: number[] }>;
+};
+
+/**
+ * Everything the skills home and the pack map need about THIS user, in one read-only call. It selects only ids,
+ * numbers, titles and progress: never a step's question, options, correct answer, explanation or any handout text.
+ * If the user's next step is in a locked month, `next` is exactly { locked: true, month, teaser }, and the progress
+ * of locked months is left out.
+ */
+export async function getHome(
+  client: SupabaseClient,
+  userId: string,
+  tier: Tier,
+  opts: { packId?: string; now?: number } = {},
+): Promise<SkillResult<HomeData>> {
+  return guard("getHome", async () => {
+    needUser(userId);
+    const now = opts.now ?? Date.now();
+    const packId = await pickPack(client, opts.packId);
+    const packs = await read(client.from("skill_packs").select("title").eq("id", packId));
+    const order = await loadPackOrder(client, packId);
+    if (order.length === 0) throw new Stop("no-content");
+    const completed = await loadCompleted(client, userId);
+
+    const monthRows = await read(
+      client.from("skill_months").select(MONTH_COLS).eq("pack_id", packId).order("month_no", { ascending: true }),
+    );
+    const months = new Map(monthRows.map(toMonth).map((m) => [m.monthNo, m]));
+
+    const index = order.findIndex((s) => !completed.has(s.stepId));
+    let next: HomeNext;
+    if (index === -1) {
+      next = { done: true };
+    } else {
+      const target = order[index]!;
+      const month = months.get(target.monthNo) ?? (await loadMonth(client, packId, target.monthNo));
+      if (!isOpen(month, tier)) {
+        next = lockedResult(month);
+      } else {
+        const gate = nextNewStep(index, await loadLastNewStepAt(client, userId, packId), now);
+        next = gate.open
+          ? { open: true, month: target.monthNo, weekNo: target.weekNo, dayNo: target.dayNo }
+          : {
+              open: false,
+              month: target.monthNo,
+              weekNo: target.weekNo,
+              dayNo: target.dayNo,
+              opensAt: gate.opensAt === null ? null : iso(gate.opensAt),
+            };
+      }
+    }
+
+    const doneByWeek = new Map<number, number[]>();
+    let completedSteps = 0;
+    for (const s of order) {
+      const month = months.get(s.monthNo);
+      if (completed.has(s.stepId)) completedSteps += 1;
+      if (!month || !isOpen(month, tier)) continue;
+      const days = doneByWeek.get(s.weekNo) ?? [];
+      if (completed.has(s.stepId)) days.push(s.dayNo);
+      doneByWeek.set(s.weekNo, days);
+    }
+    const progress = [...doneByWeek.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([weekNo, doneDays]) => ({ weekNo, doneDays: [...doneDays].sort((a, b) => a - b) }));
+
+    const due = await getDueReviews(client, userId, tier, now);
+    if ("error" in due) throw new Stop(due.error.code, false);
+    const dueReviews = "data" in due ? due.data.items.length : 0;
+
+    return {
+      data: {
+        packId,
+        packTitle: typeof packs[0]?.title === "string" ? packs[0].title : null,
+        hasProgress: completedSteps > 0,
+        completedSteps,
+        totalSteps: order.length,
+        dueReviews,
+        next,
+        progress,
+      },
+    };
+  });
+}
+
+export type HandoutSource = { ref: string; title: string; publisher: string | null; year: number | null; url: string | null };
+
+export type Handout = {
+  packId: string;
+  weekId: string;
+  weekNo: number;
+  month: number;
+  title: string;
+  goalLine: string;
+  handoutMd: string;
+  sources: HandoutSource[];
+};
+
+/** Only http(s) links are ever handed to a page; anything else (javascript:, data:, a bare word) becomes null. */
+function safeUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim();
+  return /^https?:\/\/[^\s]+$/i.test(v) ? v : null;
+}
+
+/**
+ * One week's handout and its source list (title, publisher, year, link). The week is found by its number (1 to 24).
+ * The month is checked FIRST and the handout text is selected only after the month is known to be open, so a
+ * locked week returns exactly { locked: true, month, teaser } and its content never leaves the database. No step,
+ * question, answer or explanation is read here.
+ */
+export async function getHandout(
+  client: SupabaseClient,
+  tier: Tier,
+  weekNo: number,
+  opts: { packId?: string } = {},
+): Promise<SkillResult<Handout>> {
+  return guard("getHandout", async () => {
+    if (!Number.isInteger(weekNo) || weekNo < 1 || weekNo > 24) throw new Stop("no-week", false);
+    const packId = await pickPack(client, opts.packId);
+    const weeks = await read(
+      client.from("skill_weeks").select("id, month_no, week_no").eq("pack_id", packId).eq("week_no", weekNo),
+    );
+    if (weeks.length !== 1) throw new Stop("no-week", false);
+    const w = weeks[0]!;
+    const month = await loadMonth(client, packId, asNumber(w.month_no));
+    if (!isOpen(month, tier)) return lockedResult(month);
+
+    const weekId = asString(w.id);
+    const body = await read(client.from("skill_weeks").select("title, goal_line, handout_md").eq("id", weekId));
+    if (body.length !== 1) throw new Stop("no-week");
+    const sources = await read(
+      client
+        .from("skill_sources")
+        .select("ref, title, author_or_publisher, year, url")
+        .eq("week_id", weekId)
+        .order("ref", { ascending: true }),
+    );
+    return {
+      data: {
+        packId,
+        weekId,
+        weekNo: asNumber(w.week_no),
+        month: month.monthNo,
+        title: asString(body[0]!.title),
+        goalLine: asString(body[0]!.goal_line),
+        handoutMd: asString(body[0]!.handout_md),
+        sources: sources.map((s) => ({
+          ref: asString(s.ref),
+          title: asString(s.title),
+          publisher: typeof s.author_or_publisher === "string" && s.author_or_publisher.trim() ? s.author_or_publisher : null,
+          year: typeof s.year === "number" ? s.year : null,
+          url: safeUrl(s.url),
+        })),
+      },
+    };
+  });
+}

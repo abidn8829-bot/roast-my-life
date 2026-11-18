@@ -272,7 +272,8 @@ test("wiring: results go out only through mapResult, and a server error never sh
   for (const f of routeFiles) {
     assert.doesNotMatch(routes[f]!, /Response\.json|NextResponse|new Response/, `${f}: responses come from the helpers`);
   }
-  assert.match(helpers, /if \("error" in result\) return serverError\(result\.error\.code\);/);
+  assert.match(helpers, /if \("error" in result\) return errorResponse\(result\.error\.code\);/);
+  assert.match(helpers, /NOT_FOUND_CODES\.has\(code\) \? json\(\{ error: shortCode\(code\) \}, 404\) : serverError\(code\)/);
   assert.match(helpers, /export const serverError = \(code: string\) => json\(\{ error: shortCode\(code\) \}, 500\);/);
   assert.match(helpers, /if \("locked" in result\) return lockedResponse\(result\);/);
   assert.match(helpers, /json\(\{ locked: true, month: locked\.month, teaser: locked\.teaser \}, 403\)/);

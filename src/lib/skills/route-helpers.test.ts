@@ -10,6 +10,7 @@ import {
   asIndex,
   badRequest,
   checkStepAccess,
+  errorResponse,
   lockedResponse,
   mapResult,
   notFound,
@@ -62,6 +63,23 @@ test("mapResult: an error -> 500 with only a short code, never database text", a
   assert.deepEqual(await jsonOf(bad), { error: "unknown" });
   assert.deepEqual(await jsonOf(serverError("x".repeat(50))), { error: "unknown" });
   assert.deepEqual(await jsonOf(badRequest("empty")), { error: "empty" });
+});
+
+test("mapResult: no-entry and no-step are a 404 with { error: code }; every other code stays a 500", async () => {
+  for (const code of ["no-entry", "no-step"]) {
+    for (const r of [mapResult({ error: { code } }), errorResponse(code)]) {
+      assert.equal(r.status, 404, code);
+      assert.deepEqual(await jsonOf(r), { error: code });
+      assert.equal(r.headers.get("Cache-Control"), "no-store");
+    }
+  }
+  for (const code of ["no-row", "no-week", "no-pack", "no-month", "mismatch", "exception", "23505"]) {
+    const r = mapResult({ error: { code } });
+    assert.equal(r.status, 500, code);
+    assert.deepEqual(await jsonOf(r), { error: code });
+  }
+  // a look-alike is not a not-found
+  assert.equal(mapResult({ error: { code: "no-step " } }).status, 500);
 });
 
 test("mapResult: success -> 200 with the data exactly as the server function returned it", async () => {
