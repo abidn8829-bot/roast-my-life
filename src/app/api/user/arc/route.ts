@@ -10,12 +10,10 @@ import {
 } from "@/lib/arc-trend";
 import { calculateLifeScore } from "@/lib/grades";
 import { parseCategoryScores } from "@/lib/parse-category-scores";
+import { FREE_TREND_DAYS, PRO_TREND_DAYS } from "@/lib/plans";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-
-const FREE_WINDOW_DAYS = 7;
-const PRO_WINDOW_DAYS = 30;
 
 export async function GET() {
   const supabase = await createSupabaseServerClient();
@@ -37,9 +35,9 @@ export async function GET() {
   }
 
   const today = todayKey();
-  // One extra day before the window so "vs 7 days ago" / "vs yesterday" have a
+  // One extra day before the window so "vs a week ago" / "vs yesterday" have a
   // value to carry forward from, plus the newest row before that.
-  const windowStart = `${addDays(today, -PRO_WINDOW_DAYS)}T00:00:00Z`;
+  const windowStart = `${addDays(today, -PRO_TREND_DAYS)}T00:00:00Z`;
 
   const [{ data: userData }, { data: firstRows }, { data: latestRows }, historyRes, { data: priorRows }] = await Promise.all([
     supabase.from("users").select("subscription_tier").eq("id", user.id).single(),
@@ -94,7 +92,7 @@ export async function GET() {
   }
   const series = buildDailySeries(samples);
 
-  const windowDays = isPro ? PRO_WINDOW_DAYS : FREE_WINDOW_DAYS;
+  const windowDays = isPro ? PRO_TREND_DAYS : FREE_TREND_DAYS;
   const trends = buildCategoryTrends(series, latest, today).map((t) => (isPro ? t : { ...t, dayOne: null }));
   const lifeScoreNow = Number(latestRows![0]!.life_score ?? calculateLifeScore(latest));
 
