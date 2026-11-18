@@ -214,8 +214,9 @@ test("(d) the wizard has no tone step, no tone state and sends no tone in either
 test("(d) no tone copy is left on the landing page, pricing page, FAQ or plans", () => {
   const copy = ["components/home-page.tsx", "components/pricing-page.tsx", "components/upgrade-modal.tsx", "app/pricing/page.tsx", "lib/plans.ts"].map(read).join("\n");
   assert.doesNotMatch(copy, /\bevery tone\b|\band tone\b|\broast tones?\b|\bNo Mercy\b|\bDestroy Me\b|Pick Your Intensity|\bTONES\b/);
-  assert.match(read("lib/plans.ts"), /title: `All \$\{ROAST_PERSONA_IDS\.length\} personas`/);
-  assert.equal(ROAST_PERSONA_IDS.length, 6, "the plans title therefore reads \"All 6 personas\"");
+  assert.match(read("lib/plans.ts"), /title: `All \$\{VOICE_COUNT\} voices`/);
+  assert.match(read("lib/plans.ts"), /export const VOICE_COUNT = ROAST_PERSONA_IDS\.length;/);
+  assert.equal(ROAST_PERSONA_IDS.length, 6, "the plans title therefore reads \"All 6 voices\"");
 });
 
 test("(d) the persona picker bug: the roast request carries the persona it was handed, not stale state", () => {
