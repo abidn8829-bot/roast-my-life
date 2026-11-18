@@ -4,7 +4,15 @@ import type { CategoryScores } from "@/lib/roast-types";
 
 export const runtime = "nodejs";
 
-const EMBER_ORANGE = "#FF3D00";
+// Journal values (see globals.css). Hard-coded because the image is drawn outside the page's CSS.
+// Light card: powder mist background, ink green text. Powder (track) and bar green (fill) are fills only, never text.
+const MIST = "#dce6ee";
+const SURFACE = "#ecf1f6";
+const INK = "#293a35";
+const MUTED = "#555750";
+const POWDER = "#b9c9d8";
+const BAR = "#566b5b";
+const HAIRLINE = "rgba(41, 58, 53, 0.28)";
 
 // Fixed order, real keys from CategoryScores.
 const CATEGORY_ROWS: { key: keyof CategoryScores; label: string }[] = [
@@ -14,31 +22,6 @@ const CATEGORY_ROWS: { key: keyof CategoryScores; label: string }[] = [
   { key: "focus", label: "Focus" },
   { key: "spending", label: "Spending" },
 ];
-
-function getGradeColor(grade: string): string {
-  switch (grade) {
-    case "A":
-      return "#3ddc84";
-    case "B":
-      return "#8bd450";
-    case "C":
-      return "#f2c94c";
-    case "D":
-      return "#f2994a";
-    case "F":
-      return "#eb5757";
-    default:
-      return "#eb5757";
-  }
-}
-
-function getScoreColor(score: number): string {
-  if (score >= 90) return "#3ddc84";
-  if (score >= 75) return "#8bd450";
-  if (score >= 60) return "#f2c94c";
-  if (score >= 40) return "#f2994a";
-  return "#eb5757";
-}
 
 function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
@@ -91,12 +74,12 @@ export async function GET(
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            background: "#0a0a0b",
+            background: MIST,
             padding: 80,
             fontFamily: "system-ui, sans-serif",
           }}
         >
-          {/* Life Score */}
+          {/* Life Score: the number in ink, a bar that carries it */}
           <div
             style={{
               display: "flex",
@@ -110,7 +93,7 @@ export async function GET(
                 fontSize: 32,
                 fontWeight: 600,
                 letterSpacing: 4,
-                color: "#5f5f66",
+                color: MUTED,
                 marginBottom: 10,
               }}
             >
@@ -120,14 +103,28 @@ export async function GET(
               style={{
                 fontSize: 180,
                 fontWeight: 900,
-                color: getScoreColor(lifeScore),
+                color: INK,
                 lineHeight: 1,
                 display: "flex",
               }}
             >
               {lifeScore}
-              <span style={{ fontSize: 80, color: "#5f5f66" }}>/100</span>
+              <span style={{ fontSize: 80, color: MUTED }}>/100</span>
             </span>
+            <div
+              style={{
+                display: "flex",
+                width: 560,
+                height: 26,
+                marginTop: 28,
+                border: `3px solid ${INK}`,
+                borderRadius: 8,
+                background: POWDER,
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ display: "flex", width: `${lifeScore}%`, height: "100%", background: BAR }} />
+            </div>
           </div>
 
           {/* Funny Title */}
@@ -142,7 +139,7 @@ export async function GET(
               style={{
                 fontSize: 48,
                 fontWeight: 700,
-                color: "#f5f3f0",
+                color: INK,
                 textAlign: "center",
               }}
             >
@@ -150,7 +147,7 @@ export async function GET(
             </span>
           </div>
 
-          {/* Category breakdown */}
+          {/* Category breakdown: grade letter in ink, bar carries the score */}
           {rows.length > 0 && (
             <div
               style={{
@@ -159,68 +156,63 @@ export async function GET(
                 marginBottom: 50,
               }}
             >
-              {rows.map((row, i) => {
-                const color = getGradeColor(row.grade);
-                return (
-                  <div
-                    key={row.key}
+              {rows.map((row, i) => (
+                <div
+                  key={row.key}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "26px 34px",
+                    marginTop: i === 0 ? 0 : 20,
+                    background: SURFACE,
+                    border: `2px solid ${HAIRLINE}`,
+                    borderRadius: 18,
+                  }}
+                >
+                  <span
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "26px 34px",
-                      marginTop: i === 0 ? 0 : 20,
-                      background: "#111111",
-                      border: `2px solid ${color}55`,
-                      borderRadius: 18,
+                      width: 220,
+                      fontSize: 34,
+                      fontWeight: 700,
+                      color: INK,
                     }}
                   >
-                    <span
-                      style={{
-                        width: 220,
-                        fontSize: 34,
-                        fontWeight: 700,
-                        color: "#f5f3f0",
-                      }}
-                    >
-                      {row.label}
-                    </span>
+                    {row.label}
+                  </span>
+                  <span
+                    style={{
+                      display: "flex",
+                      width: 56,
+                      fontSize: 56,
+                      fontWeight: 900,
+                      color: INK,
+                    }}
+                  >
+                    {row.grade}
+                  </span>
+                  <div
+                    style={{
+                      display: "flex",
+                      flex: 1,
+                      height: 24,
+                      marginLeft: 24,
+                      border: `2px solid ${INK}`,
+                      borderRadius: 7,
+                      background: POWDER,
+                      overflow: "hidden",
+                    }}
+                  >
                     <div
                       style={{
                         display: "flex",
-                        flex: 1,
-                        height: 22,
-                        marginLeft: 20,
-                        marginRight: 30,
-                        borderRadius: 11,
-                        background: "#262626",
-                        overflow: "hidden",
+                        width: `${row.fill}%`,
+                        height: "100%",
+                        background: BAR,
                       }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          width: `${row.fill}%`,
-                          height: "100%",
-                          borderRadius: 11,
-                          background: color,
-                        }}
-                      />
-                    </div>
-                    <span
-                      style={{
-                        display: "flex",
-                        justifyContent: "flex-end",
-                        width: 56,
-                        fontSize: 56,
-                        fontWeight: 900,
-                        color,
-                      }}
-                    >
-                      {row.grade}
-                    </span>
+                    />
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
 
@@ -231,8 +223,8 @@ export async function GET(
               justifyContent: "center",
               padding: 30,
               borderRadius: 20,
-              background: "#111111",
-              border: `2px solid ${EMBER_ORANGE}`,
+              background: SURFACE,
+              border: `2px solid ${INK}`,
               marginBottom: 60,
             }}
           >
@@ -240,7 +232,7 @@ export async function GET(
               style={{
                 fontSize: 32,
                 fontWeight: 600,
-                color: "#f5f3f0",
+                color: INK,
                 lineHeight: 1.4,
                 textAlign: "center",
               }}
@@ -262,12 +254,12 @@ export async function GET(
                 fontSize: 40,
                 fontWeight: 800,
                 letterSpacing: 6,
-                color: EMBER_ORANGE,
+                color: INK,
               }}
             >
               EMBERAI
             </span>
-            <span style={{ marginTop: 10, fontSize: 26, color: "#98979c" }}>
+            <span style={{ marginTop: 10, fontSize: 26, color: MUTED }}>
               Get roasted at emberai.site
             </span>
           </div>
