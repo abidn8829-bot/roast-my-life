@@ -1,5 +1,5 @@
 import type { Viewport } from "next";
-import { JournalHome } from "@/components/journal-home";
+import { LandingPage } from "@/components/landing/landing-page";
 import { JournalTheme } from "@/components/journal-theme";
 import { PRO_PRICE } from "@/lib/plans";
 import { pageMetadata } from "@/lib/seo";
@@ -59,7 +59,7 @@ export default function Page() {
       {/* To switch back to the old dark page: import { HomePage } from "@/components/home-page"
           and render <HomePage /> here instead of the two lines below. */}
       <JournalTheme>
-        <JournalHome />
+        <LandingPage />
       </JournalTheme>
     </>
   );
