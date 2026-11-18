@@ -11,7 +11,7 @@ import { CHECKIN_CHIP_LABELS, type SafetyPayload, type SafetyPagePayload } from 
 import { JournalTheme } from "@/components/journal-theme";
 import { errorBox, primaryButton } from "@/components/journal-auth-ui";
 import { LoadingArt, QuestionArt } from "@/components/journal-onboarding-art";
-import { DarkScope, QUESTION_NOTES, QuestionProgress, backLink, numberInput, questionTitle, textareaInput } from "@/components/journal-onboarding-ui";
+import { QUESTION_NOTES, QuestionProgress, backLink, numberInput, questionTitle, textareaInput } from "@/components/journal-onboarding-ui";
 
 // One emoji per preset check-in button, in the order of CHECKIN_CHIP_LABELS (the wording lives in @/lib/safety).
 const CHECKIN_CHIP_EMOJIS = ["😎", "😅", "🤡"] as const;
@@ -27,7 +27,6 @@ const BASE_QUESTIONS = [
   {
     key: "phoneHours" as const,
     label: "How many hours a day are you on your phone?",
-    emoji: "📱",
     type: "number" as const,
     min: 1,
     max: 20,
@@ -36,14 +35,12 @@ const BASE_QUESTIONS = [
   {
     key: "worstApp" as const,
     label: "Which app takes most of that time?",
-    emoji: "🎭",
     type: "text" as const,
     placeholder: "TikTok, Instagram…",
   },
   {
     key: "sleepHours" as const,
     label: "On a normal night, how many hours do you sleep?",
-    emoji: "😴",
     type: "number" as const,
     min: 1,
     max: 12,
@@ -52,7 +49,6 @@ const BASE_QUESTIONS = [
   {
     key: "foodDeliverySpend" as const,
     label: "How many dollars a week do you spend on food delivery?",
-    emoji: "💸",
     type: "number" as const,
     min: 0,
     placeholder: "75",
@@ -60,7 +56,6 @@ const BASE_QUESTIONS = [
   {
     key: "neverDoThing" as const,
     label: "What's the promise to yourself you keep breaking?",
-    emoji: "🤥",
     type: "text" as const,
     placeholder: "Go to the gym, read more…",
   },
@@ -70,7 +65,6 @@ const PRO_QUESTIONS = [
   {
     key: "socialMediaHours" as const,
     label: "How many hours a day do you spend doomscrolling?",
-    emoji: "👀",
     type: "number" as const,
     min: 0,
     max: 20,
@@ -79,7 +73,6 @@ const PRO_QUESTIONS = [
   {
     key: "workoutFrequency" as const,
     label: "How many times did you move your body this week?",
-    emoji: "🏃",
     type: "number" as const,
     min: 0,
     max: 14,
@@ -91,9 +84,6 @@ type Step = number | "persona" | "loading" | "followup" | "checkin-persona" | "c
 
 const inputClass =
   "w-full rounded-xl border-2 border-border bg-surface px-5 py-4 text-xl text-text outline-none ring-ember focus:ring-2 transition-all";
-
-const labelClass =
-  "text-2xl sm:text-3xl font-bold leading-relaxed text-text break-words whitespace-normal text-center";
 
 export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   const router = useRouter();
@@ -513,14 +503,12 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
             />
           </div>
         </JournalTheme>
-        <DarkScope>
-          <UpgradeModal
-            isOpen={upgradeReason !== null}
-            onClose={() => setUpgradeReason(null)}
-            reason={upgradeReason ?? undefined}
-            userEmail={userEmail}
-          />
-        </DarkScope>
+        <UpgradeModal
+          isOpen={upgradeReason !== null}
+          onClose={() => setUpgradeReason(null)}
+          reason={upgradeReason ?? undefined}
+          userEmail={userEmail}
+        />
       </>
     );
   }
@@ -652,15 +640,12 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
             ) : null}
           </div>
         </JournalTheme>
-        {/* text-center: the old loading screen centred its contents, and the modal inherited that. */}
-        <DarkScope className="text-center">
-          <UpgradeModal
-            isOpen={upgradeReason !== null}
-            onClose={() => setUpgradeReason(null)}
-            reason={upgradeReason ?? undefined}
-            userEmail={userEmail}
-          />
-        </DarkScope>
+        <UpgradeModal
+          isOpen={upgradeReason !== null}
+          onClose={() => setUpgradeReason(null)}
+          reason={upgradeReason ?? undefined}
+          userEmail={userEmail}
+        />
       </>
     );
   }
@@ -683,14 +668,12 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
             />
           </div>
         </JournalTheme>
-        <DarkScope>
-          <UpgradeModal
-            isOpen={upgradeReason !== null}
-            onClose={() => setUpgradeReason(null)}
-            reason={upgradeReason ?? undefined}
-            userEmail={userEmail}
-          />
-        </DarkScope>
+        <UpgradeModal
+          isOpen={upgradeReason !== null}
+          onClose={() => setUpgradeReason(null)}
+          reason={upgradeReason ?? undefined}
+          userEmail={userEmail}
+        />
       </>
     );
   }
@@ -698,11 +681,11 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   const slideIndex = typeof step === "number" ? step : 0;
   const q = allQuestions[slideIndex];
 
-  // Journal look for the question screens only. While an upgrade modal is open (a returning free user who has
-  // used today's roast) the previous markup below is kept, so that modal looks exactly as it always did.
-  if (upgradeReason === null) {
-    const note = QUESTION_NOTES[q.key];
-    return (
+  // Question screens. The upgrade modal (a returning free user who has used today's roast) carries its own journal
+  // scope, so it is rendered beside the screen like on the other screens.
+  const note = QUESTION_NOTES[q.key];
+  return (
+    <>
       <JournalTheme className="w-full max-w-md">
         <div data-journal-screen className="jl flex w-full flex-col">
           <QuestionProgress current={slideIndex} total={allQuestions.length} />
@@ -761,94 +744,12 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
           </div>
         </div>
       </JournalTheme>
-    );
-  }
-
-  return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-12">
-      <div className="w-full max-w-2xl">
-        {/* Progress indicator */}
-        <div className="mb-8 flex items-center justify-center gap-2">
-          {allQuestions.map((_, i) => (
-            <span
-              key={i}
-              className={`h-2 w-8 rounded-full transition-all ${
-                i === slideIndex ? "bg-ember scale-110" : i < slideIndex ? "bg-ember/50" : "bg-surface-3"
-              }`}
-            />
-          ))}
-        </div>
-
-        {/* Question card */}
-        <div
-          key={q.key}
-          className="flex flex-col items-center gap-8 text-center transition-opacity duration-300"
-        >
-          {/* Big emoji */}
-          <div className="text-9xl animate-bounce" style={{ animationDuration: "2s" }}>
-            {q.emoji}
-          </div>
-
-          {/* Question */}
-          <label className="flex w-full flex-col gap-6">
-            <span className={labelClass}>{q.label}</span>
-            
-            {/* Input */}
-            {q.type === "text" ? (
-              <textarea
-                rows={2}
-                placeholder={q.placeholder}
-                value={values[q.key]}
-                onChange={(e) => setters[q.key](e.target.value)}
-                className={`ph-no-capture ${inputClass} resize-y min-h-[4rem]`}
-              />
-            ) : (
-              <input
-                type="number"
-                min={q.min}
-                max={q.max}
-                placeholder={q.placeholder}
-                value={values[q.key]}
-                onChange={(e) => setters[q.key](e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") onNext();
-                }}
-                className={inputClass}
-              />
-            )}
-          </label>
-        </div>
-
-        {error ? <p className="mt-4 text-center text-sm text-grade-f">{error}</p> : null}
-
-        {/* Navigation buttons */}
-        <div className="mt-12 flex justify-center gap-4">
-          {slideIndex > 0 ? (
-            <button
-              type="button"
-              onClick={onBack}
-              className="rounded-xl border border-border px-8 py-4 text-lg font-medium text-text-muted transition hover:border-text-faint hover:bg-surface"
-            >
-              ← Back
-            </button>
-          ) : (
-            <span />
-          )}
-          <button
-            type="button"
-            onClick={onNext}
-            className="rounded-xl bg-ember px-8 py-4 text-lg font-medium text-on-accent transition hover:brightness-110 hover:scale-105"
-          >
-            {slideIndex === allQuestions.length - 1 ? "Choose Your Roaster →" : "Next →"}
-          </button>
-        </div>
-      </div>
       <UpgradeModal
         isOpen={upgradeReason !== null}
         onClose={() => setUpgradeReason(null)}
         reason={upgradeReason ?? undefined}
         userEmail={userEmail}
       />
-    </div>
+    </>
   );
 }
