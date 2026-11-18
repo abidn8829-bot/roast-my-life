@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import posthog from "posthog-js";
 import { canShareFile, copyText, downloadFile, fetchCardFile } from "@/lib/share-card";
+import { outlineButton, primaryButton } from "@/components/journal-auth-ui";
 import { roastShareUrl } from "@/lib/site";
 
 type Props = {
@@ -210,7 +211,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
       <div
         ref={sheetRef}
         tabIndex={-1}
-        className="relative w-full max-w-[480px] overflow-y-auto overscroll-contain rounded-t-[36px] bg-panel-legacy px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] outline-none motion-reduce:transition-none"
+        className="relative w-full max-w-[480px] overflow-y-auto overscroll-contain rounded-t-[28px] border-t border-border bg-surface px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] outline-none motion-reduce:transition-none"
         style={{
           maxHeight: "94dvh",
           transform: `translateY(${open ? `${dragY}px` : "100%"})`,
@@ -225,10 +226,10 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
           onPointerUp={onDragEnd}
           onPointerCancel={onDragEnd}
         >
-          <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-line-legacy" aria-hidden />
+          <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-text/25" aria-hidden />
           <h2
             id="share-sheet-title"
-            className="text-center text-3xl font-black tracking-tight text-text"
+            className="font-display text-center text-3xl font-medium leading-tight text-text"
           >
             This is embarrassing.
           </h2>
@@ -239,7 +240,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
 
         {/* Card preview (shrinks on short viewports so the buttons stay reachable) */}
         <div
-          className="relative mx-auto mt-5 max-w-full overflow-hidden rounded-[24px] border border-line-subtle-legacy bg-bg"
+          className="relative mx-auto mt-5 max-w-full overflow-hidden rounded-[20px] border border-border bg-bg"
           style={{ height: "clamp(300px, calc(100dvh - 470px), 605px)", aspectRatio: "9 / 16" }}
         >
           {previewUrl ? (
@@ -250,7 +251,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
               Couldn&apos;t generate your card preview.
             </p>
           ) : (
-            <div className="h-full w-full animate-pulse bg-control-legacy" aria-label="Generating your card" />
+            <div className="h-full w-full animate-pulse bg-surface-3" aria-label="Generating your card" />
           )}
         </div>
 
@@ -259,7 +260,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
             type="button"
             disabled={busy || cardFailed}
             onClick={() => void onShareToInstagram()}
-            className="w-full rounded-2xl bg-ember-legacy px-6 py-4 text-lg font-bold text-on-accent transition hover:brightness-110 active:scale-[0.99] disabled:opacity-50"
+            className={primaryButton}
           >
             {busy ? "Preparing…" : "Share to Instagram Story"}
           </button>
@@ -268,7 +269,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
             <button
               type="button"
               onClick={() => void onCopyLink()}
-              className="rounded-2xl border border-line-legacy bg-control-legacy px-4 py-3.5 text-base font-semibold text-white transition hover:border-line-hover-legacy active:scale-[0.99]"
+              className={outlineButton}
             >
               Copy Link
             </button>
@@ -276,7 +277,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
               type="button"
               disabled={busy || cardFailed}
               onClick={() => void onSaveImage()}
-              className="rounded-2xl border border-line-legacy bg-control-legacy px-4 py-3.5 text-base font-semibold text-white transition hover:border-line-hover-legacy active:scale-[0.99] disabled:opacity-50"
+              className={outlineButton}
             >
               Save Image
             </button>
@@ -285,9 +286,9 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
 
         <div aria-live="polite" className="mt-3 empty:hidden">
           {showManualPrompt ? (
-            <p className="rounded-2xl border border-line-subtle-legacy bg-control-legacy px-4 py-3 text-center text-sm leading-relaxed text-[#d4d4d8]">
+            <p className="rounded-xl border border-border bg-surface-3 px-4 py-3 text-center text-sm leading-relaxed text-text">
               Image saved to your device. Open Instagram, start a Story, and pick it from your photos
-              or downloads. 📸
+              or downloads.
             </p>
           ) : status ? (
             <p className="break-all text-center text-sm text-text-muted">{status}</p>
@@ -297,7 +298,7 @@ export function ShareSheet({ roastId, shareSlug, onClose }: Props) {
         <button
           type="button"
           onClick={() => close("skip")}
-          className="mx-auto mt-2 block px-4 py-3 text-sm text-[#6b6b70] transition hover:text-text-muted"
+          className="mx-auto mt-2 block min-h-11 px-4 py-3 text-sm text-text-muted underline underline-offset-4 transition hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-text"
         >
           Skip for now
         </button>

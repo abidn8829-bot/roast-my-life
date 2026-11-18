@@ -14,7 +14,7 @@ const css = `
   .ge-btn:focus-visible { outline:2px solid ${INK}; outline-offset:4px; }
 `;
 
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({ retry }: { error: Error & { digest?: string }; retry: () => void }) {
   return (
     <html lang="en">
       <body style={{ margin: 0, background: MIST, color: INK, fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif" }}>
@@ -29,7 +29,7 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
               Something went wrong. Try again.
             </h1>
             <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
-              <button type="button" onClick={() => reset()} className="ge-btn" style={{ background: INK, color: MIST, border: "none" }}>
+              <button type="button" onClick={() => retry()} className="ge-btn" style={{ background: INK, color: MIST, border: "none" }}>
                 Try again
               </button>
               {/* A plain link on purpose: the app's router may be what failed, and <Link> needs it. */}

@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { DarkScope } from "@/components/journal-onboarding-ui";
 import { PersonaIcon } from "@/components/journal-persona-art";
 import { GradeRow, ScoreRing, ScoreStar, StepMarker, WavyUnderline, sectionLabel } from "@/components/journal-roast-ui";
 import { ShareButtons } from "@/components/share-buttons";
@@ -433,16 +432,14 @@ export function RoastView({
         </button>
       </div>
 
-      {/* The sheet is not restyled yet: it keeps its original dark colours and font on the light page. "contents"
-          means this wrapper takes no space of its own (the sheet itself is fixed to the screen). */}
+      {/* The share sheet is fixed to the screen, so it takes no space here. It sits inside the journal wrapper and
+          uses the light journal colours and fonts. */}
       {shareSheetOpen && (
-        <DarkScope className="contents text-text [font-family:var(--font-poppins),Arial,Helvetica,sans-serif]">
-          <ShareSheet
-            roastId={roastId}
-            shareSlug={shareSlug}
-            onClose={closeShareSheet}
-          />
-        </DarkScope>
+        <ShareSheet
+          roastId={roastId}
+          shareSlug={shareSlug}
+          onClose={closeShareSheet}
+        />
       )}
     </div>
   );

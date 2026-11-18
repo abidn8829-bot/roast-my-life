@@ -26,7 +26,7 @@ function RetryMark() {
   );
 }
 
-export default function ErrorPage({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function ErrorPage({ retry }: { error: Error & { digest?: string }; retry: () => void }) {
   return (
     <JournalTheme>
       <main className="flex min-h-screen flex-col items-center justify-center px-4 py-10">
@@ -34,7 +34,7 @@ export default function ErrorPage({ reset }: { error: Error & { digest?: string 
           <RetryMark />
           <h1 className="font-display mb-8 text-[28px] font-medium leading-snug">{ERROR_MESSAGE}</h1>
           <div className="flex w-full flex-col gap-3">
-            <button type="button" onClick={() => reset()} className={primaryButton}>
+            <button type="button" onClick={() => retry()} className={primaryButton}>
               Try again
             </button>
             <Link href="/" className={outlineButton}>
