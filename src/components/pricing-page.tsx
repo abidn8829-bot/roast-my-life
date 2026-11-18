@@ -1,69 +1,77 @@
 "use client";
 
 import Link from "next/link";
+import { focusRing, outlineButton, primaryButton } from "@/components/journal-auth-ui";
+import { PlanTick } from "@/components/journal-plan-ui";
 import { FREE_FEATURES, PRO_FEATURES, PRO_PRICE } from "@/lib/plans";
 import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 import { useUserEmail } from "@/lib/use-user-email";
 
+// Journal look. Rendered inside <JournalTheme> (see app/pricing/page.tsx). Every Free/Pro line is read from
+// lib/plans.ts; nothing about the plans is typed here. Colour rules: ink text on every card; sage is a FILL only
+// (the Pro card), never a text colour; no gradient, glow or shadow. The Pro card stands out by its fill and its
+// heavier 2px ink border.
 export function PricingPage() {
   const userEmail = useUserEmail();
 
   return (
-    <main className="min-h-screen bg-bg px-4 py-10 text-text-legacy">
-      <div className="mx-auto w-full max-w-lg">
+    <main className="px-4 py-10 text-text">
+      <div className="mx-auto w-full max-w-lg md:max-w-4xl">
         <Link
           href={userEmail ? "/dashboard" : "/"}
-          className="mb-8 inline-block text-sm font-semibold text-ember-legacy hover:underline"
+          className={`mb-8 inline-flex min-h-11 items-center text-sm text-text-muted underline underline-offset-4 hover:text-text ${focusRing}`}
         >
           {userEmail ? "← Back to Dashboard" : "← Back to Home"}
         </Link>
 
-        <header className="mb-12 text-center">
-          <h1 className="text-4xl font-black tracking-tight mb-4">
-            Choose Your <span className="text-ember-legacy">Roast Level</span>
+        <header className="mb-10 text-center">
+          <h1 className="font-display mb-3 text-[38px] font-medium leading-[1.08] tracking-[-0.005em] md:text-5xl">
+            Choose your roast level
           </h1>
-          <p className="text-text-secondary-legacy">
-            How much self-destruction can you handle?
-          </p>
+          <p className="text-text-muted">How much self-destruction can you handle?</p>
         </header>
 
-        <div className="flex flex-col gap-6">
-          {/* Free Tier */}
-          <div className="rounded-xl border border-line-subtle-legacy bg-panel-legacy p-6">
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold text-text-legacy">Free</h2>
-              <p className="text-3xl font-black text-ember-legacy">$0</p>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:items-stretch">
+          {/* Free */}
+          <section aria-labelledby="plan-free" className="flex flex-col rounded-2xl border border-border-strong-legacy bg-surface p-6">
+            <div className="mb-5">
+              <h2 id="plan-free" className="text-[15px] font-medium text-text-muted">
+                Free
+              </h2>
+              <p className="font-display text-4xl font-medium text-text">$0</p>
             </div>
-            <ul className="mb-6 space-y-3 text-sm text-text-body-legacy">
+            <ul className="mb-8 space-y-3 text-[15px] text-text">
               {FREE_FEATURES.map((f) => (
-                <li key={f} className="flex items-center gap-2">
-                  <span className="text-ember-legacy">✓</span>
-                  {f}
+                <li key={f} className="flex items-start gap-3">
+                  <PlanTick />
+                  <span>{f}</span>
                 </li>
               ))}
             </ul>
-            <Link
-              href={userEmail ? "/dashboard" : "/signup"}
-              className="block w-full rounded-lg border border-border-strong-legacy px-4 py-3 text-center text-sm font-semibold text-text-legacy transition hover:border-border-hover-legacy"
-            >
+            <Link href={userEmail ? "/dashboard" : "/signup"} className={`${outlineButton} mt-auto`}>
               {userEmail ? "Current Plan" : "Get Started Free"}
             </Link>
-          </div>
+          </section>
 
-          {/* Pro Tier */}
-          <div className="rounded-xl border-2 border-ember-legacy bg-panel-legacy p-6 shadow-[0_0_32px_rgba(255,61,0,0.15)]">
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold text-text-legacy">Pro</h2>
-              <p className="text-3xl font-black text-ember-legacy">{PRO_PRICE}<span className="text-lg font-normal text-text-secondary-legacy">/month</span></p>
+          {/* Pro */}
+          <section aria-labelledby="plan-pro" className="flex flex-col rounded-2xl border-2 border-text bg-sage p-6">
+            <div className="mb-5">
+              <h2 id="plan-pro" className="text-[15px] font-medium text-text">
+                Pro
+              </h2>
+              <p className="font-display text-4xl font-medium text-text">
+                {PRO_PRICE}
+                <span className="font-sans text-base font-normal not-italic">/month</span>
+              </p>
             </div>
-            <ul className="mb-6 space-y-4 text-sm">
+            <ul className="mb-8 space-y-4 text-[15px] text-text">
               {PRO_FEATURES.map((f) => (
-                <li key={f.title}>
-                  <div className="flex items-center gap-2 font-semibold text-text-legacy">
-                    <span className="text-ember-legacy">✓</span>
-                    {f.title}
+                <li key={f.title} className="flex items-start gap-3">
+                  <PlanTick />
+                  <div>
+                    <p className="font-medium">{f.title}</p>
+                    <p className="mt-0.5 text-sm leading-relaxed">{f.desc}</p>
                   </div>
-                  <p className="mt-1 pl-6 text-xs leading-relaxed text-text-secondary-legacy">{f.desc}</p>
                 </li>
               ))}
             </ul>
@@ -71,12 +79,12 @@ export function PricingPage() {
               href={getUpgradeUrl(userEmail)}
               target="_blank"
               rel="noopener noreferrer"
-              className="block w-full rounded-lg bg-ember-legacy px-4 py-3 text-center text-sm font-semibold text-on-accent shadow-[0_0_32px_rgba(255,61,0,0.35)] transition hover:brightness-110"
+              className={`${primaryButton} mt-auto`}
             >
-              Upgrade to Pro 🔥
+              Upgrade to Pro
             </a>
-            <p className="mt-2 text-center text-xs text-text-secondary-legacy">{UPGRADE_EMAIL_HINT}</p>
-          </div>
+            <p className="mt-3 text-center text-xs leading-relaxed text-text">{UPGRADE_EMAIL_HINT}</p>
+          </section>
         </div>
       </div>
     </main>

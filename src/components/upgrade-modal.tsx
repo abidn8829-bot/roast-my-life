@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { PRO_DAILY_LIMIT } from "@/lib/daily-limit";
-import { PRO_FEATURES } from "@/lib/plans";
+import { focusRing } from "@/components/journal-auth-ui";
+import { EmberFlame, JournalScope, PlanTick } from "@/components/journal-plan-ui";
+import { PRO_FEATURES, UPGRADE_LIMIT_TEXT } from "@/lib/plans";
 import { getUpgradeUrl, UPGRADE_EMAIL_HINT } from "@/lib/upgrade-url";
 
 type Props = {
@@ -12,6 +13,11 @@ type Props = {
   userEmail?: string;
 };
 
+const buttonBase = `inline-flex h-12 flex-1 items-center justify-center rounded-xl px-4 text-sm font-medium transition ${focusRing}`;
+
+// Journal look. The modal wraps itself in <JournalScope>, so it looks the same wherever it is opened (the onboarding
+// wizard renders it both beside journal screens and inside a dark wrapper). Plan wording and numbers come from
+// lib/plans.ts only (UPGRADE_LIMIT_TEXT, PRO_FEATURES); nothing about the plans is typed here.
 export function UpgradeModal({ isOpen, onClose, reason = "daily_limit", userEmail }: Props) {
   const [loading, setLoading] = useState(false);
 
@@ -25,27 +31,30 @@ export function UpgradeModal({ isOpen, onClose, reason = "daily_limit", userEmai
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/80 p-4">
-      <div className="w-full max-w-md rounded-2xl border border-line-subtle-legacy bg-surface p-6">
-        <div className="mb-6 text-center">
-          <span className="text-5xl">🔥</span>
-          <h2 className="mt-4 text-2xl font-bold text-text-legacy">
-            {reason === "daily_limit" ? "Daily Limit Reached" : "Pro Feature"}
+    <JournalScope className="fixed inset-0 z-50 flex items-center justify-center bg-overlay/80 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="upgrade-modal-title"
+        className="max-h-full w-full max-w-md overflow-y-auto rounded-2xl border-2 border-text bg-surface p-6 text-left"
+      >
+        <div className="mb-6 flex flex-col items-center text-center">
+          <EmberFlame />
+          <h2 id="upgrade-modal-title" className="font-display mt-4 text-[30px] font-medium leading-tight text-text">
+            {reason === "daily_limit" ? "Daily limit reached" : "Pro feature"}
           </h2>
-          <p className="mt-2 text-sm text-text-secondary-legacy">
-            {reason === "daily_limit"
-              ? `You've used your free roast for today. Upgrade to Pro for ${PRO_DAILY_LIMIT} roasts a day!`
-              : "This feature is available for Pro users only."}
+          <p className="mt-2 text-[15px] leading-relaxed text-text-muted">
+            {reason === "daily_limit" ? UPGRADE_LIMIT_TEXT : "This feature is available for Pro users only."}
           </p>
         </div>
 
-        <div className="mb-6 space-y-3 rounded-xl border border-line-subtle-legacy bg-bg p-4">
-          <h3 className="text-sm font-semibold text-ember-legacy">Pro Features:</h3>
-          <ul className="space-y-2 text-sm text-text-body-legacy">
+        <div className="mb-6 rounded-xl border border-border-strong-legacy bg-bg p-4">
+          <h3 className="mb-3 text-[13px] font-medium text-text-muted">Pro features</h3>
+          <ul className="space-y-2.5 text-[15px] text-text">
             {PRO_FEATURES.map((f) => (
-              <li key={f.title} className="flex items-center gap-2">
-                <span className="text-ember-legacy">✓</span>
-                {f.title}
+              <li key={f.title} className="flex items-start gap-3">
+                <PlanTick />
+                <span>{f.title}</span>
               </li>
             ))}
           </ul>
@@ -55,7 +64,7 @@ export function UpgradeModal({ isOpen, onClose, reason = "daily_limit", userEmai
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 rounded-lg border border-border-strong-legacy px-4 py-3 text-sm font-medium text-text-body-legacy transition hover:border-border-hover-legacy"
+            className={`${buttonBase} border border-border-strong-legacy bg-transparent text-text hover:bg-bg`}
           >
             Maybe Later
           </button>
@@ -63,13 +72,13 @@ export function UpgradeModal({ isOpen, onClose, reason = "daily_limit", userEmai
             type="button"
             onClick={handleUpgrade}
             disabled={loading}
-            className="flex-1 rounded-lg bg-ember-legacy px-4 py-3 text-sm font-semibold text-on-accent transition hover:brightness-110 disabled:opacity-50"
+            className={`${buttonBase} bg-ember text-on-accent hover:opacity-90 disabled:cursor-not-allowed disabled:bg-text-faint disabled:hover:opacity-100`}
           >
             {loading ? "Loading..." : "Upgrade to Pro"}
           </button>
         </div>
-        <p className="mt-3 text-center text-xs text-text-secondary-legacy">{UPGRADE_EMAIL_HINT}</p>
+        <p className="mt-3 text-center text-xs leading-relaxed text-text-muted">{UPGRADE_EMAIL_HINT}</p>
       </div>
-    </div>
+    </JournalScope>
   );
 }
