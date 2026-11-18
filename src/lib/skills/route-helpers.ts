@@ -30,6 +30,13 @@ export const unauthorized = () => json({ error: "unauthorized" }, 401);
 export const badRequest = (code: string) => json({ error: shortCode(code) }, 400);
 export const serverError = (code: string) => json({ error: shortCode(code) }, 500);
 
+/** Codes that mean "that thing does not exist" (a note or a step id nobody has): a 404, not a server error. */
+const NOT_FOUND_CODES: ReadonlySet<string> = new Set(["no-entry", "no-step"]);
+
+/** The response for an { error: { code } } result: 404 { error: code } for no-entry and no-step, otherwise 500. */
+export const errorResponse = (code: string) =>
+  NOT_FOUND_CODES.has(code) ? json({ error: shortCode(code) }, 404) : serverError(code);
+
 /** A short code only: letters, digits and a few separators, at most 20 characters. Anything else becomes "unknown". */
 export function shortCode(code: unknown): string {
   return typeof code === "string" && /^[A-Za-z0-9_.:-]{1,20}$/.test(code) ? code : "unknown";
@@ -43,13 +50,13 @@ export const lockedResponse = (locked: LockedResult) =>
  * Turns a skills-server result into a response:
  *   { locked }    -> 403, the locked body only
  *   { notReady }  -> 200, { notReady: true }
- *   { error }     -> 500, { error: "<short code>" } and nothing else
+ *   { error }     -> 404 for no-entry and no-step, 500 for every other code; { error: "<short code>" } and nothing else
  *   { data }      -> 200, the data exactly as the server function returned it
  */
 export function mapResult<T>(result: SkillResult<T> | WeeklyResult<T>): Response {
   if ("locked" in result) return lockedResponse(result);
   if ("notReady" in result) return json({ notReady: true }, 200);
-  if ("error" in result) return serverError(result.error.code);
+  if ("error" in result) return errorResponse(result.error.code);
   return json(result.data, 200);
 }
 

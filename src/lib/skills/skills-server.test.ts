@@ -13,6 +13,8 @@ import {
   answerReview,
   deleteNotebookEntry,
   getDueReviews,
+  getHandout,
+  getHome,
   getPackMap,
   getTodayStep,
   getWeeklyTest,
@@ -917,4 +919,165 @@ test("source: the user-facing and logged strings never say 'missed' or 'failed' 
   const strings = [...code.matchAll(/"([^"\n]*)"|`([^`\n]*)`/g)].map((m) => m[1] ?? m[2] ?? "");
   assert.ok(strings.length > 50);
   for (const s of strings) assert.doesNotMatch(s, /missed|failed/i, s);
+});
+
+// ---------------------------------------------------------------------------
+// getHome and getHandout
+// ---------------------------------------------------------------------------
+
+const ANSWER_WORDS = /prove_correct|prove_explanation|prove_options|prove_question|\bcorrect\b|explanation|EXPLAIN-|learn_body|do_prompt|hint|Question \d|Body \d/i;
+
+test("getHome: a brand-new user has no progress and the next step is week 1, day 1, open", async () => {
+  const { client } = world();
+  const r = await getHome(client, U, "free", { now: NOW });
+  assert.ok("data" in r);
+  assert.equal(r.data.packId, "p1");
+  assert.equal(r.data.packTitle, "Pack");
+  assert.equal(r.data.hasProgress, false);
+  assert.equal(r.data.completedSteps, 0);
+  assert.equal(r.data.totalSteps, 13);
+  assert.equal(r.data.dueReviews, 0);
+  assert.deepEqual(r.data.next, { open: true, month: 1, weekNo: 1, dayNo: 1 });
+  // a free user: progress only for the open month (weeks 1 and 2), nothing for locked week 5
+  assert.deepEqual(r.data.progress, [{ weekNo: 1, doneDays: [] }, { weekNo: 2, doneDays: [] }]);
+});
+
+test("getHome: progress, the 20-hour wait and the due-review count", async () => {
+  const done = ["s1-1", "s1-2"];
+  const { client } = world({
+    completed: done,
+    lastNewStepAt: NOW - 2 * H,
+    reviews: [review("s1-1", 0, NOW - H), review("s1-2", 0, NOW + D)],
+  });
+  const r = await getHome(client, U, "free", { now: NOW });
+  assert.ok("data" in r);
+  assert.equal(r.data.hasProgress, true);
+  assert.equal(r.data.completedSteps, 2);
+  assert.equal(r.data.dueReviews, 1, "only the one that is due now");
+  assert.ok("open" in r.data.next && r.data.next.open === false);
+  assert.deepEqual({ ...r.data.next, opensAt: "x" }, { open: false, month: 1, weekNo: 1, dayNo: 3, opensAt: "x" });
+  assert.deepEqual(r.data.progress[0], { weekNo: 1, doneDays: [1, 2] });
+  const later = await getHome(world({ completed: done, lastNewStepAt: NOW - 30 * H }).client, U, "free", { now: NOW });
+  assert.ok("data" in later && "open" in later.data.next && later.data.next.open === true);
+});
+
+test("getHome: a free user whose next step is in a locked month gets exactly { locked, month, teaser } for it", async () => {
+  const done = [...STEPS_W1, ...STEPS_W2];
+  const { client } = world({ completed: done, lastNewStepAt: NOW - 100 * H });
+  const r = await getHome(client, U, "free", { now: NOW });
+  assert.ok("data" in r);
+  assert.deepEqual(r.data.next, { locked: true, month: 2, teaser: "Teaser 2" });
+  assert.deepEqual(Object.keys(r.data.next).sort(), ["locked", "month", "teaser"]);
+  assert.ok(!r.data.progress.some((p) => p.weekNo === 5), "no progress entry for a locked month");
+  const text = JSON.stringify(r);
+  for (const secret of ["LOCKED-WEEK-TITLE", "LOCKED-GOAL", "LOCKED-HANDOUT", "Learn 5", "EXPLAIN"]) assert.ok(!text.includes(secret), secret);
+  // the same user on Pro is simply open
+  const pro = await getHome(world({ completed: done, lastNewStepAt: NOW - 100 * H }).client, U, "pro", { now: NOW });
+  assert.ok("data" in pro && "open" in pro.data.next && pro.data.next.open === true && pro.data.next.month === 2);
+  assert.ok(pro.data.progress.some((p) => p.weekNo === 5));
+});
+
+test("getHome: everything done says done; another user's progress does not count", async () => {
+  const all = [...STEPS_W1, ...STEPS_W2, "s5-1", "s5-2", "s5-3", "s5-4", "s5-5"];
+  const r = await getHome(world({ completed: all }).client, U, "pro", { now: NOW });
+  assert.ok("data" in r && "done" in r.data.next);
+  const other = await getHome(world({ completed: all }).client, "someone-else", "pro", { now: NOW });
+  assert.ok("data" in other && other.data.hasProgress === false);
+});
+
+test("getHome: no answer, explanation, question, body or handout text in the output or in the columns asked for", async () => {
+  const { db, client } = world({ completed: ["s1-1"], reviews: [review("s1-1", 0, NOW - H)] });
+  const r = await getHome(client, U, "pro", { now: NOW });
+  assert.ok("data" in r);
+  assert.doesNotMatch(JSON.stringify(r), ANSWER_WORDS);
+  assert.doesNotMatch(JSON.stringify(r), /HANDOUT/);
+  const asked = db.log.filter((l) => l.op === "select").map((l) => `${l.table}: ${l.cols}`);
+  for (const a of asked) assert.doesNotMatch(a, /prove_correct|prove_explanation|handout_md|learn_body|do_prompt|\*/, a);
+  assert.equal(db.writes().length, 0, "read only");
+});
+
+test("getHome: a bad user, no pack and a database error return a code only", async () => {
+  const bad = await quiet(() => getHome(world().client, "", "free", { now: NOW }));
+  assert.deepEqual(bad.result, { error: { code: "no-user" } });
+  const none = await quiet(() => getHome(world({ extra: (t) => { t.skill_packs = []; } }).client, U, "free", { now: NOW }));
+  assert.deepEqual(none.result, { error: { code: "no-pack" } });
+  const w = world();
+  w.db.faults.push({ table: "skill_step_progress", op: "select", kind: "error" });
+  const err = await quiet(() => getHome(w.client, U, "free", { now: NOW }));
+  assert.deepEqual(err.result, { error: { code: "42501" } });
+  assert.deepEqual(err.lines, ["[skills-server] getHome error code=42501"]);
+  assert.ok(!JSON.stringify(err).includes("PRIVATE-DB-MESSAGE"));
+});
+
+test("getHandout: an open week returns its handout and sources, with no step, question or answer", async () => {
+  const { db, client } = world();
+  const r = await getHandout(client, "free", 1);
+  assert.ok("data" in r);
+  assert.deepEqual(r.data, {
+    packId: "p1", weekId: "w1", weekNo: 1, month: 1, title: "Week one", goalLine: "Goal one", handoutMd: "HANDOUT-ONE",
+    sources: [{ ref: "S1", title: "Source 1", publisher: null, year: 2020, url: "https://example.test/secret-url" }],
+  });
+  assert.doesNotMatch(JSON.stringify(r), ANSWER_WORDS);
+  assert.equal(db.selects("skill_steps").length, 0);
+  assert.equal(db.selects("skill_test_items").length, 0);
+  assert.equal(db.writes().length, 0);
+  const cols = db.log.filter((l) => l.op === "select").map((l) => l.cols).join(" | ");
+  assert.doesNotMatch(cols, /verified|prove_|\*/);
+});
+
+test("getHandout: a locked week returns exactly { locked, month, teaser } and its text is never even selected", async () => {
+  const { db, client } = world();
+  const r = await getHandout(client, "free", 5);
+  assert.deepEqual(r, { locked: true, month: 2, teaser: "Teaser 2" });
+  assert.deepEqual(Object.keys(r).sort(), ["locked", "month", "teaser"]);
+  const cols = db.log.filter((l) => l.op === "select").map((l) => `${l.table}: ${l.cols}`);
+  assert.ok(!cols.some((c) => /handout_md|goal_line|title,|skill_sources|skill_steps/.test(c.replace("skill_months: month_no, title, teaser_line, is_free", ""))), cols.join(" | "));
+  assert.equal(db.selects("skill_sources").length, 0);
+  // the same week for Pro is open
+  const pro = await getHandout(world().client, "pro", 5);
+  assert.ok("data" in pro && pro.data.handoutMd === "LOCKED-HANDOUT");
+  // a database flag that says "not free" keeps even week 1 locked
+  const w = world({ extra: (t) => { t.skill_months![0]!.is_free = false; } });
+  assert.deepEqual(await getHandout(w.client, "free", 1), { locked: true, month: 1, teaser: "Teaser 1" });
+  // a bad tier is free
+  assert.deepEqual(await getHandout(world().client, "gold" as never, 5), { locked: true, month: 2, teaser: "Teaser 2" });
+});
+
+test("getHandout: only http(s) links come through; a missing week, a bad number and a database error are codes", async () => {
+  const w = world({
+    extra: (t) => {
+      t.skill_sources!.push(
+        { id: "x1", week_id: "w1", ref: "S2", title: "Bad", author_or_publisher: "Pub", year: null, url: "javascript:alert(1)" },
+        { id: "x2", week_id: "w1", ref: "S3", title: "Data", author_or_publisher: "  ", year: 1999, url: "data:text/html,hi" },
+      );
+    },
+  });
+  const r = await getHandout(w.client, "free", 1);
+  assert.ok("data" in r);
+  assert.deepEqual(r.data.sources.map((s) => [s.ref, s.url, s.publisher, s.year]), [
+    ["S1", "https://example.test/secret-url", null, 2020],
+    ["S2", null, "Pub", null],
+    ["S3", null, null, 1999],
+  ]);
+  for (const n of [0, 25, 1.5, NaN, -1]) {
+    assert.deepEqual((await quiet(() => getHandout(world().client, "free", n))).result, { error: { code: "no-week" } }, String(n));
+  }
+  assert.deepEqual((await quiet(() => getHandout(world().client, "free", 3))).result, { error: { code: "no-week" } });
+  const f = world();
+  f.db.faults.push({ table: "skill_sources", op: "select", kind: "error" });
+  const err = await quiet(() => getHandout(f.client, "free", 1));
+  assert.deepEqual(err.result, { error: { code: "42501" } });
+  assert.deepEqual(err.lines, ["[skills-server] getHandout error code=42501"]);
+});
+
+test("source: getHome and getHandout never select an answer column and never write", () => {
+  for (const name of ["getHome", "getHandout"]) {
+    const start = source.indexOf(`export async function ${name}(`);
+    const next = source.indexOf("\nexport ", start + 10);
+    const body = source.slice(start, next === -1 ? undefined : next);
+    assert.doesNotMatch(body, /prove_correct|prove_explanation|prove_options|prove_question|learn_body|do_prompt|\bhint\b/, `${name} must not select step content`);
+    assert.doesNotMatch(body, /\.(insert|upsert|update|delete)\(/, `${name} is read only`);
+  }
+  const handout = source.slice(source.indexOf("export async function getHandout("));
+  assert.ok(handout.indexOf("lockedResult(month)") < handout.indexOf("handout_md"), "the month is checked before the handout text is selected");
 });
