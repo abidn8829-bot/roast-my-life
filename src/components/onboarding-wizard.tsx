@@ -9,12 +9,11 @@ import { UpgradeModal } from "@/components/upgrade-modal";
 import { GentleNotice, SafetyPage, SafetyUnavailable } from "@/components/safety-page";
 import { CHECKIN_CHIP_LABELS, type SafetyPayload, type SafetyPagePayload } from "@/lib/safety";
 import { JournalTheme } from "@/components/journal-theme";
-import { errorBox, primaryButton } from "@/components/journal-auth-ui";
+import { errorBox, focusRing, primaryButton } from "@/components/journal-auth-ui";
+import { CHECKIN_CHIP_ICONS, PencilIcon } from "@/components/journal-checkin-art";
+import { EmberFlame } from "@/components/journal-plan-ui";
 import { LoadingArt, QuestionArt } from "@/components/journal-onboarding-art";
 import { QUESTION_NOTES, QuestionProgress, backLink, numberInput, questionTitle, textareaInput } from "@/components/journal-onboarding-ui";
-
-// One emoji per preset check-in button, in the order of CHECKIN_CHIP_LABELS (the wording lives in @/lib/safety).
-const CHECKIN_CHIP_EMOJIS = ["😎", "😅", "🤡"] as const;
 
 const LOADING_MESSAGES = [
   "Analyzing your poor life choices...",
@@ -82,8 +81,10 @@ const PRO_QUESTIONS = [
 
 type Step = number | "persona" | "loading" | "followup" | "checkin-persona" | "checkin";
 
-const inputClass =
-  "w-full rounded-xl border-2 border-border bg-surface px-5 py-4 text-xl text-text outline-none ring-ember focus:ring-2 transition-all";
+// Answer buttons on the check-in screen: ink outline, soft fill. The chosen one is filled sage (a fill, never a text colour).
+const chipBase = `flex min-h-14 w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-base text-text transition ${focusRing}`;
+const chipOff = "border-border-strong-legacy bg-surface hover:bg-surface-2";
+const chipOn = "border-text bg-sage";
 
 export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
   const router = useRouter();
@@ -457,37 +458,37 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
 
   if (isCheckingReturning) {
     return (
-      <div className="w-full max-w-md text-center">
-        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-ember border-t-transparent" />
-        <p className="text-lg text-text animate-pulse">
-          Checking your profile...
-        </p>
-      </div>
+      <JournalTheme className="w-full max-w-md">
+        <div data-journal-screen className="jl w-full" role="status">
+          <LoadingArt />
+          <p className="font-display mt-7 text-[30px] font-medium leading-[1.12]">
+            Checking your profile...
+          </p>
+        </div>
+      </JournalTheme>
     );
   }
 
   if (limitNotice) {
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md text-center">
-          <div className="text-8xl mb-6">🔥</div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-text mb-3">Daily limit reached</h2>
-          <p className="text-lg text-text-muted mb-8">{limitNotice}</p>
-          <button
-            type="button"
-            onClick={() => router.replace("/dashboard")}
-            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-on-accent shadow-ember-glow transition hover:brightness-110"
-          >
-            Back to dashboard
-          </button>
-        </div>
+      <>
+        <JournalTheme className="w-full max-w-md">
+          <div data-journal-screen className="jl flex w-full flex-col">
+            <EmberFlame className="h-16 w-14" />
+            <h2 className={`${questionTitle} mt-5`}>Daily limit reached</h2>
+            <p className="mt-4 text-[17px] leading-relaxed text-text-muted">{limitNotice}</p>
+            <button type="button" onClick={() => router.replace("/dashboard")} className={`${primaryButton} mt-8`}>
+              Back to dashboard
+            </button>
+          </div>
+        </JournalTheme>
         <UpgradeModal
           isOpen={upgradeReason !== null}
           onClose={() => setUpgradeReason(null)}
           reason={upgradeReason ?? undefined}
           userEmail={userEmail}
         />
-      </div>
+      </>
     );
   }
 
@@ -515,88 +516,102 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
 
   if (step === "checkin") {
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-12">
-        <div className="w-full max-w-2xl text-center">
-          <div className="text-9xl mb-8">🔥</div>
-          <h2 className="text-3xl sm:text-4xl font-bold text-text mb-4">
-            Today&apos;s Check-in
-          </h2>
-          {isGeneratingFollowUp ? (
-            <div className="w-full max-w-md text-center">
-              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-ember border-t-transparent" />
-              <p className="text-lg text-text animate-pulse">
-                Loading your question...
-              </p>
-            </div>
-          ) : (
-            <>
-              <p className="text-xl text-text-muted mb-8">
-                {followUpQuestion || "How did your habits go yesterday?"}
-              </p>
-              <div className="mb-5 grid gap-3">
-                {CHECKIN_CHIP_LABELS.map((label, i) => [CHECKIN_CHIP_EMOJIS[i], label] as const).map(([emoji, label]) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => { setFollowUpAnswer(label); setIsCustomCheckIn(false); }}
-                    className={`rounded-xl border px-5 py-4 text-left text-lg transition ${followUpAnswer === label && !isCustomCheckIn ? "border-ember bg-ember-soft text-text" : "border-border bg-surface text-text-muted hover:border-text-faint"}`}
-                  >
-                    <span className="mr-3">{emoji}</span>{label}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => { setIsCustomCheckIn(true); setFollowUpAnswer(""); }}
-                  className={`rounded-xl border px-5 py-4 text-left text-lg transition ${isCustomCheckIn ? "border-ember bg-ember-soft text-text" : "border-border bg-surface text-text-muted hover:border-text-faint"}`}
-                >
-                  <span className="mr-3">✍️</span>Custom answer
-                </button>
+      <>
+        <JournalTheme className="w-full max-w-md">
+          <div data-journal-screen className="jl flex w-full flex-col">
+            <EmberFlame className="h-16 w-14" />
+            <h2 className={`${questionTitle} mt-5`}>
+              Today&apos;s Check-in
+            </h2>
+            {isGeneratingFollowUp ? (
+              <div className="mt-6" role="status">
+                <LoadingArt />
+                <p className="font-display mt-5 text-[24px] font-medium leading-tight">
+                  Loading your question...
+                </p>
               </div>
-              {isCustomCheckIn && (
-                <textarea
-                  rows={3}
-                  placeholder="Your answer..."
-                  value={followUpAnswer}
-                  onChange={(e) => setFollowUpAnswer(e.target.value)}
-                  className={`ph-no-capture ${inputClass} resize-y min-h-[6rem] mb-6`}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      void onCheckInSubmit();
-                    }
-                  }}
-                />
-              )}
-              <button
-                onClick={() => void onCheckInSubmit()}
-                disabled={!followUpAnswer.trim() || isGenerating}
-                className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-on-accent shadow-ember-glow transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Continue →
-              </button>
-              {error ? <p className="mt-4 text-sm text-grade-f">{error}</p> : null}
-            </>
-          )}
-        </div>
+            ) : (
+              <>
+                <p className="mt-4 text-[17px] leading-relaxed text-text-muted">
+                  {followUpQuestion || "How did your habits go yesterday?"}
+                </p>
+                <div className="mt-7 grid gap-3">
+                  {CHECKIN_CHIP_LABELS.map((label, i) => {
+                    const Icon = CHECKIN_CHIP_ICONS[i];
+                    const chosen = followUpAnswer === label && !isCustomCheckIn;
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        aria-pressed={chosen}
+                        onClick={() => { setFollowUpAnswer(label); setIsCustomCheckIn(false); }}
+                        className={`${chipBase} ${chosen ? chipOn : chipOff}`}
+                      >
+                        <Icon />
+                        {label}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    aria-pressed={isCustomCheckIn}
+                    onClick={() => { setIsCustomCheckIn(true); setFollowUpAnswer(""); }}
+                    className={`${chipBase} ${isCustomCheckIn ? chipOn : chipOff}`}
+                  >
+                    <PencilIcon />
+                    Custom answer
+                  </button>
+                </div>
+                {isCustomCheckIn && (
+                  <textarea
+                    rows={3}
+                    placeholder="Your answer..."
+                    value={followUpAnswer}
+                    onChange={(e) => setFollowUpAnswer(e.target.value)}
+                    className={`ph-no-capture ${textareaInput} mt-5`}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void onCheckInSubmit();
+                      }
+                    }}
+                  />
+                )}
+                <button
+                  onClick={() => void onCheckInSubmit()}
+                  disabled={!followUpAnswer.trim() || isGenerating}
+                  className={`${primaryButton} mt-8`}
+                >
+                  Continue →
+                </button>
+                {error ? (
+                  <p role="alert" className={`${errorBox} mt-4`}>
+                    {error}
+                  </p>
+                ) : null}
+              </>
+            )}
+          </div>
+        </JournalTheme>
         <UpgradeModal
           isOpen={upgradeReason !== null}
           onClose={() => setUpgradeReason(null)}
           reason={upgradeReason ?? undefined}
           userEmail={userEmail}
         />
-      </div>
+      </>
     );
   }
 
   if (step === "followup") {
     return (
-      <div className="flex min-h-screen w-full flex-col items-center justify-center px-4 py-12">
-        <div className="w-full max-w-2xl text-center">
-          <div className="text-9xl mb-8">🔥</div>
-          <h2 className="text-3xl sm:text-4xl font-bold text-text mb-6">
+      <JournalTheme className="w-full max-w-md">
+        <div data-journal-screen className="jl flex w-full flex-col">
+          <EmberFlame className="h-16 w-14" />
+          <h2 className={`${questionTitle} mt-5`}>
             One more thing...
           </h2>
-          <p className="text-xl text-text-muted mb-8">
+          <p className="mt-4 text-[17px] leading-relaxed text-text-muted">
             {followUpQuestion}
           </p>
           <textarea
@@ -604,7 +619,7 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
             placeholder="Your answer..."
             value={followUpAnswer}
             onChange={(e) => setFollowUpAnswer(e.target.value)}
-            className={`ph-no-capture ${inputClass} resize-y min-h-[6rem] mb-6`}
+            className={`ph-no-capture ${textareaInput} mt-7`}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -615,12 +630,12 @@ export function OnboardingWizard({ userEmail }: { userEmail?: string }) {
           <button
             onClick={onFollowUpSubmit}
             disabled={!followUpAnswer.trim()}
-            className="w-full rounded-xl bg-ember px-8 py-4 text-xl font-semibold text-on-accent shadow-ember-glow transition hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`${primaryButton} mt-8`}
           >
             Get Roasted →
           </button>
         </div>
-      </div>
+      </JournalTheme>
     );
   }
 
