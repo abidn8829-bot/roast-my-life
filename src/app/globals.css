@@ -69,9 +69,13 @@
    Opt-in per page: render <JournalTheme> (src/components/journal-theme.tsx) around
    the page. The html:has() selector puts the tokens on <html>, so the body, native
    dialogs and their ::backdrop all follow; [data-theme] alone covers the wrapper.
-   --grade-* are intentionally NOT set here yet. */
+   --grade-* are intentionally NOT set here yet.
+   [data-theme="journal-scope"] gets the same values on ONE subtree and does NOT reach <html>: the upgrade
+   modal uses it so it looks like the journal even where the page behind it is dark or sits inside a
+   [data-theme="dark"] wrapper. */
 html:has([data-theme="journal"]),
-[data-theme="journal"] {
+[data-theme="journal"],
+[data-theme="journal-scope"] {
   --bg: #dce6ee;
   --surface: #ecf1f6;
   --surface-2: #b9c9d8;
@@ -108,7 +112,8 @@ html:has([data-theme="journal"]),
 
 /* Fonts are resolved on the wrapper itself, because the next/font variables
    (--font-sora etc.) are only defined on that element, not on <html>. */
-[data-theme="journal"] {
+[data-theme="journal"],
+[data-theme="journal-scope"] {
   --font-body: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
 }
 
