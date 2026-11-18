@@ -385,7 +385,7 @@ export function RoastView({
                   <StepMarker onDark />
                   <div className="flex min-w-0 flex-col gap-1">
                     <p className="break-words text-base text-bg min-[1280px]:text-sm min-[1280px]:leading-[1.4]">{s.step}</p>
-                    <p className="break-words text-sm text-powder min-[1280px]:text-[13px] min-[1280px]:leading-[1.4]">{s.why}</p>
+                    <p className="break-words text-sm text-bg/85 min-[1280px]:text-[13px] min-[1280px]:leading-[1.4]">{s.why}</p>
                   </div>
                 </li>
               ))}

@@ -1,6 +1,39 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+
+// The prompt sits on the dashboard, which is not on the journal theme yet. <JournalTheme> would also repaint the
+// whole page (its tokens are set on <html>), so the journal values are scoped to this one card instead. The values
+// are the ones in globals.css under [data-theme="journal"]. Once the dashboard is wrapped in <JournalTheme> this
+// scope is simply redundant.
+const JOURNAL_SCOPE = {
+  "--surface": "#ecf1f6",
+  "--text": "#293a35",
+  "--text-muted": "#555750",
+  "--text-faint": "#566563",
+  "--border": "rgba(41, 58, 53, 0.13)",
+  "--border-strong-legacy": "rgba(41, 58, 53, 0.28)",
+  "--ember": "#293a35",
+  "--on-accent": "#dce6ee",
+} as CSSProperties;
+
+const RING = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text";
+
+/** A small hand-drawn bell: ink stroke with a clay clapper, decoration only (same stroke style as journal-roast-ui). */
+function BellMark() {
+  return (
+    <svg className="h-8 w-8 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true" focusable="false">
+      <path
+        d="M7 22 C 9 19, 9 15, 10 12 C 11 7, 14 5, 16 5 C 19 5, 21 8, 22 12 C 23 16, 23 19, 25 22 C 21 23, 11 23, 7 22 Z"
+        stroke="var(--text)"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M13 26 C 14 28, 18 28, 19 26" stroke="var(--clay)" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -103,16 +136,25 @@ export function PushPermissionPrompt() {
   if (!visible) return null;
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-      <p className="text-sm text-text-muted">Want Ember to roast you when you forget to check in?</p>
+    <div
+      style={JOURNAL_SCOPE}
+      className="flex flex-col gap-4 rounded-xl border border-border-strong-legacy bg-surface px-4 py-4 text-text min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between"
+    >
+      <div className="flex items-center gap-3">
+        <BellMark />
+        <p className="text-sm leading-snug text-text">Want Ember to roast you when you forget to check in?</p>
+      </div>
       <div className="flex shrink-0 gap-2">
-        <button onClick={dismiss} className="rounded-xl px-3 py-1.5 text-sm text-text-faint hover:text-text-muted">
+        <button
+          onClick={dismiss}
+          className={`inline-flex min-h-11 items-center rounded-xl px-4 text-sm text-text-muted underline underline-offset-4 hover:text-text ${RING}`}
+        >
           No
         </button>
         <button
           onClick={() => void enable()}
           disabled={busy}
-          className="rounded-xl bg-ember px-3 py-1.5 text-sm font-medium text-on-accent transition hover:brightness-110 disabled:opacity-50"
+          className={`inline-flex min-h-11 items-center rounded-xl bg-ember px-5 text-sm font-medium text-on-accent transition hover:opacity-90 disabled:cursor-not-allowed disabled:bg-text-faint disabled:hover:opacity-100 ${RING}`}
         >
           {busy ? "..." : "Turn on"}
         </button>
